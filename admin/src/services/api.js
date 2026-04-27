@@ -74,4 +74,12 @@ export const leadService = {
   stats: () => api.get('/leads/stats'),
 };
 
+export const configService = {
+  getAll: () => api.get('/configs'),
+  get: (key) => api.get(`/configs/${key}`),
+  update: (data) => api.put('/configs', data),
+  bulkUpdate: (configs) => api.patch('/configs/bulk', { configs }),
+  seed: () => api.post('/configs/seed'),
+};
+
 export default api;

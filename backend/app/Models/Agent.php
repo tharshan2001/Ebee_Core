@@ -61,9 +61,9 @@ class Agent extends Model implements AuthenticatableContract
         }
 
         if ($this->commission_tier === 'performance') {
-            return 7.0;
+            return (float) Config::get('commission_performance_rate', 7);
         }
 
-        return 5.0;
+        return (float) Config::get('commission_default_rate', 5);
     }
 }

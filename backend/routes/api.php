@@ -53,3 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::apiResource('leads', LeadController::class);
 Route::post('leads/{lead}/convert', [LeadController::class, 'convert']);
 Route::get('leads/stats', [LeadController::class, 'stats']);
+
+Route::get('configs', [ConfigController::class, 'index']);
+Route::get('configs/{key}', [ConfigController::class, 'get']);
+Route::put('configs', [ConfigController::class, 'update']);
+Route::patch('configs/bulk', [ConfigController::class, 'bulkUpdate']);
+Route::post('configs/seed', [ConfigController::class, 'seed']);

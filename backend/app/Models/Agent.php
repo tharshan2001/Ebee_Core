@@ -49,6 +49,11 @@ class Agent extends Model implements AuthenticatableContract
         return $this->hasMany(Commission::class);
     }
 
+    public function leads(): HasMany
+    {
+        return $this->hasMany(Lead::class);
+    }
+
     public function getCommissionRateAttribute(): float
     {
         if ($this->commission_tier === 'custom' && $this->custom_rate) {

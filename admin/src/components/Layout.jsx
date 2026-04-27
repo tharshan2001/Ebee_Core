@@ -1,5 +1,6 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Package, FolderTree, LayoutDashboard, Settings, Users, ShoppingCart } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Package, FolderTree, LayoutDashboard, Settings, Users, ShoppingCart, LogOut } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -12,6 +13,13 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen flex bg-[#fffefb]">
@@ -41,6 +49,15 @@ export default function Layout() {
             );
           })}
         </nav>
+        <div className="absolute bottom-0 w-56 p-4 border-t border-[#c5c0b1]">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg w-full text-[#36342e] hover:bg-[#eceae3] transition-colors"
+          >
+            <LogOut size={18} />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
       </aside>
       <main className="flex-1 ml-56">
         <div className="p-8">

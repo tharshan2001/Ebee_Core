@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\DriverController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\ConfigController;
+use App\Http\Controllers\Api\AuthController;
+
+Route::post('auth/login', [AuthController::class, 'login']);
 
 Route::get('dashboard/stats', [DashboardController::class, 'getStats']);
 Route::get('dashboard/recent-products', [DashboardController::class, 'getRecentProducts']);
@@ -60,3 +63,8 @@ Route::get('configs/{key}', [ConfigController::class, 'get']);
 Route::put('configs', [ConfigController::class, 'update']);
 Route::patch('configs/bulk', [ConfigController::class, 'bulkUpdate']);
 Route::post('configs/seed', [ConfigController::class, 'seed']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('auth/me', [AuthController::class, 'me']);
+    Route::post('auth/logout', [AuthController::class, 'logout']);
+});

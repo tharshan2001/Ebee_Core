@@ -6,8 +6,17 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 });
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error.response?.status, error.response?.data);
+    return Promise.reject(error);
+  }
+);
 
 export const productService = {
   getAll: (params) => api.get('/products', { params }),

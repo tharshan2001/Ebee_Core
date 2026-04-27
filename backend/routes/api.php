@@ -20,9 +20,9 @@ Route::apiResource('products', ProductController::class);
 Route::get('products/lookup/{sku}', [ProductController::class, 'lookup']);
 Route::apiResource('categories', CategoryController::class);
 
+Route::get('agents/stats', [AgentController::class, 'stats']);
 Route::apiResource('agents', AgentController::class);
 Route::patch('agents/{agent}/toggle-status', [AgentController::class, 'toggleStatus']);
-Route::get('agents/stats', [AgentController::class, 'stats']);
 
 Route::post('agents/login', [AgentController::class, 'login']);
 Route::post('agents/register', [AgentController::class, 'store']);
@@ -35,16 +35,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('agents/orders', [OrderController::class, 'myOrders']);
 });
 
+Route::get('orders/stats', [OrderController::class, 'stats']);
+Route::get('orders/zones', [OrderController::class, 'zones']);
 Route::apiResource('orders', OrderController::class);
 Route::get('orders/{order}/timeline', [OrderController::class, 'timeline']);
 Route::post('orders/{order}/assign-driver', [OrderController::class, 'assignDriver']);
 Route::post('orders/{order}/resolve-attribution', [OrderController::class, 'resolveAttribution']);
-Route::get('orders/stats', [OrderController::class, 'stats']);
-Route::get('orders/zones', [OrderController::class, 'zones']);
 
+Route::post('drivers/login', [DriverController::class, 'login']);
 Route::apiResource('drivers', DriverController::class);
 Route::patch('drivers/{driver}/toggle-status', [DriverController::class, 'toggleStatus']);
-Route::post('drivers/login', [DriverController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('drivers/me/deliveries', [DriverController::class, 'myDeliveries']);

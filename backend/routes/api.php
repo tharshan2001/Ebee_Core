@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AgentController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\DriverController;
 use App\Http\Controllers\Api\LeadController;
+use App\Http\Controllers\Api\ConfigController;
 
 Route::get('dashboard/stats', [DashboardController::class, 'getStats']);
 Route::get('dashboard/recent-products', [DashboardController::class, 'getRecentProducts']);

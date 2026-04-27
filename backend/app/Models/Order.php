@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -51,12 +51,12 @@ class Order extends Model
         return $this->belongsTo(User::class, 'customer_id');
     }
 
-    public function delivery(): HasMany
+    public function delivery(): HasOne
     {
         return $this->hasOne(Delivery::class);
     }
 
-    public function commission(): HasMany
+    public function commission(): HasOne
     {
         return $this->hasOne(Commission::class);
     }

@@ -162,6 +162,41 @@ public class ProductService {
     }
 
     @Transactional
+    public ProductResponse addImagesToProduct(UUID id, List<MultipartFile> images) throws IOException {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        List<ProductImage> existingImages = productImageRepository.findByProductIdOrderBySortOrder(id);
+        int sortOrder = existingImages.size();
+
+        if (sortOrder >= 10) {
+            throw new IllegalStateException("Product already has maximum of 10 images");
+        }
+
+        for (MultipartFile image : images) {
+            if (sortOrder >= 10) break;
+            if (image != null && !image.isEmpty()) {
+                String imageUrl = s3Service.uploadFile(image, "products/" + id);
+                ProductImage productImage = ProductImage.builder()
+                        .product(product)
+                        .imageUrl(imageUrl)
+                        .imageName(image.getOriginalFilename())
+                        .imageType(image.getContentType())
+                        .sortOrder(sortOrder++)
+                        .build();
+                productImageRepository.save(productImage);
+            }
+        }
+
+        ProductResponse response = productMapper.toResponse(product);
+        List<String> imageUrls = existingImages.stream()
+                .map(ProductImage::getImageUrl)
+                .collect(java.util.stream.Collectors.toList());
+        response.setImageUrls(imageUrls);
+        return response;
+    }
+
+    @Transactional
     public void deleteProduct(UUID id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));

@@ -111,6 +111,16 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
     }
 
+    @PostMapping("/{id}/images")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ProductResponse>> uploadProductImages(
+            @PathVariable UUID id,
+            @RequestParam("images") MultipartFile[] images) throws IOException {
+
+        ProductResponse response = productService.addImagesToProduct(id, Arrays.asList(images));
+        return ResponseEntity.ok(ApiResponse.success("Images uploaded successfully", response));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {

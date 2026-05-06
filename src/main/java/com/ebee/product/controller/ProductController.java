@@ -10,7 +10,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,9 +25,32 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(@Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
+            @RequestParam("name") String name,
+            @RequestParam("sku") String sku,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("category") String category,
+            @RequestParam("price") BigDecimal price,
+            @RequestParam("costPrice") BigDecimal costPrice,
+            @RequestParam("quantityInStock") Integer quantityInStock,
+            @RequestParam(value = "reorderLevel", required = false) Integer reorderLevel,
+            @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
+
+        ProductRequest request = new ProductRequest();
+        request.setName(name);
+        request.setSku(sku);
+        request.setDescription(description);
+        request.setCategory(category);
+        request.setPrice(price);
+        request.setCostPrice(costPrice);
+        request.setQuantityInStock(quantityInStock);
+        request.setReorderLevel(reorderLevel);
+        if (images != null) {
+            request.setImages(Arrays.asList(images));
+        }
+
         ProductResponse response = productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Product created successfully", response));
@@ -53,11 +80,33 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(value = "/{id}", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable UUID id,
-            @Valid @RequestBody ProductRequest request) {
+            @RequestParam("name") String name,
+            @RequestParam("sku") String sku,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("category") String category,
+            @RequestParam("price") BigDecimal price,
+            @RequestParam("costPrice") BigDecimal costPrice,
+            @RequestParam("quantityInStock") Integer quantityInStock,
+            @RequestParam(value = "reorderLevel", required = false) Integer reorderLevel,
+            @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
+
+        ProductRequest request = new ProductRequest();
+        request.setName(name);
+        request.setSku(sku);
+        request.setDescription(description);
+        request.setCategory(category);
+        request.setPrice(price);
+        request.setCostPrice(costPrice);
+        request.setQuantityInStock(quantityInStock);
+        request.setReorderLevel(reorderLevel);
+        if (images != null) {
+            request.setImages(Arrays.asList(images));
+        }
+
         ProductResponse response = productService.updateProduct(id, request);
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
     }

@@ -4,8 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ProductRequest {
@@ -31,4 +33,6 @@ public class ProductRequest {
     private Integer quantityInStock;
 
     private Integer reorderLevel;
+
+    private List<MultipartFile> images;
 }

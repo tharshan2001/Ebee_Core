@@ -1,5 +1,7 @@
 package com.ebee.agent.entity;
 
+import com.ebee.order.entity.Order;
+import com.ebee.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +11,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -23,8 +27,9 @@ public class Agent {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private UUID userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     @Column(nullable = false)
     private String agentCode;
@@ -46,6 +51,9 @@ public class Agent {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @OneToMany(mappedBy = "agent")
+    private List<Order> orders = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

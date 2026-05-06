@@ -2,6 +2,7 @@ package com.ebee.agent.controller;
 
 import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
+import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.service.AgentService;
 import com.ebee.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -58,8 +59,15 @@ public class AgentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateAgent(
             @PathVariable UUID id,
-            @Valid @RequestBody AgentRequest request) {
+            @Valid @RequestBody AgentUpdateRequest request) {
         AgentResponse response = agentService.updateAgent(id, request);
         return ResponseEntity.ok(ApiResponse.success("Agent updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteAgent(@PathVariable UUID id) {
+        agentService.deleteAgent(id);
+        return ResponseEntity.ok(ApiResponse.success("Agent deleted successfully"));
     }
 }

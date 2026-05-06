@@ -2,8 +2,10 @@ package com.ebee.agent.service;
 
 import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
+import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
+import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -25,18 +27,18 @@ public class AgentService {
     @Transactional
     public AgentResponse createAgent(AgentRequest request) {
         User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
 
         if (!user.getRole().equals(RoleType.AGENT)) {
-            throw new RuntimeException("User must have AGENT role");
+            throw new IllegalArgumentException("User must have AGENT role");
         }
 
         if (agentRepository.existsByAgentCode(request.getAgentCode())) {
-            throw new RuntimeException("Agent code already exists");
+            throw new IllegalArgumentException("Agent code already exists");
         }
 
         Agent agent = Agent.builder()
-                .userId(request.getUserId())
+                .user(user)
                 .agentCode(request.getAgentCode())
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(request.getCommissionRate())
@@ -48,13 +50,13 @@ public class AgentService {
 
     public AgentResponse getAgentById(UUID id) {
         Agent agent = agentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Agent not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
         return mapToResponse(agent);
     }
 
     public AgentResponse getAgentByUserId(UUID userId) {
         Agent agent = agentRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Agent not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
         return mapToResponse(agent);
     }
 
@@ -65,13 +67,13 @@ public class AgentService {
     }
 
     @Transactional
-    public AgentResponse updateAgent(UUID id, AgentRequest request) {
+    public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) {
         Agent agent = agentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Agent not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
 
         if (!agent.getAgentCode().equals(request.getAgentCode()) &&
             agentRepository.existsByAgentCode(request.getAgentCode())) {
-            throw new RuntimeException("Agent code already exists");
+            throw new IllegalArgumentException("Agent code already exists");
         }
 
         agent.setAgentCode(request.getAgentCode());
@@ -83,14 +85,22 @@ public class AgentService {
 
     public AgentResponse getAgentByAgentCode(String agentCode) {
         Agent agent = agentRepository.findByAgentCode(agentCode)
-                .orElseThrow(() -> new RuntimeException("Agent not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", agentCode));
         return mapToResponse(agent);
+    }
+
+    @Transactional
+    public void deleteAgent(UUID id) {
+        Agent agent = agentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+        agent.setIsActive(false);
+        agentRepository.save(agent);
     }
 
     private AgentResponse mapToResponse(Agent agent) {
         AgentResponse response = new AgentResponse();
         response.setId(agent.getId());
-        response.setUserId(agent.getUserId());
+        response.setUserId(agent.getUser().getId());
         response.setAgentCode(agent.getAgentCode());
         response.setPhoneNumber(agent.getPhoneNumber());
         response.setCommissionRate(agent.getCommissionRate());

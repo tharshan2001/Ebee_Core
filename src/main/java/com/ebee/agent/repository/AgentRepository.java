@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface AgentRepository extends JpaRepository<Agent, UUID> {
 
     Optional<Agent> findByUserId(UUID userId);
+    boolean existsByUserId(UUID userId);
     boolean existsByAgentCode(String agentCode);
     Optional<Agent> findByAgentCode(String agentCode);
 }

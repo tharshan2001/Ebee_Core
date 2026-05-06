@@ -24,8 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +40,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final SecurityService securityService;
     private final StockService stockService;
+    private final OrderNumberService orderNumberService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -55,7 +54,7 @@ public class OrderService {
         User currentUser = userRepository.findById(securityService.getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
 
-        String orderNumber = generateOrderNumber();
+        String orderNumber = orderNumberService.generateOrderNumber();
 
         Order order = Order.builder()
                 .agent(agent)
@@ -174,11 +173,5 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
         return orderMapper.toResponse(updatedOrder);
-    }
-
-    private String generateOrderNumber() {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        String prefix = "ORD";
-        return prefix + "-" + timestamp;
     }
 }

@@ -27,6 +27,7 @@
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
 		<lombok.version>1.18.30</lombok.version>
 		<mockito.version>5.5.0</mockito.version>
+		<awssdk.version>2.20.0</awssdk.version>
 	</properties>
 
 	<dependencyManagement>
@@ -121,6 +122,13 @@
 			<artifactId>mapstruct-processor</artifactId>
 			<version>${mapstruct.version}</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<!-- AWS S3 -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>${awssdk.version}</version>
 		</dependency>
 
 		<!-- Testing -->

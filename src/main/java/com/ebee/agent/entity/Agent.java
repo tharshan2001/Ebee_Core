@@ -55,9 +55,8 @@ public class Agent {
     @Column(name = "nic_number")
     private String nicNumber;
 
-    @Lob
-    @Column(name = "nic_document", columnDefinition = "BYTEA")
-    private byte[] nicDocument;
+    @Column(name = "nic_document_url")
+    private String nicDocumentUrl;
 
     @Column(name = "nic_document_name")
     private String nicDocumentName;
@@ -65,9 +64,8 @@ public class Agent {
     @Column(name = "nic_document_type")
     private String nicDocumentType;
 
-    @Lob
-    @Column(name = "bank_passbook_document", columnDefinition = "BYTEA")
-    private byte[] bankPassbookDocument;
+    @Column(name = "bank_passbook_document_url")
+    private String bankPassbookDocumentUrl;
 
     @Column(name = "bank_passbook_document_name")
     private String bankPassbookDocumentName;

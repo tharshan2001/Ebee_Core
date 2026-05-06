@@ -18,8 +18,10 @@ public class AgentResponse {
     private Boolean isActive;
 
     private String nicNumber;
+    private String nicDocumentUrl;
     private String nicDocumentName;
     private String nicDocumentType;
+    private String bankPassbookDocumentUrl;
     private String bankPassbookDocumentName;
     private String bankPassbookDocumentType;
     private String bankAccountNumber;

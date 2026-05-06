@@ -6,6 +6,7 @@ import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.service.S3Service;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -25,6 +26,7 @@ public class AgentService {
 
     private final AgentRepository agentRepository;
     private final UserRepository userRepository;
+    private final S3Service s3Service;
 
     @Transactional
     public AgentResponse createAgent(AgentRequest request) throws IOException {
@@ -50,16 +52,18 @@ public class AgentService {
                 .bankBranch(request.getBankBranch())
                 .build();
 
-        // Handle NIC document upload
+        // Handle NIC document upload to S3
         if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
-            agent.setNicDocument(request.getNicDocument().getBytes());
+            String nicUrl = s3Service.uploadFile(request.getNicDocument(), "agents/nic");
+            agent.setNicDocumentUrl(nicUrl);
             agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
             agent.setNicDocumentType(request.getNicDocument().getContentType());
         }
 
-        // Handle Bank Passbook document upload
+        // Handle Bank Passbook document upload to S3
         if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
-            agent.setBankPassbookDocument(request.getBankPassbookDocument().getBytes());
+            String passbookUrl = s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook");
+            agent.setBankPassbookDocumentUrl(passbookUrl);
             agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
             agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
         }
@@ -104,16 +108,26 @@ public class AgentService {
         agent.setBankName(request.getBankName());
         agent.setBankBranch(request.getBankBranch());
 
-        // Handle NIC document upload
+        // Handle NIC document upload to S3
         if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
-            agent.setNicDocument(request.getNicDocument().getBytes());
+            // Delete old file if exists
+            if (agent.getNicDocumentUrl() != null) {
+                s3Service.deleteFile(agent.getNicDocumentUrl());
+            }
+            String nicUrl = s3Service.uploadFile(request.getNicDocument(), "agents/nic");
+            agent.setNicDocumentUrl(nicUrl);
             agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
             agent.setNicDocumentType(request.getNicDocument().getContentType());
         }
 
-        // Handle Bank Passbook document upload
+        // Handle Bank Passbook document upload to S3
         if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
-            agent.setBankPassbookDocument(request.getBankPassbookDocument().getBytes());
+            // Delete old file if exists
+            if (agent.getBankPassbookDocumentUrl() != null) {
+                s3Service.deleteFile(agent.getBankPassbookDocumentUrl());
+            }
+            String passbookUrl = s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook");
+            agent.setBankPassbookDocumentUrl(passbookUrl);
             agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
             agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
         }
@@ -155,8 +169,10 @@ public class AgentService {
         response.setIsActive(agent.getIsActive());
 
         response.setNicNumber(agent.getNicNumber());
+        response.setNicDocumentUrl(agent.getNicDocumentUrl());
         response.setNicDocumentName(agent.getNicDocumentName());
         response.setNicDocumentType(agent.getNicDocumentType());
+        response.setBankPassbookDocumentUrl(agent.getBankPassbookDocumentUrl());
         response.setBankPassbookDocumentName(agent.getBankPassbookDocumentName());
         response.setBankPassbookDocumentType(agent.getBankPassbookDocumentType());
         response.setBankAccountNumber(agent.getBankAccountNumber());

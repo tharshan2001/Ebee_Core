@@ -55,7 +55,7 @@ public class AgentController {
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateAgent(
             @PathVariable UUID id,
@@ -71,7 +71,7 @@ public class AgentController {
         return ResponseEntity.ok(ApiResponse.success("Agent deleted successfully"));
     }
 
-    @PutMapping("/{id}/commission-rate")
+    @PatchMapping("/{id}/commission-rate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateCommissionRate(
             @PathVariable UUID id,

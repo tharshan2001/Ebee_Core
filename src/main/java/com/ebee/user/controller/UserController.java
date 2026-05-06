@@ -62,7 +62,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", response));
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @securityService.isCurrentUser(#id, authentication)")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable UUID id,

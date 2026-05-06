@@ -53,7 +53,7 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable UUID id,

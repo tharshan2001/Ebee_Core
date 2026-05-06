@@ -29,7 +29,7 @@ public class CommissionConfigController {
                 .body(ApiResponse.success("Commission config created successfully", response));
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> updateConfig(
             @PathVariable UUID id,

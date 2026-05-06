@@ -70,4 +70,13 @@ public class AgentController {
         agentService.deleteAgent(id);
         return ResponseEntity.ok(ApiResponse.success("Agent deleted successfully"));
     }
+
+    @PutMapping("/{id}/commission-rate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgentResponse>> updateCommissionRate(
+            @PathVariable UUID id,
+            @RequestParam Double commissionRate) {
+        AgentResponse response = agentService.updateCommissionRate(id, commissionRate);
+        return ResponseEntity.ok(ApiResponse.success("Commission rate updated successfully", response));
+    }
 }

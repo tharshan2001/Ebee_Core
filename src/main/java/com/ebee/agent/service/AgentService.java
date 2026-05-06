@@ -97,6 +97,14 @@ public class AgentService {
         agentRepository.save(agent);
     }
 
+    @Transactional
+    public AgentResponse updateCommissionRate(UUID id, Double commissionRate) {
+        Agent agent = agentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+        agent.setCommissionRate(commissionRate);
+        return mapToResponse(agentRepository.save(agent));
+    }
+
     private AgentResponse mapToResponse(Agent agent) {
         AgentResponse response = new AgentResponse();
         response.setId(agent.getId());

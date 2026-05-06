@@ -9,16 +9,10 @@ import com.ebee.commission.entity.CommissionConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.factory.Mappers;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface CommissionMapper {
 
-    CommissionMapper INSTANCE = Mappers.getMapper(CommissionMapper.class);
-
-    @Mapping(target = "agent", ignore = true)
-    @Mapping(target = "order", ignore = true)
-    @Mapping(target = "config", ignore = true)
     Commission toEntity(CommissionRequest request);
 
     @Mapping(target = "agentId", source = "agent.id")

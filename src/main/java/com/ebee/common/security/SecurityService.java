@@ -26,4 +26,15 @@ public class SecurityService {
                 .map(user -> user.getId().equals(userId))
                 .orElse(false);
     }
+
+    public UUID getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new IllegalStateException("No authenticated user found");
+        }
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .map(user -> user.getId())
+                .orElseThrow(() -> new IllegalStateException("User not found for email: " + email));
+    }
 }

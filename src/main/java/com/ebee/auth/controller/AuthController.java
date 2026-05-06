@@ -43,10 +43,6 @@ public class AuthController {
         refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
         response.addCookie(refreshCookie);
 
-        // Remove tokens from response body for security
-        authResponse.setToken(null);
-        authResponse.setRefreshToken(null);
-
         return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
     }
 
@@ -112,10 +108,6 @@ public class AuthController {
         newRefreshCookie.setPath("/api/auth/refresh");
         newRefreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
         response.addCookie(newRefreshCookie);
-
-        // Remove tokens from response body
-        authResponse.setToken(null);
-        authResponse.setRefreshToken(null);
 
         return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
     }

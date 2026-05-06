@@ -86,11 +86,4 @@ public class ProductService {
         productRepository.save(product);
     }
 
-    @Transactional
-    public void updateStock(UUID id, Integer quantityChange) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
-        product.setQuantityInStock(product.getQuantityInStock() + quantityChange);
-        productRepository.save(product);
-    }
 }

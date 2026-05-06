@@ -5,6 +5,7 @@ import com.ebee.common.security.SecurityService;
 import com.ebee.user.dto.UserProfileResponse;
 import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
+import com.ebee.user.dto.UserUpdateRequest;
 import com.ebee.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +66,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN') or @securityService.isCurrentUser(#id, authentication)")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable UUID id,
-            @Valid @RequestBody UserRequest request) {
+            @Valid @RequestBody UserUpdateRequest request) {
         UserResponse response = userService.updateUser(id, request);
         return ResponseEntity.ok(ApiResponse.success("User updated successfully", response));
     }

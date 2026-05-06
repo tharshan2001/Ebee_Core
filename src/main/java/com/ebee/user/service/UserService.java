@@ -4,6 +4,7 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.user.dto.UserProfileResponse;
 import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
+import com.ebee.user.dto.UserUpdateRequest;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.enums.UserStatus;
@@ -66,7 +67,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateUser(UUID id, UserRequest request) {
+    public UserResponse updateUser(UUID id, UserUpdateRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 

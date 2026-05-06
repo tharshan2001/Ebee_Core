@@ -1,5 +1,8 @@
 package com.ebee.user.entity;
 
+import com.ebee.agent.entity.Agent;
+import com.ebee.order.entity.Order;
+import com.ebee.stock.entity.Stock;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.enums.UserStatus;
 import jakarta.persistence.*;
@@ -11,6 +14,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -52,6 +57,15 @@ public class User {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @OneToMany(mappedBy = "user")
+    private List<Agent> agents = new ArrayList<>();
+
+    @OneToMany(mappedBy = "createdBy")
+    private List<Stock> stockMovements = new ArrayList<>();
+
+    @OneToMany(mappedBy = "createdBy")
+    private List<Order> orders = new ArrayList<>();
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

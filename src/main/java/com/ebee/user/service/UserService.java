@@ -33,9 +33,7 @@ public class UserService {
         }
 
         User user = userMapper.toEntity(request);
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
+        encodePasswordIfPresent(user, request.getPassword());
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -80,10 +78,7 @@ public class UserService {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhoneNumber(request.getPhoneNumber());
-
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
+        encodePasswordIfPresent(user, request.getPassword());
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -107,5 +102,11 @@ public class UserService {
         user.setStatus(UserStatus.ACTIVE);
         user.setIsActive(true);
         return userMapper.toResponse(userRepository.save(user));
+    }
+
+    private void encodePasswordIfPresent(User user, String rawPassword) {
+        if (rawPassword != null && !rawPassword.isEmpty()) {
+            user.setPassword(passwordEncoder.encode(rawPassword));
+        }
     }
 }

@@ -68,4 +68,14 @@ public class ProductController {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully"));
     }
+
+    @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ProductResponse>> updateStock(
+            @PathVariable UUID id,
+            @RequestParam Integer quantityChange) {
+        productService.updateStock(id, quantityChange);
+        ProductResponse response = productService.getProductById(id);
+        return ResponseEntity.ok(ApiResponse.success("Stock updated successfully", response));
+    }
 }

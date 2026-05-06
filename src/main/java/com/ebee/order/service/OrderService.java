@@ -95,9 +95,7 @@ public class OrderService {
             order.getItems().add(item);
             totalAmount = totalAmount.add(subtotal);
 
-            product.setQuantityInStock(currentStock - itemRequest.getQuantity());
-            productRepository.save(product);
-
+            // Update stock through StockService
             StockRequest stockRequest = new StockRequest();
             stockRequest.setProductId(itemRequest.getProductId());
             stockRequest.setQuantityChange(-itemRequest.getQuantity());
@@ -164,9 +162,6 @@ public class OrderService {
 
         for (OrderItem item : order.getItems()) {
             Product product = item.getProduct();
-            int newStock = product.getQuantityInStock() + item.getQuantity();
-            product.setQuantityInStock(newStock);
-            productRepository.save(product);
 
             StockRequest stockRequest = new StockRequest();
             stockRequest.setProductId(product.getId());

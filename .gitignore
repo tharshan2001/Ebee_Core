@@ -38,3 +38,4 @@ application-prod.yml
 # Test
 surefire-reports/
 failsafe-reports/
+cookies.txt

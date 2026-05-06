@@ -8,6 +8,7 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.commission.entity.CommissionConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 
 @Mapper

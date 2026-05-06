@@ -16,6 +16,16 @@ public class AgentResponse {
     private Double totalSales;
     private Double totalCommission;
     private Boolean isActive;
+
+    private String nicNumber;
+    private String nicDocumentName;
+    private String nicDocumentType;
+    private String bankPassbookDocumentName;
+    private String bankPassbookDocumentType;
+    private String bankAccountNumber;
+    private String bankName;
+    private String bankBranch;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

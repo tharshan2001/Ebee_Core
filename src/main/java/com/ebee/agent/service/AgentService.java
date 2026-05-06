@@ -12,7 +12,9 @@ import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,7 +27,7 @@ public class AgentService {
     private final UserRepository userRepository;
 
     @Transactional
-    public AgentResponse createAgent(AgentRequest request) {
+    public AgentResponse createAgent(AgentRequest request) throws IOException {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
 
@@ -42,7 +44,25 @@ public class AgentService {
                 .agentCode(request.getAgentCode())
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(request.getCommissionRate())
+                .nicNumber(request.getNicNumber())
+                .bankAccountNumber(request.getBankAccountNumber())
+                .bankName(request.getBankName())
+                .bankBranch(request.getBankBranch())
                 .build();
+
+        // Handle NIC document upload
+        if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
+            agent.setNicDocument(request.getNicDocument().getBytes());
+            agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
+            agent.setNicDocumentType(request.getNicDocument().getContentType());
+        }
+
+        // Handle Bank Passbook document upload
+        if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
+            agent.setBankPassbookDocument(request.getBankPassbookDocument().getBytes());
+            agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
+            agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
+        }
 
         Agent savedAgent = agentRepository.save(agent);
         return mapToResponse(savedAgent);
@@ -67,7 +87,7 @@ public class AgentService {
     }
 
     @Transactional
-    public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) {
+    public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) throws IOException {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
 
@@ -79,6 +99,24 @@ public class AgentService {
         agent.setAgentCode(request.getAgentCode());
         agent.setPhoneNumber(request.getPhoneNumber());
         agent.setCommissionRate(request.getCommissionRate());
+        agent.setNicNumber(request.getNicNumber());
+        agent.setBankAccountNumber(request.getBankAccountNumber());
+        agent.setBankName(request.getBankName());
+        agent.setBankBranch(request.getBankBranch());
+
+        // Handle NIC document upload
+        if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
+            agent.setNicDocument(request.getNicDocument().getBytes());
+            agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
+            agent.setNicDocumentType(request.getNicDocument().getContentType());
+        }
+
+        // Handle Bank Passbook document upload
+        if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
+            agent.setBankPassbookDocument(request.getBankPassbookDocument().getBytes());
+            agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
+            agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
+        }
 
         return mapToResponse(agentRepository.save(agent));
     }
@@ -115,6 +153,16 @@ public class AgentService {
         response.setTotalSales(agent.getTotalSales());
         response.setTotalCommission(agent.getTotalCommission());
         response.setIsActive(agent.getIsActive());
+
+        response.setNicNumber(agent.getNicNumber());
+        response.setNicDocumentName(agent.getNicDocumentName());
+        response.setNicDocumentType(agent.getNicDocumentType());
+        response.setBankPassbookDocumentName(agent.getBankPassbookDocumentName());
+        response.setBankPassbookDocumentType(agent.getBankPassbookDocumentType());
+        response.setBankAccountNumber(agent.getBankAccountNumber());
+        response.setBankName(agent.getBankName());
+        response.setBankBranch(agent.getBankBranch());
+
         response.setCreatedAt(agent.getCreatedAt());
         response.setUpdatedAt(agent.getUpdatedAt());
         return response;

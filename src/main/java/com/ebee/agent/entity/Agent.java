@@ -52,6 +52,38 @@ public class Agent {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "nic_number")
+    private String nicNumber;
+
+    @Lob
+    @Column(name = "nic_document", columnDefinition = "BYTEA")
+    private byte[] nicDocument;
+
+    @Column(name = "nic_document_name")
+    private String nicDocumentName;
+
+    @Column(name = "nic_document_type")
+    private String nicDocumentType;
+
+    @Lob
+    @Column(name = "bank_passbook_document", columnDefinition = "BYTEA")
+    private byte[] bankPassbookDocument;
+
+    @Column(name = "bank_passbook_document_name")
+    private String bankPassbookDocumentName;
+
+    @Column(name = "bank_passbook_document_type")
+    private String bankPassbookDocumentType;
+
+    @Column(name = "bank_account_number")
+    private String bankAccountNumber;
+
+    @Column(name = "bank_name")
+    private String bankName;
+
+    @Column(name = "bank_branch")
+    private String bankBranch;
+
     @OneToMany(mappedBy = "agent")
     private List<Order> orders = new ArrayList<>();
 

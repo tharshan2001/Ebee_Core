@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,9 +23,32 @@ public class AgentController {
 
     private final AgentService agentService;
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<AgentResponse>> createAgent(@Valid @RequestBody AgentRequest request) {
+    public ResponseEntity<ApiResponse<AgentResponse>> createAgent(
+            @RequestParam("userId") String userId,
+            @RequestParam("agentCode") String agentCode,
+            @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
+            @RequestParam(value = "nicNumber", required = false) String nicNumber,
+            @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
+            @RequestParam(value = "bankPassbookDocument", required = false) MultipartFile bankPassbookDocument,
+            @RequestParam(value = "bankAccountNumber", required = false) String bankAccountNumber,
+            @RequestParam(value = "bankName", required = false) String bankName,
+            @RequestParam(value = "bankBranch", required = false) String bankBranch) throws java.io.IOException {
+
+        AgentRequest request = new AgentRequest();
+        request.setUserId(java.util.UUID.fromString(userId));
+        request.setAgentCode(agentCode);
+        request.setCommissionRate(commissionRate);
+        request.setPhoneNumber(phoneNumber);
+        request.setNicNumber(nicNumber);
+        request.setNicDocument(nicDocument);
+        request.setBankPassbookDocument(bankPassbookDocument);
+        request.setBankAccountNumber(bankAccountNumber);
+        request.setBankName(bankName);
+        request.setBankBranch(bankBranch);
+
         AgentResponse response = agentService.createAgent(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Agent created successfully", response));
@@ -55,11 +79,31 @@ public class AgentController {
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(value = "/{id}", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateAgent(
             @PathVariable UUID id,
-            @Valid @RequestBody AgentUpdateRequest request) {
+            @RequestParam("agentCode") String agentCode,
+            @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
+            @RequestParam(value = "nicNumber", required = false) String nicNumber,
+            @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
+            @RequestParam(value = "bankPassbookDocument", required = false) MultipartFile bankPassbookDocument,
+            @RequestParam(value = "bankAccountNumber", required = false) String bankAccountNumber,
+            @RequestParam(value = "bankName", required = false) String bankName,
+            @RequestParam(value = "bankBranch", required = false) String bankBranch) throws java.io.IOException {
+
+        AgentUpdateRequest request = new AgentUpdateRequest();
+        request.setAgentCode(agentCode);
+        request.setCommissionRate(commissionRate);
+        request.setPhoneNumber(phoneNumber);
+        request.setNicNumber(nicNumber);
+        request.setNicDocument(nicDocument);
+        request.setBankPassbookDocument(bankPassbookDocument);
+        request.setBankAccountNumber(bankAccountNumber);
+        request.setBankName(bankName);
+        request.setBankBranch(bankBranch);
+
         AgentResponse response = agentService.updateAgent(id, request);
         return ResponseEntity.ok(ApiResponse.success("Agent updated successfully", response));
     }

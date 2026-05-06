@@ -3,6 +3,9 @@ package com.ebee.commission.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
+import com.ebee.commission.entity.Commission;
+import com.ebee.commission.mapper.CommissionMapper;
+import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.commission.service.CommissionQueryService;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/commissions")
@@ -23,6 +27,8 @@ public class CommissionController {
     private final CommissionCalculationService calculationService;
     private final CommissionLifecycleService lifecycleService;
     private final CommissionQueryService queryService;
+    private final CommissionRepository commissionRepository;
+    private final CommissionMapper mapper;
 
     @PostMapping("/calculate")
     @PreAuthorize("hasRole('ADMIN')")
@@ -67,6 +73,16 @@ public class CommissionController {
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getCommissionsByAgent(
             @PathVariable UUID agentId) {
         List<CommissionResponse> response = queryService.getCommissionsByAgent(agentId);
+        return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CommissionResponse>>> getAllCommissions() {
+        List<Commission> commissions = commissionRepository.findAll();
+        List<CommissionResponse> response = commissions.stream()
+                .map(mapper::toResponse)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
     }
 

@@ -40,8 +40,9 @@ server:
   port: 8085
 
 jwt:
-  secret: ${JWT_SECRET:${JWT_SECRET}}
+  secret: ${JWT_SECRET:dev-secret-key-must-be-at-least-256-bits-long-for-hs256}
   expiration: 86400000
+  refreshExpiration: 604800000
 
 logging:
   level:

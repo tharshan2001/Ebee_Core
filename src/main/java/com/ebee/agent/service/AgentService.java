@@ -72,8 +72,9 @@ public class AgentService {
         return mapToResponse(savedAgent);
     }
 
+    @Transactional(readOnly = true)
     public AgentResponse getAgentById(UUID id) {
-        Agent agent = agentRepository.findById(id)
+        Agent agent = agentRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
         return mapToResponse(agent);
     }
@@ -85,7 +86,7 @@ public class AgentService {
     }
 
     public List<AgentResponse> getAllAgents() {
-        return agentRepository.findAll().stream()
+        return agentRepository.findAllWithUser().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -135,6 +136,7 @@ public class AgentService {
         return mapToResponse(agentRepository.save(agent));
     }
 
+    @Transactional(readOnly = true)
     public AgentResponse getAgentByAgentCode(String agentCode) {
         Agent agent = agentRepository.findByAgentCode(agentCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", agentCode));
@@ -161,6 +163,9 @@ public class AgentService {
         AgentResponse response = new AgentResponse();
         response.setId(agent.getId());
         response.setUserId(agent.getUser().getId());
+        response.setFirstName(agent.getUser().getFirstName());
+        response.setLastName(agent.getUser().getLastName());
+        response.setFullName(agent.getUser().getFirstName() + " " + agent.getUser().getLastName());
         response.setAgentCode(agent.getAgentCode());
         response.setPhoneNumber(agent.getPhoneNumber());
         response.setCommissionRate(agent.getCommissionRate());

@@ -10,6 +10,9 @@ public class AgentResponse {
 
     private UUID id;
     private UUID userId;
+    private String firstName;
+    private String lastName;
+    private String fullName;
     private String agentCode;
     private String phoneNumber;
     private Double commissionRate;

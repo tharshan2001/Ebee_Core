@@ -31,10 +31,10 @@ spring:
       port: 6379
 
 aws:
-  access-key: ${AWS_ACCESS_KEY:your-access-key}
-  secret-key: ${AWS_SECRET_KEY:your-secret-key}
-  region: eu-north-1
-  bucket-name: pathfinder-app-media
+  access-key: ${AWS_ACCESS_KEY_ID}
+  secret-key: ${AWS_SECRET_ACCESS_KEY}
+  region: ${AWS_REGION:eu-north-1}
+  bucket-name: ${AWS_BUCKET_NAME:pathfinder-app-media}
 
 server:
   port: 8085

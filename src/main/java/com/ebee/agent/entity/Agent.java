@@ -40,11 +40,11 @@ public class Agent {
     @Column(name = "commission_rate", nullable = false)
     private Double commissionRate;
 
-    @Column(name = "total_sales", columnDefinition = "DECIMAL(10,2) DEFAULT 0.00")
+    @Column(name = "total_sales", nullable = false)
     @Builder.Default
     private Double totalSales = 0.0;
 
-    @Column(name = "total_commission", columnDefinition = "DECIMAL(10,2) DEFAULT 0.00")
+    @Column(name = "total_commission", nullable = false)
     @Builder.Default
     private Double totalCommission = 0.0;
 

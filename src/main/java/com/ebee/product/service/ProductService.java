@@ -9,7 +9,11 @@ import com.ebee.product.entity.ProductImage;
 import com.ebee.product.mapper.ProductMapper;
 import com.ebee.product.repository.ProductImageRepository;
 import com.ebee.product.repository.ProductRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
@@ -27,6 +32,7 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final ProductImageRepository productImageRepository;
     private final S3Service s3Service;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) throws IOException {
@@ -36,22 +42,23 @@ public class ProductService {
 
         Product product = productMapper.toEntity(request);
         Product savedProduct = productRepository.save(product);
+        productRepository.flush();
+        UUID productId = savedProduct.getId();
+        log.info("Product saved with ID: {}", productId);
 
-        // Handle image uploads to S3 (up to 10 images)
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             int sortOrder = 0;
             for (MultipartFile image : request.getImages()) {
-                if (sortOrder >= 10) break; // Max 10 images
+                if (sortOrder >= 10) break;
                 if (image != null && !image.isEmpty()) {
-                    String imageUrl = s3Service.uploadFile(image, "products/" + savedProduct.getId());
-                    ProductImage productImage = ProductImage.builder()
-                            .product(savedProduct)
-                            .imageUrl(imageUrl)
-                            .imageName(image.getOriginalFilename())
-                            .imageType(image.getContentType())
-                            .sortOrder(sortOrder++)
-                            .build();
-                    productImageRepository.save(productImage);
+                    String imageUrl = s3Service.uploadFile(image, "products/" + productId);
+                    log.info("Uploaded image to: {}", imageUrl);
+
+                    jdbcTemplate.update(
+                            "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                            UUID.randomUUID(), productId, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
+                    );
+                    log.info("Image inserted for product_id={}", productId);
                 }
             }
         }
@@ -63,11 +70,10 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         ProductResponse response = productMapper.toResponse(product);
-        // Add image URLs to response
         List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(id);
         List<String> imageUrls = images.stream()
                 .map(ProductImage::getImageUrl)
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
         response.setImageUrls(imageUrls);
         return response;
     }
@@ -76,11 +82,10 @@ public class ProductService {
         Product product = productRepository.findBySku(sku)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", sku));
         ProductResponse response = productMapper.toResponse(product);
-        // Add image URLs to response
         List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(product.getId());
         List<String> imageUrls = images.stream()
                 .map(ProductImage::getImageUrl)
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
         response.setImageUrls(imageUrls);
         return response;
     }
@@ -93,11 +98,11 @@ public class ProductService {
                     List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(p.getId());
                     List<String> imageUrls = images.stream()
                             .map(ProductImage::getImageUrl)
-                            .collect(java.util.stream.Collectors.toList());
+                            .toList();
                     response.setImageUrls(imageUrls);
                     return response;
                 })
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
     }
 
     public List<ProductResponse> getActiveProducts() {
@@ -110,11 +115,11 @@ public class ProductService {
                     List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(p.getId());
                     List<String> imageUrls = images.stream()
                             .map(ProductImage::getImageUrl)
-                            .collect(java.util.stream.Collectors.toList());
+                            .toList();
                     response.setImageUrls(imageUrls);
                     return response;
                 })
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -122,37 +127,49 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        if (!product.getSku().equals(request.getSku()) &&
-            productRepository.existsBySkuAndIdNot(request.getSku(), id)) {
-            throw new IllegalArgumentException("SKU already exists: " + request.getSku());
+        if (request.getName() != null) {
+            product.setName(request.getName());
+        }
+        if (request.getSku() != null) {
+            if (!product.getSku().equals(request.getSku()) &&
+                productRepository.existsBySkuAndIdNot(request.getSku(), id)) {
+                throw new IllegalArgumentException("SKU already exists: " + request.getSku());
+            }
+            product.setSku(request.getSku());
+        }
+        if (request.getDescription() != null) {
+            product.setDescription(request.getDescription());
+        }
+        if (request.getCategory() != null) {
+            product.setCategory(request.getCategory());
+        }
+        if (request.getPrice() != null) {
+            product.setPrice(request.getPrice());
+        }
+        if (request.getCostPrice() != null) {
+            product.setCostPrice(request.getCostPrice());
+        }
+        if (request.getQuantityInStock() != null) {
+            product.setQuantityInStock(request.getQuantityInStock());
+        }
+        if (request.getReorderLevel() != null) {
+            product.setReorderLevel(request.getReorderLevel());
         }
 
-        product.setName(request.getName());
-        product.setSku(request.getSku());
-        product.setDescription(request.getDescription());
-        product.setCategory(request.getCategory());
-        product.setPrice(request.getPrice());
-        product.setCostPrice(request.getCostPrice());
-        product.setQuantityInStock(request.getQuantityInStock());
-        product.setReorderLevel(request.getReorderLevel());
-
-        // Handle new image uploads (append to existing, max 10 total)
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             List<ProductImage> existingImages = productImageRepository.findByProductIdOrderBySortOrder(id);
             int sortOrder = existingImages.size();
 
             for (MultipartFile image : request.getImages()) {
-                if (sortOrder >= 10) break; // Max 10 images total
+                if (sortOrder >= 10) break;
                 if (image != null && !image.isEmpty()) {
                     String imageUrl = s3Service.uploadFile(image, "products/" + id);
-                    ProductImage productImage = ProductImage.builder()
-                            .product(product)
-                            .imageUrl(imageUrl)
-                            .imageName(image.getOriginalFilename())
-                            .imageType(image.getContentType())
-                            .sortOrder(sortOrder++)
-                            .build();
-                    productImageRepository.save(productImage);
+
+                    jdbcTemplate.update(
+                            "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                            UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
+                    );
+                    log.info("Image inserted for product_id={}", id);
                 }
             }
         }
@@ -177,21 +194,19 @@ public class ProductService {
             if (sortOrder >= 10) break;
             if (image != null && !image.isEmpty()) {
                 String imageUrl = s3Service.uploadFile(image, "products/" + id);
-                ProductImage productImage = ProductImage.builder()
-                        .product(product)
-                        .imageUrl(imageUrl)
-                        .imageName(image.getOriginalFilename())
-                        .imageType(image.getContentType())
-                        .sortOrder(sortOrder++)
-                        .build();
-                productImageRepository.save(productImage);
+
+                jdbcTemplate.update(
+                        "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
+                );
             }
         }
 
         ProductResponse response = productMapper.toResponse(product);
-        List<String> imageUrls = existingImages.stream()
+        List<ProductImage> updatedImages = productImageRepository.findByProductIdOrderBySortOrder(id);
+        List<String> imageUrls = updatedImages.stream()
                 .map(ProductImage::getImageUrl)
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
         response.setImageUrls(imageUrls);
         return response;
     }
@@ -201,7 +216,6 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        // Delete all images from S3
         List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(id);
         for (ProductImage image : images) {
             s3Service.deleteFile(image.getImageUrl());
@@ -211,5 +225,4 @@ public class ProductService {
         product.setIsActive(false);
         productRepository.save(product);
     }
-
 }

@@ -84,13 +84,13 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable UUID id,
-            @RequestParam("name") String name,
-            @RequestParam("sku") String sku,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "sku", required = false) String sku,
             @RequestParam(value = "description", required = false) String description,
-            @RequestParam("category") String category,
-            @RequestParam("price") BigDecimal price,
-            @RequestParam("costPrice") BigDecimal costPrice,
-            @RequestParam("quantityInStock") Integer quantityInStock,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "price", required = false) BigDecimal price,
+            @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
+            @RequestParam(value = "quantityInStock", required = false) Integer quantityInStock,
             @RequestParam(value = "reorderLevel", required = false) Integer reorderLevel,
             @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
 

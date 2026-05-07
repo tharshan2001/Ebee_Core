@@ -1,5 +1,6 @@
 package com.ebee.commission.dto;
 
+import com.ebee.commission.enums.CommissionType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ public class CommissionConfigResponse {
     private UUID id;
     private String name;
     private Double commissionRate;
+    private CommissionType type;
     private Double minAmount;
     private Double maxAmount;
     private String appliesTo;

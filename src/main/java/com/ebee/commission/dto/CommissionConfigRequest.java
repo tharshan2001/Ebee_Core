@@ -1,5 +1,6 @@
 package com.ebee.commission.dto;
 
+import com.ebee.commission.enums.CommissionType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -11,6 +12,8 @@ public class CommissionConfigRequest {
 
     @NotNull
     private Double commissionRate;
+
+    private CommissionType type;
 
     private Double minAmount;
 

@@ -6,6 +6,7 @@ import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionStatus;
+import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -38,11 +40,7 @@ public class CommissionCalculationService {
 
         Agent agent = order.getAgent();
 
-        CommissionConfig config = configRepository.findByIsActiveTrue().stream()
-                .filter(c -> c.getAppliesTo().equalsIgnoreCase(agent.getAgentCode()) ||
-                            c.getAppliesTo().equalsIgnoreCase("ALL"))
-                .findFirst()
-                .orElse(null);
+        CommissionConfig config = findApplicableConfig(agent);
 
         BigDecimal commissionRate = config != null ?
                 BigDecimal.valueOf(config.getCommissionRate()) :
@@ -65,5 +63,26 @@ public class CommissionCalculationService {
 
         commission = commissionRepository.save(commission);
         return mapper.toResponse(commission);
+    }
+
+    private CommissionConfig findApplicableConfig(Agent agent) {
+        List<CommissionConfig> activeConfigs = configRepository.findByIsActiveTrue();
+
+        CommissionConfig performanceConfig = activeConfigs.stream()
+                .filter(c -> c.getType() == CommissionType.PERFORMANCE)
+                .filter(c -> c.getAppliesTo().equalsIgnoreCase(agent.getAgentCode()))
+                .findFirst()
+                .orElse(null);
+
+        if (performanceConfig != null) {
+            return performanceConfig;
+        }
+
+        return activeConfigs.stream()
+                .filter(c -> c.getType() == CommissionType.DEFAULT)
+                .filter(c -> c.getAppliesTo().equalsIgnoreCase("ALL") ||
+                            c.getAppliesTo().equalsIgnoreCase(agent.getAgentCode()))
+                .findFirst()
+                .orElse(null);
     }
 }

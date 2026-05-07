@@ -1,5 +1,6 @@
 package com.ebee.commission.entity;
 
+import com.ebee.commission.enums.CommissionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +29,11 @@ public class CommissionConfig {
 
     @Column(name = "commission_rate", nullable = false)
     private Double commissionRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    @Builder.Default
+    private CommissionType type = CommissionType.DEFAULT;
 
     @Column(name = "min_amount", nullable = false)
     @Builder.Default

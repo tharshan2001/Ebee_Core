@@ -3,6 +3,7 @@ package com.ebee.commission.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.commission.dto.CommissionConfigRequest;
 import com.ebee.commission.dto.CommissionConfigResponse;
+import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.service.CommissionConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -65,5 +66,35 @@ public class CommissionConfigController {
     public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getActiveConfigs() {
         List<CommissionConfigResponse> response = configService.getActiveConfigs();
         return ResponseEntity.ok(ApiResponse.success("Active commission configs retrieved successfully", response));
+    }
+
+    @GetMapping("/type/{type}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getConfigsByType(
+            @PathVariable CommissionType type) {
+        List<CommissionConfigResponse> response = configService.getConfigsByType(type);
+        return ResponseEntity.ok(ApiResponse.success("Commission configs retrieved successfully", response));
+    }
+
+    @GetMapping("/type/{type}/active")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getActiveConfigsByType(
+            @PathVariable CommissionType type) {
+        List<CommissionConfigResponse> response = configService.getActiveConfigsByType(type);
+        return ResponseEntity.ok(ApiResponse.success("Active commission configs retrieved successfully", response));
+    }
+
+    @GetMapping("/default")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getDefaultConfigs() {
+        List<CommissionConfigResponse> response = configService.getDefaultConfigs();
+        return ResponseEntity.ok(ApiResponse.success("Default commission configs retrieved successfully", response));
+    }
+
+    @GetMapping("/performance")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getPerformanceConfigs() {
+        List<CommissionConfigResponse> response = configService.getPerformanceConfigs();
+        return ResponseEntity.ok(ApiResponse.success("Performance commission configs retrieved successfully", response));
     }
 }

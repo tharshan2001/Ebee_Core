@@ -3,6 +3,7 @@ package com.ebee.commission.service;
 import com.ebee.commission.dto.CommissionConfigRequest;
 import com.ebee.commission.dto.CommissionConfigResponse;
 import com.ebee.commission.entity.CommissionConfig;
+import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -57,6 +58,26 @@ public class CommissionConfigService {
         return configRepository.findByIsActiveTrue().stream()
                 .map(mapper::toConfigResponse)
                 .collect(Collectors.toList());
+    }
+
+    public List<CommissionConfigResponse> getConfigsByType(CommissionType type) {
+        return configRepository.findByType(type).stream()
+                .map(mapper::toConfigResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CommissionConfigResponse> getActiveConfigsByType(CommissionType type) {
+        return configRepository.findByIsActiveTrueAndType(type).stream()
+                .map(mapper::toConfigResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CommissionConfigResponse> getDefaultConfigs() {
+        return getConfigsByType(CommissionType.DEFAULT);
+    }
+
+    public List<CommissionConfigResponse> getPerformanceConfigs() {
+        return getConfigsByType(CommissionType.PERFORMANCE);
     }
 
     private CommissionConfig getConfigEntity(UUID id) {

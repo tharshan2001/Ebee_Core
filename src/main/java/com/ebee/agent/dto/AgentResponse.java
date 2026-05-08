@@ -1,5 +1,6 @@
 package com.ebee.agent.dto;
 
+import com.ebee.user.enums.UserStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ public class AgentResponse {
 
     private UUID id;
     private UUID userId;
+    private String email;
     private String firstName;
     private String lastName;
     private String fullName;
@@ -19,6 +21,7 @@ public class AgentResponse {
     private Double totalSales;
     private Double totalCommission;
     private Boolean isActive;
+    private UserStatus userStatus;
 
     private String nicNumber;
     private String nicDocumentUrl;

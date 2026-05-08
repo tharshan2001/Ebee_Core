@@ -1,9 +1,11 @@
 package com.ebee.auth.controller;
 
 import com.ebee.auth.dto.AuthResponse;
+import com.ebee.auth.dto.ChangePasswordRequest;
 import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.service.AuthService;
+import com.ebee.auth.service.JwtService;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.user.dto.UserResponse;
 import jakarta.servlet.http.Cookie;
@@ -13,7 +15,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtService jwtService;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
@@ -29,18 +31,16 @@ public class AuthController {
             HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request);
 
-        // Set JWT token in cookie
         Cookie jwtCookie = new Cookie("jwt_token", authResponse.getToken());
         jwtCookie.setHttpOnly(true);
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(24 * 60 * 60); // 24 hours
+        jwtCookie.setMaxAge(24 * 60 * 60);
         response.addCookie(jwtCookie);
 
-        // Set refresh token in cookie
         Cookie refreshCookie = new Cookie("refresh_token", authResponse.getRefreshToken());
         refreshCookie.setHttpOnly(true);
         refreshCookie.setPath("/api/auth/refresh");
-        refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+        refreshCookie.setMaxAge(7 * 24 * 60 * 60);
         response.addCookie(refreshCookie);
 
         return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
@@ -60,13 +60,13 @@ public class AuthController {
         Cookie jwtCookie = new Cookie("jwt_token", null);
         jwtCookie.setHttpOnly(true);
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(0); // Delete cookie
+        jwtCookie.setMaxAge(0);
         response.addCookie(jwtCookie);
 
         Cookie refreshCookie = new Cookie("refresh_token", null);
         refreshCookie.setHttpOnly(true);
         refreshCookie.setPath("/api/auth/refresh");
-        refreshCookie.setMaxAge(0); // Delete cookie
+        refreshCookie.setMaxAge(0);
         response.addCookie(refreshCookie);
 
         return ResponseEntity.ok(ApiResponse.success("Logout successful"));
@@ -95,20 +95,28 @@ public class AuthController {
 
         AuthResponse authResponse = authService.refreshToken(refreshToken);
 
-        // Set new JWT token in cookie
         Cookie jwtCookie = new Cookie("jwt_token", authResponse.getToken());
         jwtCookie.setHttpOnly(true);
         jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(24 * 60 * 60); // 24 hours
+        jwtCookie.setMaxAge(24 * 60 * 60);
         response.addCookie(jwtCookie);
 
-        // Set new refresh token in cookie
         Cookie newRefreshCookie = new Cookie("refresh_token", authResponse.getRefreshToken());
         newRefreshCookie.setHttpOnly(true);
         newRefreshCookie.setPath("/api/auth/refresh");
-        newRefreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+        newRefreshCookie.setMaxAge(7 * 24 * 60 * 60);
         response.addCookie(newRefreshCookie);
 
         return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.replace("Bearer ", "");
+        String email = jwtService.extractEmailFromToken(token);
+        authService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
 }

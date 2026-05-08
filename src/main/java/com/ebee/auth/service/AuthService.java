@@ -51,6 +51,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .role(user.getRole())
+                .mustChangePassword(user.getMustChangePassword())
                 .expiresAt(jwtService.getExpirationDate(token))
                 .build();
     }
@@ -98,5 +99,20 @@ public class AuthService {
                 .role(user.getRole())
                 .expiresAt(jwtService.getExpirationDate(newToken))
                 .build();
+    }
+
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        user.setPasswordChangedAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
     }
 }

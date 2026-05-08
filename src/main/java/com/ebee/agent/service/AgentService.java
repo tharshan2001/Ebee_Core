@@ -3,19 +3,23 @@ package com.ebee.agent.service;
 import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
+import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
+import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,22 +31,41 @@ public class AgentService {
     private final AgentRepository agentRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
+    private final PasswordEncoder passwordEncoder;
+
+    private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+    private static final int PASSWORD_LENGTH = 12;
+    private final SecureRandom random = new SecureRandom();
 
     @Transactional
-    public AgentResponse createAgent(AgentRequest request) throws IOException {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
-
-        if (!user.getRole().equals(RoleType.AGENT)) {
-            throw new IllegalArgumentException("User must have AGENT role");
+    public AgentWithCredentialsResponse createAgent(AgentRequest request, boolean createdByAdmin) throws IOException {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
         if (agentRepository.existsByAgentCode(request.getAgentCode())) {
             throw new IllegalArgumentException("Agent code already exists");
         }
 
+        String generatedPassword = generatePassword();
+        UserStatus initialStatus = createdByAdmin ? UserStatus.ACTIVE : UserStatus.INACTIVE;
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(generatedPassword))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phoneNumber(request.getPhoneNumber())
+                .role(RoleType.AGENT)
+                .status(initialStatus)
+                .isActive(true)
+                .mustChangePassword(createdByAdmin ? false : true)
+                .build();
+
+        User savedUser = userRepository.save(user);
+
         Agent agent = Agent.builder()
-                .user(user)
+                .user(savedUser)
                 .agentCode(request.getAgentCode())
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(request.getCommissionRate())
@@ -50,9 +73,9 @@ public class AgentService {
                 .bankAccountNumber(request.getBankAccountNumber())
                 .bankName(request.getBankName())
                 .bankBranch(request.getBankBranch())
+                .isActive(true)
                 .build();
 
-        // Handle NIC document upload to S3
         if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
             String nicUrl = s3Service.uploadFile(request.getNicDocument(), "agents/nic");
             agent.setNicDocumentUrl(nicUrl);
@@ -60,7 +83,6 @@ public class AgentService {
             agent.setNicDocumentType(request.getNicDocument().getContentType());
         }
 
-        // Handle Bank Passbook document upload to S3
         if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
             String passbookUrl = s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook");
             agent.setBankPassbookDocumentUrl(passbookUrl);
@@ -68,6 +90,85 @@ public class AgentService {
             agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
         }
 
+        Agent savedAgent = agentRepository.save(agent);
+
+        boolean mustChangePw = createdByAdmin ? false : true;
+
+        return AgentWithCredentialsResponse.builder()
+                .agentId(savedAgent.getId())
+                .userId(savedUser.getId())
+                .email(savedUser.getEmail())
+                .firstName(savedUser.getFirstName())
+                .lastName(savedUser.getLastName())
+                .agentCode(savedAgent.getAgentCode())
+                .phoneNumber(savedAgent.getPhoneNumber())
+                .commissionRate(savedAgent.getCommissionRate())
+                .nicNumber(savedAgent.getNicNumber())
+                .bankAccountNumber(savedAgent.getBankAccountNumber())
+                .bankName(savedAgent.getBankName())
+                .bankBranch(savedAgent.getBankBranch())
+                .userStatus(savedUser.getStatus())
+                .isActive(savedAgent.getIsActive())
+                .createdAt(savedAgent.getCreatedAt())
+                .generatedPassword(generatedPassword)
+                .mustChangePassword(mustChangePw)
+                .build();
+    }
+
+    @Transactional
+    public AgentResponse approveAgent(UUID id) {
+        Agent agent = agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+
+        User user = agent.getUser();
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        agent.setIsActive(true);
+        Agent savedAgent = agentRepository.save(agent);
+        return mapToResponse(savedAgent);
+    }
+
+    @Transactional
+    public AgentResponse rejectAgent(UUID id) {
+        Agent agent = agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+
+        User user = agent.getUser();
+        user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
+
+        agent.setIsActive(false);
+        Agent savedAgent = agentRepository.save(agent);
+        return mapToResponse(savedAgent);
+    }
+
+    @Transactional
+    public AgentResponse activateAgent(UUID id) {
+        Agent agent = agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+
+        User user = agent.getUser();
+        user.setStatus(UserStatus.ACTIVE);
+        user.setIsActive(true);
+        userRepository.save(user);
+
+        agent.setIsActive(true);
+        Agent savedAgent = agentRepository.save(agent);
+        return mapToResponse(savedAgent);
+    }
+
+    @Transactional
+    public AgentResponse deactivateAgent(UUID id) {
+        Agent agent = agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+
+        User user = agent.getUser();
+        user.setStatus(UserStatus.INACTIVE);
+        user.setIsActive(false);
+        userRepository.save(user);
+
+        agent.setIsActive(false);
         Agent savedAgent = agentRepository.save(agent);
         return mapToResponse(savedAgent);
     }
@@ -163,6 +264,7 @@ public class AgentService {
         AgentResponse response = new AgentResponse();
         response.setId(agent.getId());
         response.setUserId(agent.getUser().getId());
+        response.setEmail(agent.getUser().getEmail());
         response.setFirstName(agent.getUser().getFirstName());
         response.setLastName(agent.getUser().getLastName());
         response.setFullName(agent.getUser().getFirstName() + " " + agent.getUser().getLastName());
@@ -172,6 +274,7 @@ public class AgentService {
         response.setTotalSales(agent.getTotalSales());
         response.setTotalCommission(agent.getTotalCommission());
         response.setIsActive(agent.getIsActive());
+        response.setUserStatus(agent.getUser().getStatus());
 
         response.setNicNumber(agent.getNicNumber());
         response.setNicDocumentUrl(agent.getNicDocumentUrl());
@@ -187,5 +290,13 @@ public class AgentService {
         response.setCreatedAt(agent.getCreatedAt());
         response.setUpdatedAt(agent.getUpdatedAt());
         return response;
+    }
+
+    private String generatePassword() {
+        StringBuilder password = new StringBuilder(PASSWORD_LENGTH);
+        for (int i = 0; i < PASSWORD_LENGTH; i++) {
+            password.append(PASSWORD_CHARS.charAt(random.nextInt(PASSWORD_CHARS.length())));
+        }
+        return password.toString();
     }
 }

@@ -18,5 +18,6 @@ public class AuthResponse {
     private String firstName;
     private String lastName;
     private RoleType role;
+    private Boolean mustChangePassword;
     private LocalDateTime expiresAt;
 }

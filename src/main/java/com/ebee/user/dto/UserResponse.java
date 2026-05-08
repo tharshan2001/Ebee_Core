@@ -18,6 +18,7 @@ public class UserResponse {
     private RoleType role;
     private UserStatus status;
     private Boolean isActive;
+    private Boolean mustChangePassword;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

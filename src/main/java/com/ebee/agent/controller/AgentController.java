@@ -3,9 +3,9 @@ package com.ebee.agent.controller;
 import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
+import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.service.AgentService;
 import com.ebee.common.response.ApiResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,8 +25,10 @@ public class AgentController {
 
     @PostMapping(consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<AgentResponse>> createAgent(
-            @RequestParam("userId") String userId,
+    public ResponseEntity<ApiResponse<AgentWithCredentialsResponse>> createAgent(
+            @RequestParam("email") String email,
+            @RequestParam("firstName") String firstName,
+            @RequestParam("lastName") String lastName,
             @RequestParam("agentCode") String agentCode,
             @RequestParam("commissionRate") Double commissionRate,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
@@ -38,7 +40,9 @@ public class AgentController {
             @RequestParam(value = "bankBranch", required = false) String bankBranch) throws java.io.IOException {
 
         AgentRequest request = new AgentRequest();
-        request.setUserId(java.util.UUID.fromString(userId));
+        request.setEmail(email);
+        request.setFirstName(firstName);
+        request.setLastName(lastName);
         request.setAgentCode(agentCode);
         request.setCommissionRate(commissionRate);
         request.setPhoneNumber(phoneNumber);
@@ -49,9 +53,37 @@ public class AgentController {
         request.setBankName(bankName);
         request.setBankBranch(bankBranch);
 
-        AgentResponse response = agentService.createAgent(request);
+        AgentWithCredentialsResponse response = agentService.createAgent(request, true);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Agent created successfully", response));
+    }
+
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgentResponse>> activateAgent(@PathVariable UUID id) {
+        AgentResponse response = agentService.activateAgent(id);
+        return ResponseEntity.ok(ApiResponse.success("Agent activated successfully", response));
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgentResponse>> deactivateAgent(@PathVariable UUID id) {
+        AgentResponse response = agentService.deactivateAgent(id);
+        return ResponseEntity.ok(ApiResponse.success("Agent deactivated successfully", response));
+    }
+
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgentResponse>> approveAgent(@PathVariable UUID id) {
+        AgentResponse response = agentService.approveAgent(id);
+        return ResponseEntity.ok(ApiResponse.success("Agent approved successfully", response));
+    }
+
+    @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgentResponse>> rejectAgent(@PathVariable UUID id) {
+        AgentResponse response = agentService.rejectAgent(id);
+        return ResponseEntity.ok(ApiResponse.success("Agent rejected successfully", response));
     }
 
     @GetMapping("/{id}")

@@ -2,7 +2,6 @@ package com.ebee.product.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,11 +27,6 @@ public class ProductRequest {
 
     @Positive(message = "Cost price must be positive")
     private BigDecimal costPrice;
-
-    @PositiveOrZero(message = "Quantity in stock must be zero or positive")
-    private Integer quantityInStock;
-
-    private Integer reorderLevel;
 
     private List<MultipartFile> images;
 }

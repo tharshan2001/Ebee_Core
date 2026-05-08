@@ -2,6 +2,8 @@ package com.ebee.product.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
+import com.ebee.inventory.dto.InventoryResponse;
+import com.ebee.inventory.service.InventoryService;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
 import com.ebee.product.entity.Product;
@@ -9,8 +11,6 @@ import com.ebee.product.entity.ProductImage;
 import com.ebee.product.mapper.ProductMapper;
 import com.ebee.product.repository.ProductImageRepository;
 import com.ebee.product.repository.ProductRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +32,7 @@ public class ProductService {
     private final ProductImageRepository productImageRepository;
     private final S3Service s3Service;
     private final JdbcTemplate jdbcTemplate;
+    private final InventoryService inventoryService;
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) throws IOException {
@@ -45,6 +45,9 @@ public class ProductService {
         productRepository.flush();
         UUID productId = savedProduct.getId();
         log.info("Product saved with ID: {}", productId);
+
+        inventoryService.createInventory(productId, 0, null);
+        log.info("Inventory created for product: {}", productId);
 
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             int sortOrder = 0;
@@ -63,18 +66,15 @@ public class ProductService {
             }
         }
 
-        return productMapper.toResponse(savedProduct);
+        return getProductById(productId);
     }
 
     public ProductResponse getProductById(UUID id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         ProductResponse response = productMapper.toResponse(product);
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(id);
-        List<String> imageUrls = images.stream()
-                .map(ProductImage::getImageUrl)
-                .toList();
-        response.setImageUrls(imageUrls);
+        setProductImages(id, response);
+        setInventory(id, response);
         return response;
     }
 
@@ -82,11 +82,8 @@ public class ProductService {
         Product product = productRepository.findBySku(sku)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", sku));
         ProductResponse response = productMapper.toResponse(product);
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(product.getId());
-        List<String> imageUrls = images.stream()
-                .map(ProductImage::getImageUrl)
-                .toList();
-        response.setImageUrls(imageUrls);
+        setProductImages(product.getId(), response);
+        setInventory(product.getId(), response);
         return response;
     }
 
@@ -95,11 +92,8 @@ public class ProductService {
         return products.stream()
                 .map(p -> {
                     ProductResponse response = productMapper.toResponse(p);
-                    List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(p.getId());
-                    List<String> imageUrls = images.stream()
-                            .map(ProductImage::getImageUrl)
-                            .toList();
-                    response.setImageUrls(imageUrls);
+                    setProductImages(p.getId(), response);
+                    setInventory(p.getId(), response);
                     return response;
                 })
                 .toList();
@@ -112,14 +106,28 @@ public class ProductService {
         return products.stream()
                 .map(p -> {
                     ProductResponse response = productMapper.toResponse(p);
-                    List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(p.getId());
-                    List<String> imageUrls = images.stream()
-                            .map(ProductImage::getImageUrl)
-                            .toList();
-                    response.setImageUrls(imageUrls);
+                    setProductImages(p.getId(), response);
+                    setInventory(p.getId(), response);
                     return response;
                 })
                 .toList();
+    }
+
+    private void setProductImages(UUID productId, ProductResponse response) {
+        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
+        List<String> imageUrls = images.stream()
+                .map(ProductImage::getImageUrl)
+                .toList();
+        response.setImageUrls(imageUrls);
+    }
+
+    private void setInventory(UUID productId, ProductResponse response) {
+        try {
+            InventoryResponse inventory = inventoryService.getInventoryByProductId(productId);
+            response.setInventory(inventory);
+        } catch (ResourceNotFoundException e) {
+            response.setInventory(null);
+        }
     }
 
     @Transactional
@@ -148,12 +156,6 @@ public class ProductService {
         }
         if (request.getCostPrice() != null) {
             product.setCostPrice(request.getCostPrice());
-        }
-        if (request.getQuantityInStock() != null) {
-            product.setQuantityInStock(request.getQuantityInStock());
-        }
-        if (request.getReorderLevel() != null) {
-            product.setReorderLevel(request.getReorderLevel());
         }
 
         if (request.getImages() != null && !request.getImages().isEmpty()) {
@@ -208,6 +210,7 @@ public class ProductService {
                 .map(ProductImage::getImageUrl)
                 .toList();
         response.setImageUrls(imageUrls);
+        setInventory(id, response);
         return response;
     }
 

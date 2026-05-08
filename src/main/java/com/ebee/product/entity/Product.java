@@ -1,7 +1,7 @@
 package com.ebee.product.entity;
 
+import com.ebee.inventory.entity.Inventory;
 import com.ebee.order.entity.OrderItem;
-import com.ebee.stock.entity.Stock;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -48,18 +48,12 @@ public class Product {
     @Column(name = "cost_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal costPrice;
 
-    @Column(name = "quantity_in_stock", nullable = false)
-    private Integer quantityInStock;
-
-    @Column(name = "reorder_level")
-    private Integer reorderLevel;
-
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Stock> stockMovements = new ArrayList<>();
+    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Inventory inventory;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();

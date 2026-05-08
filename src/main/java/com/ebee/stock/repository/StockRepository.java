@@ -10,7 +10,7 @@ import java.util.UUID;
 @Repository
 public interface StockRepository extends JpaRepository<Stock, UUID> {
 
-    List<Stock> findByProductIdOrderByCreatedAtDesc(UUID productId);
+    List<Stock> findByInventoryIdOrderByCreatedAtDesc(UUID inventoryId);
 
-    List<Stock> findByProductIdAndMovementTypeOrderByCreatedAtDesc(UUID productId, com.ebee.stock.enums.StockMovementType movementType);
+    List<Stock> findByInventoryIdAndMovementTypeOrderByCreatedAtDesc(UUID inventoryId, com.ebee.stock.enums.StockMovementType movementType);
 }

@@ -4,6 +4,7 @@ import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
@@ -14,9 +15,7 @@ import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
-import com.ebee.stock.dto.StockRequest;
 import com.ebee.stock.enums.StockMovementType;
-import com.ebee.stock.service.StockService;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +38,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final OrderMapper orderMapper;
     private final SecurityService securityService;
-    private final StockService stockService;
+    private final InventoryService inventoryService;
     private final OrderNumberService orderNumberService;
 
     @Transactional
@@ -76,9 +75,9 @@ public class OrderService {
                 throw new IllegalArgumentException("Product is not active: " + product.getName());
             }
 
-            int currentStock = product.getQuantityInStock();
-            if (currentStock < itemRequest.getQuantity()) {
-                throw new IllegalArgumentException("Insufficient stock for " + product.getName() + ". Available: " + currentStock);
+            if (!inventoryService.hasSufficientStock(itemRequest.getProductId(), itemRequest.getQuantity())) {
+                Integer available = inventoryService.getAvailableStock(itemRequest.getProductId());
+                throw new IllegalArgumentException("Insufficient stock for " + product.getName() + ". Available: " + available);
             }
 
             BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
@@ -94,13 +93,12 @@ public class OrderService {
             order.getItems().add(item);
             totalAmount = totalAmount.add(subtotal);
 
-            // Update stock through StockService
-            StockRequest stockRequest = new StockRequest();
-            stockRequest.setProductId(itemRequest.getProductId());
-            stockRequest.setQuantityChange(-itemRequest.getQuantity());
-            stockRequest.setMovementType(StockMovementType.OUT);
-            stockRequest.setNotes("Order " + orderNumber + " - Item " + sequence.getAndIncrement());
-            stockService.recordStockMovement(stockRequest);
+            inventoryService.recordOrderStock(
+                    itemRequest.getProductId(),
+                    itemRequest.getQuantity(),
+                    StockMovementType.OUT,
+                    "Order " + orderNumber + " - Item " + sequence.getAndIncrement()
+            );
         }
 
         order.setTotalAmount(totalAmount);
@@ -162,12 +160,12 @@ public class OrderService {
         for (OrderItem item : order.getItems()) {
             Product product = item.getProduct();
 
-            StockRequest stockRequest = new StockRequest();
-            stockRequest.setProductId(product.getId());
-            stockRequest.setQuantityChange(item.getQuantity());
-            stockRequest.setMovementType(StockMovementType.RETURN);
-            stockRequest.setNotes("Order " + order.getOrderNumber() + " cancelled - Item restored");
-            stockService.recordStockMovement(stockRequest);
+            inventoryService.recordOrderStock(
+                    product.getId(),
+                    item.getQuantity(),
+                    StockMovementType.RETURN,
+                    "Order " + order.getOrderNumber() + " cancelled - Item restored"
+            );
         }
 
         order.setStatus(OrderStatus.CANCELLED);

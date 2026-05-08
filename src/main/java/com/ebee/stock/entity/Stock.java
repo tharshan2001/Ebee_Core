@@ -1,6 +1,6 @@
 package com.ebee.stock.entity;
 
-import com.ebee.product.entity.Product;
+import com.ebee.inventory.entity.Inventory;
 import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -25,11 +25,11 @@ public class Stock {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "inventory_id", nullable = false)
+    private Inventory inventory;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "created_by")
     private User createdBy;
 

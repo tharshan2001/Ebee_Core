@@ -34,8 +34,6 @@ public class ProductController {
             @RequestParam("category") String category,
             @RequestParam("price") BigDecimal price,
             @RequestParam("costPrice") BigDecimal costPrice,
-            @RequestParam("quantityInStock") Integer quantityInStock,
-            @RequestParam(value = "reorderLevel", required = false) Integer reorderLevel,
             @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
 
         ProductRequest request = new ProductRequest();
@@ -45,8 +43,6 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
-        request.setQuantityInStock(quantityInStock);
-        request.setReorderLevel(reorderLevel);
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
@@ -90,8 +86,6 @@ public class ProductController {
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "price", required = false) BigDecimal price,
             @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
-            @RequestParam(value = "quantityInStock", required = false) Integer quantityInStock,
-            @RequestParam(value = "reorderLevel", required = false) Integer reorderLevel,
             @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
 
         ProductRequest request = new ProductRequest();
@@ -101,8 +95,6 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
-        request.setQuantityInStock(quantityInStock);
-        request.setReorderLevel(reorderLevel);
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }

@@ -1,5 +1,6 @@
 package com.ebee.product.dto;
 
+import com.ebee.inventory.dto.InventoryResponse;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -17,10 +18,9 @@ public class ProductResponse {
     private String category;
     private BigDecimal price;
     private BigDecimal costPrice;
-    private Integer quantityInStock;
-    private Integer reorderLevel;
     private Boolean isActive;
     private List<String> imageUrls;
+    private InventoryResponse inventory;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

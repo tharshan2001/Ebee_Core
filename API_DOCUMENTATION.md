@@ -90,20 +90,38 @@ Authorization: Bearer <token>
   "message": "Products retrieved successfully",
   "data": [
     {
-      "id": "...",
-      "name": "Product Name",
-      "sku": "SKU001",
-      "price": 100.00,
-      "costPrice": 50.00,
+      "id": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+      "name": "Browser",
+      "sku": "BRW001",
+      "description": "Product description",
+      "category": "Electronics",
+      "price": 250.00,
+      "costPrice": 150.00,
+      "isActive": true,
+      "imageUrls": [
+        "https://s3.../image1.jpg"
+      ],
       "inventory": {
-        "quantity": 100,
-        "availableQuantity": 100,
-        "isLowStock": false
-      }
+        "id": "4b2fbacb-1897-45f7-810d-06b4a2186f87",
+        "productId": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+        "productName": "Browser",
+        "productSku": "BRW001",
+        "quantity": 50,
+        "reservedQuantity": 0,
+        "availableQuantity": 50,
+        "reorderLevel": 10,
+        "isLowStock": false,
+        "createdAt": "2026-05-08T20:38:55.890176",
+        "updatedAt": "2026-05-08T20:38:55.890176"
+      },
+      "createdAt": "2026-05-08T20:38:55.123456",
+      "updatedAt": "2026-05-08T20:38:55.123456"
     }
   ]
 }
 ```
+
+> Each product response includes `imageUrls` and `inventory` (may be `null` if no inventory exists).
 
 ---
 
@@ -165,7 +183,34 @@ Authorization: Bearer <token>
 {
   "success": true,
   "message": "Product updated successfully",
-  "data": { ... }
+  "data": {
+    "id": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+    "name": "Updated Product",
+    "sku": "BRW001",
+    "description": "Updated description",
+    "category": "Electronics",
+    "price": 275.00,
+    "costPrice": 160.00,
+    "isActive": true,
+    "imageUrls": [
+      "https://s3.eu-north-1.amazonaws.com/pathfinder-app-media/products/746f35da-dbee-4e2b-a7ab-23fcc4e79a13/image1.jpg"
+    ],
+    "inventory": {
+      "id": "4b2fbacb-1897-45f7-810d-06b4a2186f87",
+      "productId": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+      "productName": "Updated Product",
+      "productSku": "BRW001",
+      "quantity": 50,
+      "reservedQuantity": 0,
+      "availableQuantity": 50,
+      "reorderLevel": null,
+      "isLowStock": false,
+      "createdAt": "2026-05-08T20:38:55.890176",
+      "updatedAt": "2026-05-08T20:40:00.000000"
+    },
+    "createdAt": "2026-05-08T20:38:55.123456",
+    "updatedAt": "2026-05-08T20:40:00.000000"
+  }
 }
 ```
 
@@ -185,14 +230,38 @@ Authorization: Bearer <token>
   "success": true,
   "message": "Images uploaded successfully",
   "data": {
-    "id": "...",
+    "id": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+    "name": "Browser",
+    "sku": "BRW001",
+    "description": null,
+    "category": "Electronics",
+    "price": 250.00,
+    "costPrice": 150.00,
+    "isActive": true,
     "imageUrls": [
-      "https://s3.../image1.jpg",
-      "https://s3.../image2.jpg"
-    ]
+      "https://s3.eu-north-1.amazonaws.com/pathfinder-app-media/products/746f35da-dbee-4e2b-a7ab-23fcc4e79a13/image1.jpg",
+      "https://s3.eu-north-1.amazonaws.com/pathfinder-app-media/products/746f35da-dbee-4e2b-a7ab-23fcc4e79a13/image2.jpg"
+    ],
+    "inventory": {
+      "id": "4b2fbacb-1897-45f7-810d-06b4a2186f87",
+      "productId": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+      "productName": "Browser",
+      "productSku": "BRW001",
+      "quantity": 50,
+      "reservedQuantity": 0,
+      "availableQuantity": 50,
+      "reorderLevel": null,
+      "isLowStock": false,
+      "createdAt": "2026-05-08T20:38:55.890176",
+      "updatedAt": "2026-05-08T20:38:55.890176"
+    },
+    "createdAt": "2026-05-08T20:38:55.123456",
+    "updatedAt": "2026-05-08T20:38:55.123456"
   }
 }
 ```
+
+> Note: Returns the full product object with updated `imageUrls` and `inventory`.
 
 ---
 
@@ -561,20 +630,83 @@ async function createProduct(productData: {
 }
 ```
 
-## 4.2 Get Products with Inventory
+## 4.2 Update Product
+
+```typescript
+async function updateProduct(
+  productId: string,
+  updates: {
+    name?: string;
+    sku?: string;
+    description?: string;
+    category?: string;
+    price?: number;
+    costPrice?: number;
+    images?: File[];
+  }
+) {
+  const formData = new FormData();
+  if (updates.name) formData.append('name', updates.name);
+  if (updates.sku) formData.append('sku', updates.sku);
+  if (updates.description) formData.append('description', updates.description);
+  if (updates.category) formData.append('category', updates.category);
+  if (updates.price) formData.append('price', updates.price.toString());
+  if (updates.costPrice) formData.append('costPrice', updates.costPrice.toString());
+  if (updates.images) {
+    updates.images.forEach((image) => formData.append('images', image));
+  }
+
+  const response = await api.patch(`/products/${productId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+// Usage — update text only
+await updateProduct('product-id', { name: 'New Name', price: 299.99 });
+
+// Usage — upload images
+await updateProduct('product-id', { images: [file1, file2] });
+```
+
+## 4.3 Upload Images Only
+
+```typescript
+async function uploadProductImages(productId: string, images: File[]) {
+  const formData = new FormData();
+  images.forEach((image) => formData.append('images', image));
+
+  const response = await api.post(`/products/${productId}/images`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+```
+
+## 4.4 Get Product by ID / SKU
+
+```typescript
+async function getProductById(id: string) {
+  const response = await api.get(`/products/${id}`);
+  return response.data; // ProductResponse with inventory & imageUrls
+}
+
+async function getProductBySku(sku: string) {
+  const response = await api.get(`/products/sku/${sku}`);
+  return response.data;
+}
+```
+
+## 4.5 Get Products with Inventory
 
 ```typescript
 async function getProducts() {
   const response = await api.get('/products');
   return response.data;
 }
-
-// Usage
-const result = await getProducts();
-// result.data = ProductResponse[]
 ```
 
-## 4.3 Adjust Stock
+## 4.6 Adjust Stock
 
 ```typescript
 async function adjustStock(productId: string, quantity: number, type: 'IN' | 'OUT', notes?: string) {
@@ -594,7 +726,7 @@ await adjustStock('746f35da-dbee-4e2b-a7ab-23fcc4e79a13', 100, 'IN', 'Stock repl
 await adjustStock('746f35da-dbee-4e2b-a7ab-23fcc4e79a13', 10, 'OUT', 'Sold to customer');
 ```
 
-## 4.4 Get Low Stock Products
+## 4.7 Get Low Stock Products
 
 ```typescript
 async function getLowStockProducts() {
@@ -603,7 +735,7 @@ async function getLowStockProducts() {
 }
 ```
 
-## 4.5 Get Stock History
+## 4.8 Get Stock History
 
 ```typescript
 async function getStockHistory(productId: string) {
@@ -619,7 +751,7 @@ async function getStockHistory(productId: string) {
 // - createdAt
 ```
 
-## 4.6 Check Stock Availability for Order
+## 4.9 Check Stock Availability for Order
 
 ```typescript
 async function checkStockAvailable(productId: string, quantity: number): Promise<boolean> {
@@ -805,6 +937,37 @@ curl http://localhost:8085/api/inventory/low-stock \
 # Get Stock History
 curl http://localhost:8085/api/inventory/product/<PRODUCT_ID>/history \
   -H "Authorization: Bearer $TOKEN"
+
+# Update Product (text fields only)
+curl -X PATCH http://localhost:8085/api/products/<PRODUCT_ID> \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "name=Updated Name" \
+  -F "price=199.99" \
+  -F "costPrice=100.00"
+
+# Update Product (with image upload)
+curl -X PATCH http://localhost:8085/api/products/<PRODUCT_ID> \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "name=Updated Name" \
+  -F "images=@/path/to/image.png"
+
+# Upload Images Only
+curl -X POST http://localhost:8085/api/products/<PRODUCT_ID>/images \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "images=@/path/to/image1.png" \
+  -F "images=@/path/to/image2.png"
+
+# Get Product by ID
+curl http://localhost:8085/api/products/<PRODUCT_ID> \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get Product by SKU
+curl http://localhost:8085/api/products/sku/<SKU> \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete Product (soft delete)
+curl -X DELETE http://localhost:8085/api/products/<PRODUCT_ID> \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -812,9 +975,11 @@ curl http://localhost:8085/api/inventory/product/<PRODUCT_ID>/history \
 # 9. Notes
 
 1. **Inventory is auto-created** when a product is created (quantity starts at 0)
-2. **Stock must be added** using `/inventory/adju` endpoint after product creation
+2. **Stock must be added** using `/inventory/adjust` endpoint after product creation
 3. **Available Quantity** = Quantity - Reserved Quantity
 4. **Low Stock** = When available quantity <= reorder level
 5. **Reserved Stock** is held for cart/checkout processes
 6. **Orders automatically deduct stock** when created
 7. **Order cancellation restores stock** automatically
+8. **Product responses always include `imageUrls` and `inventory`** — these are eagerly fetched via JOIN FETCH, eliminating N+1 queries
+9. **Images uploaded via PATCH/POST** are appended to existing images (up to max 10 per product)

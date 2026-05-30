@@ -16,6 +16,9 @@ public class OrderResponse {
     private UUID agentId;
     private String agentCode;
     private String agentName;
+    private UUID customerId;
+    private String customerName;
+    private String customerPhone;
     private BigDecimal totalAmount;
     private OrderStatus status;
     private String notes;

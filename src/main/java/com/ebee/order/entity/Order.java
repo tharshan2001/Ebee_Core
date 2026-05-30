@@ -1,6 +1,7 @@
 package com.ebee.order.entity;
 
 import com.ebee.agent.entity.Agent;
+import com.ebee.customer.entity.Customer;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -36,6 +37,10 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @Column(name = "order_number", nullable = false, unique = true)
     private String orderNumber;

@@ -1,8 +1,10 @@
 package com.ebee.common.security;
 
+import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -36,5 +38,15 @@ public class SecurityService {
         return userRepository.findByEmail(email)
                 .map(user -> user.getId())
                 .orElseThrow(() -> new IllegalStateException("User not found for email: " + email));
+    }
+
+    public boolean isAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
     }
 }

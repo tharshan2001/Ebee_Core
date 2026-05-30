@@ -2,8 +2,12 @@ package com.ebee.order.service;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
+import com.ebee.commission.service.CommissionCalculationService;
+import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.customer.entity.Customer;
+import com.ebee.customer.service.CustomerService;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
@@ -40,23 +44,38 @@ public class OrderService {
     private final SecurityService securityService;
     private final InventoryService inventoryService;
     private final OrderNumberService orderNumberService;
+    private final CommissionCalculationService commissionCalculationService;
+    private final CommissionLifecycleService commissionLifecycleService;
+    private final CustomerService customerService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
-        Agent agent = agentRepository.findById(request.getAgentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", request.getAgentId()));
+        Agent agent = null;
+        
+        if (request.getAgentId() != null) {
+            agent = agentRepository.findById(request.getAgentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", request.getAgentId()));
 
-        if (!Boolean.TRUE.equals(agent.getIsActive())) {
-            throw new IllegalArgumentException("Agent is not active");
+            if (!Boolean.TRUE.equals(agent.getIsActive())) {
+                throw new IllegalArgumentException("Agent is not active");
+            }
+        } else if (!securityService.isAdmin()) {
+            throw new IllegalArgumentException("Agent is required for non-admin users");
         }
 
         User currentUser = userRepository.findById(securityService.getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
 
+        Customer customer = null;
+        if (request.getCustomerPhoneNumber() != null) {
+            customer = customerService.findByPhone(request.getCustomerPhoneNumber());
+        }
+
         String orderNumber = orderNumberService.generateOrderNumber();
 
         Order order = Order.builder()
                 .agent(agent)
+                .customer(customer)
                 .createdBy(currentUser)
                 .orderNumber(orderNumber)
                 .notes(request.getNotes())
@@ -103,30 +122,43 @@ public class OrderService {
 
         order.setTotalAmount(totalAmount);
         Order savedOrder = orderRepository.save(order);
+
+        if (agent != null) {
+            commissionCalculationService.calculateCommissionForOrder(savedOrder);
+        }
+
+        if (customer != null) {
+            customerService.incrementTotalOrders(customer.getId());
+        }
+
         return orderMapper.toResponse(savedOrder);
     }
 
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(UUID id) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
         return orderMapper.toResponse(order);
     }
 
+    @Transactional(readOnly = true)
     public OrderResponse getOrderByOrderNumber(String orderNumber) {
-        Order order = orderRepository.findByOrderNumber(orderNumber)
+        Order order = orderRepository.findByOrderNumberWithDetails(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "orderNumber", orderNumber));
         return orderMapper.toResponse(order);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByAgentId(UUID agentId) {
         agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", agentId));
-        List<Order> orders = orderRepository.findByAgentId(agentId);
+        List<Order> orders = orderRepository.findByAgentIdWithDetails(agentId);
         return orderMapper.toResponseList(orders);
     }
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
+        List<Order> orders = orderRepository.findAllWithDetails();
         return orderMapper.toResponseList(orders);
     }
 
@@ -167,6 +199,8 @@ public class OrderService {
                     "Order " + order.getOrderNumber() + " cancelled - Item restored"
             );
         }
+
+        commissionLifecycleService.cancelCommissionForOrder(id);
 
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);

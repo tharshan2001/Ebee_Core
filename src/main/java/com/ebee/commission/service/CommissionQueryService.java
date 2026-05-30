@@ -8,6 +8,7 @@ import com.ebee.commission.repository.CommissionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CommissionQueryService {
 
     private final CommissionRepository commissionRepository;
@@ -36,5 +38,11 @@ public class CommissionQueryService {
         Commission commission = commissionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Commission not found: " + id));
         return mapper.toResponse(commission);
+    }
+
+    public List<CommissionResponse> getAllCommissions() {
+        return commissionRepository.findAll().stream()
+                .map(mapper::toResponse)
+                .collect(Collectors.toList());
     }
 }

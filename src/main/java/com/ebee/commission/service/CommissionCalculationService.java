@@ -38,8 +38,17 @@ public class CommissionCalculationService {
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Order not found: " + request.getOrderId()));
 
-        Agent agent = order.getAgent();
+        Commission commission = calculateCommissionForOrder(order);
+        return mapper.toResponse(commission);
+    }
 
+    @Transactional
+    public Commission calculateCommissionForOrder(Order order) {
+        if (order.getAgent() == null) {
+            throw new IllegalStateException("Order has no agent, cannot calculate commission");
+        }
+
+        Agent agent = order.getAgent();
         CommissionConfig config = findApplicableConfig(agent);
 
         BigDecimal commissionRate = config != null ?
@@ -61,8 +70,7 @@ public class CommissionCalculationService {
                 .calculatedAt(LocalDateTime.now())
                 .build();
 
-        commission = commissionRepository.save(commission);
-        return mapper.toResponse(commission);
+        return commissionRepository.save(commission);
     }
 
     private CommissionConfig findApplicableConfig(Agent agent) {

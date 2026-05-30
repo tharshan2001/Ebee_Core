@@ -79,10 +79,7 @@ public class CommissionController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getAllCommissions() {
-        List<Commission> commissions = commissionRepository.findAll();
-        List<CommissionResponse> response = commissions.stream()
-                .map(mapper::toResponse)
-                .collect(Collectors.toList());
+        List<CommissionResponse> response = queryService.getAllCommissions();
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
     }
 

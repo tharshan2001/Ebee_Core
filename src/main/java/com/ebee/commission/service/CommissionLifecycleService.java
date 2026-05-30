@@ -2,6 +2,7 @@ package com.ebee.commission.service;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.commission.dto.CommissionResponse;
+import com.ebee.agent.entity.Agent;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.mapper.CommissionMapper;
@@ -59,6 +60,20 @@ public class CommissionLifecycleService {
         commission.setErrorMessage(reason);
         commission = commissionRepository.save(commission);
         return mapper.toResponse(commission);
+    }
+
+    @Transactional
+    public void cancelCommissionForOrder(UUID orderId) {
+        commissionRepository.findCommissionByOrderId(orderId).ifPresent(commission -> {
+
+            if (commission.getStatus() == CommissionStatus.PAID) {
+                Agent agent = commission.getAgent();
+                agent.setTotalCommission(agent.getTotalCommission() - commission.getCommissionAmount().doubleValue());
+                agent.setTotalSales(agent.getTotalSales() - commission.getOrderAmount().doubleValue());
+            }
+
+            commission.setStatus(CommissionStatus.CANCELLED);
+        });
     }
 
     private Commission getCommissionEntity(UUID id) {

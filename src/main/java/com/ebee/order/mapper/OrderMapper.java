@@ -14,7 +14,10 @@ public interface OrderMapper {
 
     @Mapping(target = "agentId", source = "agent.id")
     @Mapping(target = "agentCode", source = "agent.agentCode")
-    @Mapping(target = "agentName", expression = "java(order.getAgent().getUser() != null ? order.getAgent().getUser().getFirstName() + \" \" + order.getAgent().getUser().getLastName() : null)")
+    @Mapping(target = "agentName", expression = "java(order.getAgent() != null && order.getAgent().getUser() != null ? order.getAgent().getUser().getFirstName() + \" \" + order.getAgent().getUser().getLastName() : \"Direct Order\")")
+    @Mapping(target = "customerId", source = "customer.id")
+    @Mapping(target = "customerName", expression = "java(order.getCustomer() != null ? order.getCustomer().getFirstName() + \" \" + order.getCustomer().getLastName() : null)")
+    @Mapping(target = "customerPhone", source = "customer.phoneNumber")
     @Mapping(target = "createdById", source = "createdBy.id")
     @Mapping(target = "createdByName", expression = "java(order.getCreatedBy() != null ? order.getCreatedBy().getFirstName() + \" \" + order.getCreatedBy().getLastName() : null)")
     OrderResponse toResponse(Order order);

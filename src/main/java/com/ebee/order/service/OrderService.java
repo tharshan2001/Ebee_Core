@@ -52,9 +52,9 @@ public class OrderService {
     public OrderResponse createOrder(OrderRequest request) {
         Agent agent = null;
         
-        if (request.getAgentId() != null) {
-            agent = agentRepository.findById(request.getAgentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", request.getAgentId()));
+        if (request.getAgentCode() != null) {
+            agent = agentRepository.findByAgentCode(request.getAgentCode())
+                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", request.getAgentCode()));
 
             if (!Boolean.TRUE.equals(agent.getIsActive())) {
                 throw new IllegalArgumentException("Agent is not active");
@@ -87,15 +87,15 @@ public class OrderService {
         AtomicInteger sequence = new AtomicInteger(1);
 
         for (OrderItemRequest itemRequest : request.getItems()) {
-            Product product = productRepository.findById(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemRequest.getProductId()));
+            Product product = productRepository.findBySku(itemRequest.getProductSku())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", itemRequest.getProductSku()));
 
             if (!Boolean.TRUE.equals(product.getIsActive())) {
                 throw new IllegalArgumentException("Product is not active: " + product.getName());
             }
 
-            if (!inventoryService.hasSufficientStock(itemRequest.getProductId(), itemRequest.getQuantity())) {
-                Integer available = inventoryService.getAvailableStock(itemRequest.getProductId());
+            if (!inventoryService.hasSufficientStock(product.getId(), itemRequest.getQuantity())) {
+                Integer available = inventoryService.getAvailableStock(product.getId());
                 throw new IllegalArgumentException("Insufficient stock for " + product.getName() + ". Available: " + available);
             }
 
@@ -113,7 +113,7 @@ public class OrderService {
             totalAmount = totalAmount.add(subtotal);
 
             inventoryService.recordOrderStock(
-                    itemRequest.getProductId(),
+                    product.getId(),
                     itemRequest.getQuantity(),
                     StockMovementType.OUT,
                     "Order " + orderNumber + " - Item " + sequence.getAndIncrement()

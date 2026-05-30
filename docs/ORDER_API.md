@@ -35,12 +35,12 @@ Authorization: Bearer <JWT_TOKEN>
 **Request Body:**
 ```json
 {
-  "agentId": "UUID",
+  "agentCode": "AG-001",
   "customerPhoneNumber": "+94771234567",
   "notes": "Optional order notes",
   "items": [
     {
-      "productId": "UUID",
+      "productSku": "PA-001",
       "quantity": 2
     }
   ]
@@ -50,11 +50,11 @@ Authorization: Bearer <JWT_TOKEN>
 **Validation:**
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| agentId | UUID | Yes (for non-admin) | Must be an active agent |
+| agentCode | String | Yes (for non-admin) | Must match an active agent's code |
 | customerPhoneNumber | String | No | Links to existing customer; fails if phone not found |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
-| items[].productId | UUID | Yes | Must be an active product |
+| items[].productSku | String | Yes | Must match an active product's SKU |
 | items[].quantity | Integer | Yes | Positive integer |
 
 **Success Response (201 Created):**
@@ -269,12 +269,12 @@ Cancels an order.
 ### OrderRequest
 ```json
 {
-  "agentId": "UUID (required for non-admin)",
+  "agentCode": "String (required for non-admin, e.g. AG-001)",
   "customerPhoneNumber": "String (optional, must match existing customer)",
   "notes": "String (optional)",
   "items": [
     {
-      "productId": "UUID (required)",
+      "productSku": "String (required, e.g. PA-001)",
       "quantity": "Integer (required, positive)"
     }
   ]
@@ -365,12 +365,12 @@ curl -X POST http://localhost:8085/api/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <ADMIN_TOKEN>" \
   -d '{
-    "agentId": "478de22c-9519-4503-829e-56b0236b24ce",
+    "agentCode": "AG-001",
     "customerPhoneNumber": "+94771234567",
     "notes": "Customer requested express delivery",
     "items": [
       {
-        "productId": "171ab477-cba6-4589-934d-01906d480852",
+        "productSku": "PA-001",
         "quantity": 3
       }
     ]
@@ -392,18 +392,18 @@ curl -X POST http://localhost:8085/api/auth/login \
   -d '{"email":"agent@ebee.com","password":"password123"}'
 ```
 
-2. Agent creates order (using their own agentId):
+2. Agent creates order (using their own agentCode):
 ```bash
 curl -X POST http://localhost:8085/api/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <AGENT_TOKEN>" \
   -d '{
-    "agentId": "6e236ef6-d64d-4835-9d15-14e6427d3907",
+    "agentCode": "AG-001",
     "customerPhoneNumber": "+94771234567",
     "notes": "Customer order",
     "items": [
       {
-        "productId": "171ab477-cba6-4589-934d-01906d480852",
+        "productSku": "PA-001",
         "quantity": 1
       }
     ]

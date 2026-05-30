@@ -46,9 +46,9 @@ curl -X POST http://localhost:8085/api/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{
-    "agentId": "<AGENT_UUID>",
+    "agentCode": "AG-001",
     "customerPhoneNumber": "+94771234567",
-    "items": [{"productId": "<PRODUCT_UUID>", "quantity": 2}]
+    "items": [{"productSku": "PA-001", "quantity": 2}]
   }'
 ```
 

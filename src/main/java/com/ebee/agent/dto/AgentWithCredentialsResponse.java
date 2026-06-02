@@ -1,5 +1,6 @@
 package com.ebee.agent.dto;
 
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.user.enums.UserStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -25,6 +26,7 @@ public class AgentWithCredentialsResponse {
     private String bankAccountNumber;
     private String bankName;
     private String bankBranch;
+    private AgentCommissionType commissionType;
     private UserStatus userStatus;
     private Boolean isActive;
     private Boolean mustChangePassword;

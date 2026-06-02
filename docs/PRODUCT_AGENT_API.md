@@ -47,6 +47,52 @@ Authorization: Bearer <JWT_TOKEN>
 
 ## Agents
 
+### Commission Types
+Each agent has a `commissionType` that determines how commission is calculated:
+
+| Type     | Behavior |
+|----------|----------|
+| `DEFAULT` | Uses the global default commission config rate (see Default Config below). Falls back to agent's own `commissionRate` if no default config exists. |
+| `CUSTOM`  | Skips config lookup entirely — always uses the agent's own `commissionRate` as a fixed percentage of the order total |
+
+### Default Commission Config (Singleton)
+
+There is exactly **one** active default commission config at any time. This is the rate applied to all agents with `commissionType: DEFAULT`.
+
+**GET** `/api/commission-configs/default`
+
+**PUT** `/api/commission-configs/default` — Create or update the default rate.
+
+```bash
+curl -X PUT http://localhost:8085/api/commission-configs/default \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Global Default",
+    "commissionRate": 7.5,
+    "appliesTo": "ALL"
+  }'
+```
+
+> Creating a second `DEFAULT` config via `POST /api/commission-configs` will throw an error. Use `PUT /default` instead.
+
+### Performance Configs (Per-Agent)
+
+Per-agent override configs. Matched by agent code via `appliesTo`.
+
+**POST** `/api/commission-configs`
+```json
+{
+  "name": "JF-008 Bonus",
+  "commissionRate": 12.0,
+  "type": "PERFORMANCE",
+  "appliesTo": "JF-008",
+  "isActive": true
+}
+```
+
+Performance configs take priority over the default config when calculating commissions.
+
 ### Supported Districts
 Agents are assigned to one of the following districts (North & East Sri Lanka only). The district determines the auto-generated agent code prefix.
 
@@ -84,6 +130,7 @@ Content-Type: multipart/form-data
 | firstName              | string   | yes      | First name                                          |
 | lastName               | string   | yes      | Last name                                           |
 | commissionRate         | number   | yes      | Commission rate (percentage, e.g. 5.0)              |
+
 | district               | string   | yes      | District name (see table above)                     |
 | address                | string   | no       | Agent's address                                     |
 | phoneNumber            | string   | no       | Phone number                                        |
@@ -93,6 +140,8 @@ Content-Type: multipart/form-data
 | bankAccountNumber      | string   | no       | Bank account number                                 |
 | bankName               | string   | no       | Bank name                                           |
 | bankBranch             | string   | no       | Bank branch                                         |
+
+> Agents are always created with `commissionType: DEFAULT`. The admin can change it to `CUSTOM` later via the PATCH update endpoint.
 
 **cURL Example:**
 ```bash
@@ -123,6 +172,7 @@ curl -X POST http://localhost:8085/api/agents \
     "district": "Jaffna",
     "phoneNumber": "0771234567",
     "commissionRate": 5.0,
+    "commissionType": "DEFAULT",
     "nicNumber": null,
     "bankAccountNumber": null,
     "bankName": null,
@@ -170,6 +220,7 @@ Authorization: Bearer <JWT_TOKEN>
       "district": "Jaffna",
       "phoneNumber": "0771234567",
       "commissionRate": 5.0,
+      "commissionType": "DEFAULT",
       "totalSales": 0.0,
       "totalCommission": 0.0,
       "isActive": true,
@@ -224,6 +275,7 @@ Content-Type: multipart/form-data
 |------------------------|----------|----------|------------------------------------|
 | agentCode              | string   | yes      | Agent code (manually settable)     |
 | commissionRate         | number   | yes      | Commission rate                    |
+| commissionType         | string   | no       | Change to `DEFAULT` or `CUSTOM`    |
 | district               | string   | no       | Change district                    |
 | address                | string   | no       | Change address                     |
 | phoneNumber            | string   | no       | Change phone number                |
@@ -240,6 +292,7 @@ curl -X PATCH http://localhost:8085/api/agents/{id} \
   -H "Authorization: Bearer <JWT_TOKEN>" \
   -F "agentCode=JF-001" \
   -F "commissionRate=7.0" \
+  -F "commissionType=CUSTOM" \
   -F "address=456 New Road" \
   -F "district=Kilinochchi" \
   -F "phoneNumber=0777654321"

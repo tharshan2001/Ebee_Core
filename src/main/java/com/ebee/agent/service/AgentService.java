@@ -5,6 +5,7 @@ import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.entity.Agent;
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.enums.District;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -75,6 +76,7 @@ public class AgentService {
                 .district(district.getDisplayName())
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(request.getCommissionRate())
+                .commissionType(AgentCommissionType.DEFAULT)
                 .nicNumber(request.getNicNumber())
                 .bankAccountNumber(request.getBankAccountNumber())
                 .bankName(request.getBankName())
@@ -114,6 +116,7 @@ public class AgentService {
                 .district(savedAgent.getDistrict())
                 .phoneNumber(savedAgent.getPhoneNumber())
                 .commissionRate(savedAgent.getCommissionRate())
+                .commissionType(savedAgent.getCommissionType())
                 .nicNumber(savedAgent.getNicNumber())
                 .bankAccountNumber(savedAgent.getBankAccountNumber())
                 .bankName(savedAgent.getBankName())
@@ -220,6 +223,10 @@ public class AgentService {
             agent.setDistrict(request.getDistrict());
         }
 
+        if (request.getCommissionType() != null) {
+            agent.setCommissionType(request.getCommissionType());
+        }
+
         agent.setAddress(request.getAddress());
         agent.setPhoneNumber(request.getPhoneNumber());
         agent.setCommissionRate(request.getCommissionRate());
@@ -291,6 +298,7 @@ public class AgentService {
         response.setDistrict(agent.getDistrict());
         response.setPhoneNumber(agent.getPhoneNumber());
         response.setCommissionRate(agent.getCommissionRate());
+        response.setCommissionType(agent.getCommissionType());
         response.setTotalSales(agent.getTotalSales());
         response.setTotalCommission(agent.getTotalCommission());
         response.setIsActive(agent.getIsActive());

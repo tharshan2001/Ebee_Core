@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,6 +26,10 @@ public class CommissionConfigService {
 
     @Transactional
     public CommissionConfigResponse createConfig(CommissionConfigRequest request) {
+        if (request.getType() == CommissionType.DEFAULT &&
+            configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT).isPresent()) {
+            throw new IllegalStateException("A default commission config already exists. Use PUT /api/commission-configs/default to update it.");
+        }
         CommissionConfig config = mapper.toConfigEntity(request);
         config = configRepository.save(config);
         return mapper.toConfigResponse(config);
@@ -72,8 +78,29 @@ public class CommissionConfigService {
                 .collect(Collectors.toList());
     }
 
-    public List<CommissionConfigResponse> getDefaultConfigs() {
-        return getConfigsByType(CommissionType.DEFAULT);
+    public CommissionConfigResponse getDefaultConfig() {
+        CommissionConfig config = configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                .orElseThrow(() -> new EntityNotFoundException("No active default commission config found"));
+        return mapper.toConfigResponse(config);
+    }
+
+    @Transactional
+    public CommissionConfigResponse updateDefaultConfig(CommissionConfigRequest request) {
+        Optional<CommissionConfig> existing = configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT);
+        CommissionConfig config;
+        if (existing.isPresent()) {
+            config = existing.get();
+            mapper.updateConfigFromRequest(request, config);
+        } else {
+            config = mapper.toConfigEntity(request);
+            config.setType(CommissionType.DEFAULT);
+        }
+        if (request.getEffectiveFrom() == null) {
+            config.setEffectiveFrom(LocalDateTime.now());
+        }
+        config.setIsActive(true);
+        config = configRepository.save(config);
+        return mapper.toConfigResponse(config);
     }
 
     public List<CommissionConfigResponse> getPerformanceConfigs() {

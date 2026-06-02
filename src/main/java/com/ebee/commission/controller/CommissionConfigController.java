@@ -5,6 +5,7 @@ import com.ebee.commission.dto.CommissionConfigRequest;
 import com.ebee.commission.dto.CommissionConfigResponse;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.service.CommissionConfigService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -86,9 +87,17 @@ public class CommissionConfigController {
 
     @GetMapping("/default")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getDefaultConfigs() {
-        List<CommissionConfigResponse> response = configService.getDefaultConfigs();
-        return ResponseEntity.ok(ApiResponse.success("Default commission configs retrieved successfully", response));
+    public ResponseEntity<ApiResponse<CommissionConfigResponse>> getDefaultConfig() {
+        CommissionConfigResponse response = configService.getDefaultConfig();
+        return ResponseEntity.ok(ApiResponse.success("Default commission config retrieved successfully", response));
+    }
+
+    @PutMapping("/default")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CommissionConfigResponse>> updateDefaultConfig(
+            @Valid @RequestBody CommissionConfigRequest request) {
+        CommissionConfigResponse response = configService.updateDefaultConfig(request);
+        return ResponseEntity.ok(ApiResponse.success("Default commission config updated successfully", response));
     }
 
     @GetMapping("/performance")

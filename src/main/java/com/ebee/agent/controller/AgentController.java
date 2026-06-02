@@ -4,6 +4,7 @@ import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.service.AgentService;
 import com.ebee.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -119,6 +120,7 @@ public class AgentController {
             @PathVariable UUID id,
             @RequestParam("agentCode") String agentCode,
             @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType,
             @RequestParam(value = "address", required = false) String address,
             @RequestParam(value = "district", required = false) String district,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
@@ -132,6 +134,7 @@ public class AgentController {
         AgentUpdateRequest request = new AgentUpdateRequest();
         request.setAgentCode(agentCode);
         request.setCommissionRate(commissionRate);
+        request.setCommissionType(commissionType);
         request.setAddress(address);
         request.setDistrict(district);
         request.setPhoneNumber(phoneNumber);

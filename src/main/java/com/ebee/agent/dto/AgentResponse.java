@@ -1,5 +1,6 @@
 package com.ebee.agent.dto;
 
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.user.enums.UserStatus;
 import lombok.Data;
 
@@ -22,6 +23,7 @@ public class AgentResponse {
     private Double commissionRate;
     private Double totalSales;
     private Double totalCommission;
+    private AgentCommissionType commissionType;
     private Boolean isActive;
     private UserStatus userStatus;
 

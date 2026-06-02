@@ -1,5 +1,6 @@
 package com.ebee.agent.entity;
 
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.order.entity.Order;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -48,6 +49,11 @@ public class Agent {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "commission_type", nullable = false)
+    @Builder.Default
+    private AgentCommissionType commissionType = AgentCommissionType.DEFAULT;
 
     @Column(columnDefinition = "TEXT")
     private String address;

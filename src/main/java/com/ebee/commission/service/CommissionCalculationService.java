@@ -1,6 +1,7 @@
 package com.ebee.commission.service;
 
 import com.ebee.agent.entity.Agent;
+import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -74,6 +75,10 @@ public class CommissionCalculationService {
     }
 
     private CommissionConfig findApplicableConfig(Agent agent) {
+        if (agent.getCommissionType() == AgentCommissionType.CUSTOM) {
+            return null;
+        }
+
         List<CommissionConfig> activeConfigs = configRepository.findByIsActiveTrue();
 
         CommissionConfig performanceConfig = activeConfigs.stream()

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .header {
+            background: #1a73e8;
+            padding: 32px 40px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+        }
+        .body {
+            padding: 32px 40px;
+            color: #333333;
+            line-height: 1.6;
+        }
+        .body h2 {
+            color: #1a73e8;
+            font-size: 18px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+        .body p {
+            margin: 8px 0;
+        }
+        .details {
+            background: #f8f9fa;
+            border-left: 4px solid #1a73e8;
+            padding: 16px 20px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+        .details p {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        .requirements {
+            background: #fff8e1;
+            border-left: 4px solid #f9a825;
+            padding: 16px 20px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+        .requirements ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        .requirements li {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+        .footer {
+            padding: 24px 40px;
+            text-align: center;
+            color: #888888;
+            font-size: 13px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .footer p {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Application Received</h1>
+        </div>
+        <div class="body">
+            <p>Dear <strong>{{firstName}}</strong>,</p>
+            <p>Thank you for applying to become an Ebee agent! We have received your application and our team will review it shortly.</p>
+
+            <h2>Application Summary</h2>
+            <div class="details">
+                <p><strong>Name:</strong> {{firstName}} {{lastName}}</p>
+                <p><strong>Email:</strong> {{email}}</p>
+                <p><strong>Phone:</strong> {{phoneNumber}}</p>
+            </div>
+
+            <h2>Next Steps</h2>
+            <p>An administrator will review your application. If approved, you will receive your agent credentials and further instructions via email.</p>
+
+            <h2>Registration Requirements</h2>
+            <p>To complete the registration process, please ensure you have the following ready:</p>
+            <div class="requirements">
+                <ul>
+                    <li>Valid National Identity Card (NIC)</li>
+                    <li>Bank account details (account number, bank name, branch)</li>
+                    <li>Recent passport-sized photograph</li>
+                    <li>Proof of address (utility bill or bank statement)</li>
+                </ul>
+            </div>
+            <p>You will be contacted once your application has been processed. If you have any questions, please reach out to our support team.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Ebee. All rights reserved.</p>
+            <p>This is an automated message, please do not reply directly.</p>
+        </div>
+    </div>
+</body>
+</html>

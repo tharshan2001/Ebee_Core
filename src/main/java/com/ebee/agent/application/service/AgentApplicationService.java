@@ -5,18 +5,26 @@ import com.ebee.agent.application.dto.AgentApplicationResponse;
 import com.ebee.agent.application.entity.AgentApplication;
 import com.ebee.agent.application.repository.AgentApplicationRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.notification.model.EmailRequest;
+import com.ebee.notification.sender.EmailSender;
+import com.ebee.notification.template.NotificationTemplateService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentApplicationService {
 
     private final AgentApplicationRepository repository;
+    private final EmailSender emailSender;
+    private final NotificationTemplateService templateService;
 
     @Transactional
     public AgentApplicationResponse create(AgentApplicationRequest request) {
@@ -28,7 +36,33 @@ public class AgentApplicationService {
                 .build();
 
         AgentApplication saved = repository.save(application);
+
+        sendConfirmationEmail(request);
+
         return mapToResponse(saved);
+    }
+
+    private void sendConfirmationEmail(AgentApplicationRequest request) {
+        try {
+            String html = templateService.resolve("agent-application-confirmation.html", Map.of(
+                    "firstName", request.getFirstName(),
+                    "lastName", request.getLastName(),
+                    "email", request.getEmail(),
+                    "phoneNumber", request.getPhoneNumber()
+            ));
+
+            EmailRequest emailReq = EmailRequest.builder()
+                    .to(request.getEmail())
+                    .subject("Application Received – Ebee Agent Registration")
+                    .body(html)
+                    .html(true)
+                    .build();
+
+            emailSender.send(emailReq);
+            log.info("Confirmation email sent to: {}", request.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send confirmation email to {}: {}", request.getEmail(), e.getMessage());
+        }
     }
 
     @Transactional(readOnly = true)

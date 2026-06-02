@@ -5,14 +5,17 @@ import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.entity.Agent;
+import com.ebee.agent.enums.District;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
+import com.ebee.notification.NotificationService;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentService {
@@ -32,6 +36,7 @@ public class AgentService {
     private final UserRepository userRepository;
     private final S3Service s3Service;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -43,9 +48,8 @@ public class AgentService {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
-        if (agentRepository.existsByAgentCode(request.getAgentCode())) {
-            throw new IllegalArgumentException("Agent code already exists");
-        }
+        District district = District.fromDisplayName(request.getDistrict());
+        String agentCode = generateAgentCode(district);
 
         String generatedPassword = generatePassword();
         UserStatus initialStatus = createdByAdmin ? UserStatus.ACTIVE : UserStatus.INACTIVE;
@@ -66,7 +70,9 @@ public class AgentService {
 
         Agent agent = Agent.builder()
                 .user(savedUser)
-                .agentCode(request.getAgentCode())
+                .agentCode(agentCode)
+                .address(request.getAddress())
+                .district(district.getDisplayName())
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(request.getCommissionRate())
                 .nicNumber(request.getNicNumber())
@@ -94,6 +100,9 @@ public class AgentService {
 
         boolean mustChangePw = createdByAdmin ? false : true;
 
+        sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, generatedPassword,
+                savedAgent);
+
         return AgentWithCredentialsResponse.builder()
                 .agentId(savedAgent.getId())
                 .userId(savedUser.getId())
@@ -101,6 +110,8 @@ public class AgentService {
                 .firstName(savedUser.getFirstName())
                 .lastName(savedUser.getLastName())
                 .agentCode(savedAgent.getAgentCode())
+                .address(savedAgent.getAddress())
+                .district(savedAgent.getDistrict())
                 .phoneNumber(savedAgent.getPhoneNumber())
                 .commissionRate(savedAgent.getCommissionRate())
                 .nicNumber(savedAgent.getNicNumber())
@@ -203,6 +214,13 @@ public class AgentService {
         }
 
         agent.setAgentCode(request.getAgentCode());
+
+        if (request.getDistrict() != null) {
+            District.fromDisplayName(request.getDistrict());
+            agent.setDistrict(request.getDistrict());
+        }
+
+        agent.setAddress(request.getAddress());
         agent.setPhoneNumber(request.getPhoneNumber());
         agent.setCommissionRate(request.getCommissionRate());
         agent.setNicNumber(request.getNicNumber());
@@ -269,6 +287,8 @@ public class AgentService {
         response.setLastName(agent.getUser().getLastName());
         response.setFullName(agent.getUser().getFirstName() + " " + agent.getUser().getLastName());
         response.setAgentCode(agent.getAgentCode());
+        response.setAddress(agent.getAddress());
+        response.setDistrict(agent.getDistrict());
         response.setPhoneNumber(agent.getPhoneNumber());
         response.setCommissionRate(agent.getCommissionRate());
         response.setTotalSales(agent.getTotalSales());
@@ -290,6 +310,44 @@ public class AgentService {
         response.setCreatedAt(agent.getCreatedAt());
         response.setUpdatedAt(agent.getUpdatedAt());
         return response;
+    }
+
+    private void sendWelcomeNotification(String firstName, String lastName, String agentCode,
+                                          String password, Agent agent) {
+        try {
+            String subject = "Welcome to Ebee — Agent Registration Successful";
+            String message = """
+                    Dear %s %s,
+                    
+                    Congratulations! Your agent account has been successfully created.
+                    
+                    Your Login Credentials:
+                    ───────────────────────────
+                    Agent Code : %s
+                    Email      : %s
+                    Password   : %s
+                    ───────────────────────────
+                    
+                    Please log in and change your password at your earliest convenience.
+                    
+                    Best regards,
+                    Ebee Team
+                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), password);
+            notificationService.notifyAgent(agent, subject, message);
+        } catch (Exception e) {
+            log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
+        }
+    }
+
+    private String generateAgentCode(District district) {
+        String prefix = district.name();
+        String maxCode = agentRepository.findMaxAgentCodeByPattern(prefix + "-%");
+        int nextSeq = 1;
+        if (maxCode != null) {
+            String[] parts = maxCode.split("-");
+            nextSeq = Integer.parseInt(parts[parts.length - 1]) + 1;
+        }
+        return String.format("%s-%03d", prefix, nextSeq);
     }
 
     private String generatePassword() {

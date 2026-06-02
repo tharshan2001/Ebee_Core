@@ -7,9 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +49,12 @@ public class Agent {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(columnDefinition = "TEXT")
+    private String address;
+
+    @Column(length = 50)
+    private String district;
+
     @Column(name = "nic_number")
     private String nicNumber;
 
@@ -85,11 +88,20 @@ public class Agent {
     @OneToMany(mappedBy = "agent")
     private List<Order> orders = new ArrayList<>();
 
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

@@ -17,6 +17,8 @@ public class AgentWithCredentialsResponse {
     private String firstName;
     private String lastName;
     private String agentCode;
+    private String address;
+    private String district;
     private String phoneNumber;
     private Double commissionRate;
     private String nicNumber;

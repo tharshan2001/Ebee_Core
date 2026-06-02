@@ -19,10 +19,12 @@ public class AgentRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    private String phoneNumber;
+    private String address;
 
-    @NotBlank(message = "Agent code is required")
-    private String agentCode;
+    @NotBlank(message = "District is required")
+    private String district;
+
+    private String phoneNumber;
 
     @NotNull(message = "Commission rate is required")
     private Double commissionRate;

@@ -29,8 +29,9 @@ public class AgentController {
             @RequestParam("email") String email,
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
-            @RequestParam("agentCode") String agentCode,
             @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "address", required = false) String address,
+            @RequestParam("district") String district,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
             @RequestParam(value = "nicNumber", required = false) String nicNumber,
             @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
@@ -43,8 +44,9 @@ public class AgentController {
         request.setEmail(email);
         request.setFirstName(firstName);
         request.setLastName(lastName);
-        request.setAgentCode(agentCode);
         request.setCommissionRate(commissionRate);
+        request.setAddress(address);
+        request.setDistrict(district);
         request.setPhoneNumber(phoneNumber);
         request.setNicNumber(nicNumber);
         request.setNicDocument(nicDocument);
@@ -117,6 +119,8 @@ public class AgentController {
             @PathVariable UUID id,
             @RequestParam("agentCode") String agentCode,
             @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "address", required = false) String address,
+            @RequestParam(value = "district", required = false) String district,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
             @RequestParam(value = "nicNumber", required = false) String nicNumber,
             @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
@@ -128,6 +132,8 @@ public class AgentController {
         AgentUpdateRequest request = new AgentUpdateRequest();
         request.setAgentCode(agentCode);
         request.setCommissionRate(commissionRate);
+        request.setAddress(address);
+        request.setDistrict(district);
         request.setPhoneNumber(phoneNumber);
         request.setNicNumber(nicNumber);
         request.setNicDocument(nicDocument);

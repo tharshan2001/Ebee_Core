@@ -28,4 +28,7 @@ public interface AgentRepository extends JpaRepository<Agent, UUID> {
 
     @Query("SELECT a FROM Agent a LEFT JOIN FETCH a.user WHERE a.id = :id")
     Optional<Agent> findByIdWithUser(@Param("id") UUID id);
+
+    @Query("SELECT MAX(a.agentCode) FROM Agent a WHERE a.agentCode LIKE :pattern")
+    String findMaxAgentCodeByPattern(@Param("pattern") String pattern);
 }

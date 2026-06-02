@@ -16,6 +16,8 @@ public class AgentResponse {
     private String lastName;
     private String fullName;
     private String agentCode;
+    private String address;
+    private String district;
     private String phoneNumber;
     private Double commissionRate;
     private Double totalSales;

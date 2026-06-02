@@ -16,7 +16,12 @@
 
 ### Product & Agent API
 - [Product & Agent Quick Reference](PRODUCT_AGENT_API.md)
+- Full CRUD for agents with district-based auto-code generation
 - Required for order creation (products, agents, authentication)
+
+### Agent Application API
+- [Agent Application API Documentation](AGENT_APPLICATION_API.md)
+- Public submission endpoint, admin list/view/delete
 
 ---
 

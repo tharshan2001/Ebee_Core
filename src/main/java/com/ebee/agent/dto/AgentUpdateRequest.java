@@ -16,6 +16,11 @@ public class AgentUpdateRequest {
     @NotNull(message = "Commission rate is required")
     private Double commissionRate;
 
+    private String address;
+
+    @NotBlank(message = "District is required")
+    private String district;
+
     private String nicNumber;
 
     private MultipartFile nicDocument;

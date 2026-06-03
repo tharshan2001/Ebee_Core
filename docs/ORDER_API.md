@@ -51,7 +51,7 @@ Authorization: Bearer <JWT_TOKEN>
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | agentCode | String | Yes (for non-admin) | Must match an active agent's code |
-| customerPhoneNumber | String | No | Links to existing customer; fails if phone not found |
+| customerPhoneNumber | String | Yes | Must match an existing customer's phone number |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
 | items[].productItemCode | String | Yes | Must match an active product's item code |

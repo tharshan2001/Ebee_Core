@@ -70,10 +70,7 @@ public class OrderService {
         User currentUser = userRepository.findById(securityService.getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
 
-        Customer customer = null;
-        if (request.getCustomerPhoneNumber() != null) {
-            customer = customerService.findByPhone(request.getCustomerPhoneNumber());
-        }
+        Customer customer = customerService.findByPhone(request.getCustomerPhoneNumber());
 
         String orderNumber = orderNumberService.generateOrderNumber();
 

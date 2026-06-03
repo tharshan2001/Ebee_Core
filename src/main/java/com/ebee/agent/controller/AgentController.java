@@ -30,7 +30,6 @@ public class AgentController {
             @RequestParam("email") String email,
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
-            @RequestParam("commissionRate") Double commissionRate,
             @RequestParam(value = "address", required = false) String address,
             @RequestParam("district") String district,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
@@ -45,7 +44,6 @@ public class AgentController {
         request.setEmail(email);
         request.setFirstName(firstName);
         request.setLastName(lastName);
-        request.setCommissionRate(commissionRate);
         request.setAddress(address);
         request.setDistrict(district);
         request.setPhoneNumber(phoneNumber);
@@ -119,7 +117,7 @@ public class AgentController {
     public ResponseEntity<ApiResponse<AgentResponse>> updateAgent(
             @PathVariable UUID id,
             @RequestParam("agentCode") String agentCode,
-            @RequestParam("commissionRate") Double commissionRate,
+            @RequestParam(value = "commissionRate", required = false) Double commissionRate,
             @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType,
             @RequestParam(value = "address", required = false) String address,
             @RequestParam(value = "district", required = false) String district,

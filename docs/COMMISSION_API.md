@@ -1,45 +1,57 @@
-# Commission API Documentation
+# Commission API Reference
 
-## Base URL
-```
-http://localhost:8085/api/commissions
-```
+Two categories of endpoints:
+- **Commissions** (`/api/commissions`) — the commission lifecycle (calculate → approve → process → pay)
+- **Commission Configs** (`/api/commission-configs`) — rate configuration (DEFAULT global, PERFORMANCE per-agent)
+
+---
+
+# Commissions
+
+**Base URL:** `http://localhost:8085/api/commissions`
 
 ## Authentication
-All commission endpoints require JWT authentication via Authorization header:
+
+All endpoints require JWT:
 ```
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-### Roles
-- `ADMIN` - Full access (create, approve, process, pay, reject, read)
-- Any authenticated user - Read access (by ID, by agent)
+**Roles:**
+- `ADMIN` — full access (create, approve, process, pay, reject, read)
+- Any authenticated user — read access (by ID, by agent)
+
+---
+
+## Commission Rate Resolution
+
+When a commission is calculated (auto on order creation, or manual via `/calculate`), the rate is resolved based on the agent's `commissionType`:
+
+| Agent Type | Resolution |
+|---|---|
+| `DEFAULT` | Uses the global `DEFAULT` commission config rate. Falls back to agent's own `commissionRate` if no default config exists. |
+| `PERFORMANCE` | Config lookup is skipped entirely. Agent uses their own `commissionRate` directly. |
 
 ---
 
 ## Endpoints
 
-### 1. Calculate Commission
+### Calculate Commission
+
 **POST** `/api/commissions/calculate`
 
-Manually calculate and create a commission for an existing order. Commissions are also auto-created when an order is placed via `POST /api/orders` (if the order has an agent).
+Calculates commission for an existing order. Commissions are also auto-created when an order is placed (if the order has an agent).
 
 **Access:** ADMIN only
 
-**Request Headers:**
-```
-Content-Type: application/json
-Authorization: Bearer <JWT_TOKEN>
-```
-
-**Request Body:**
+**Request:**
 ```json
 {
   "orderId": "UUID"
 }
 ```
 
-**Success Response (201 Created):**
+**Response (201 Created):**
 ```json
 {
   "success": true,
@@ -60,307 +72,152 @@ Authorization: Bearer <JWT_TOKEN>
 }
 ```
 
-**Commission Rate Resolution (priority):**
-1. PERFORMANCE config matching agent's `agent_code` → rate from config
-2. DEFAULT config with `applies_to = "ALL"` or matching agent's code → rate from config
-3. Agent's default `commissionRate` → fallback
-
-**Error Responses:**
-- 400: Commission already exists for order
-- 401: Unauthorized
-- 403: Forbidden
+**Errors:**
+- 400: Commission already exists for order / Order has no agent
 
 ---
 
-### 2. Approve Commission
-**PUT** `/api/commissions/{id}/approve`
+### Lifecycle Transitions
 
-Marks a commission as APPROVED. Sets `approvedAt` timestamp.
+| Action | Endpoint | Description |
+|--------|----------|-------------|
+| Approve | **PUT** `/api/commissions/{id}/approve` | Marks as `APPROVED`, sets `approvedAt` |
+| Process | **PUT** `/api/commissions/{id}/process` | Marks as `PROCESSING` |
+| Pay | **PUT** `/api/commissions/{id}/pay` | Marks as `PAID`, sets `paidAt`, updates agent totals |
+| Reject | **PUT** `/api/commissions/{id}/reject?reason=...` | Rejects with reason (any state) |
 
-**Access:** ADMIN only
+All transitions require ADMIN role.
 
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| id | UUID | Commission ID |
+**State Machine:**
+```
+CALCULATED  (auto on order creation, or via /calculate)
+    │
+    ▼
+APPROVED    (admin calls /approve)
+    │
+    ▼
+PROCESSING  (admin calls /process)
+    │
+    ▼
+PAID        (admin calls /pay)  →  updates agent totalSales / totalCommission
+    │
+    ▼
+CANCELLED   (on order cancel)   →  reverts agent totals if was PAID
 
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commission approved successfully",
-  "data": {
-    "id": "...",
-    "status": "APPROVED",
-    "approvedAt": "2026-05-30T11:44:00",
-    ...
-  }
-}
+Any state ──→ REJECTED (admin calls /reject?reason=...)
 ```
 
 ---
 
-### 3. Mark as Processing
-**PUT** `/api/commissions/{id}/process`
+### Read Endpoints
 
-Marks a commission as PROCESSING.
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| **GET** `/api/commissions/{id}` | Any authenticated | Get by ID |
+| **GET** `/api/commissions/agent/{agentId}` | Any authenticated | Get by agent |
+| **GET** `/api/commissions` | ADMIN only | Get all |
+| **GET** `/api/commissions/status/{status}` | ADMIN only | Filter by status |
 
-**Access:** ADMIN only
-
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| id | UUID | Commission ID |
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commission marked as processing",
-  "data": {
-    "id": "...",
-    "status": "PROCESSING",
-    ...
-  }
-}
-```
+Status values: `CALCULATED`, `APPROVED`, `PROCESSING`, `PAID`, `REJECTED`, `CANCELLED`.
 
 ---
 
-### 4. Mark as Paid
-**PUT** `/api/commissions/{id}/pay`
+# Commission Configs
 
-Marks a commission as PAID. Records `paidAt` timestamp and **updates agent accumulators**:
-- `agent.totalSales` += `commission.orderAmount`
-- `agent.totalCommission` += `commission.commissionAmount`
+**Base URL:** `http://localhost:8085/api/commission-configs`
 
-**Access:** ADMIN only
+## Overview
 
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| id | UUID | Commission ID |
+There is exactly **one** active `DEFAULT` config at any time. This is the global rate applied to all agents with `commissionType: DEFAULT`.
 
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commission marked as paid",
-  "data": {
-    "id": "...",
-    "status": "PAID",
-    "paidAt": "2026-05-30T11:44:10",
-    ...
-  }
-}
-```
+- Use `PUT /api/commission-configs/default` to create or update.
+- `POST` with `type: DEFAULT` is **blocked** if one already exists.
+
+To give an agent a custom rate, set their `commissionType` to `PERFORMANCE` via PATCH update and set their `commissionRate` directly.
 
 ---
 
-### 5. Reject Commission
-**PUT** `/api/commissions/{id}/reject?reason={reason}`
+## Endpoints
 
-Rejects a commission and records the rejection reason as `errorMessage`.
+### Create Config
 
-**Access:** ADMIN only
-
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| id | UUID | Commission ID |
-
-**Query Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| reason | String | Rejection reason |
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commission rejected",
-  "data": {
-    "id": "...",
-    "status": "REJECTED",
-    "errorMessage": "Invalid order",
-    ...
-  }
-}
-```
-
----
-
-### 6. Get Commission by ID
-**GET** `/api/commissions/{id}`
-
-Retrieves a specific commission by UUID.
-
-**Access:** Any authenticated user
-
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| id | UUID | Commission ID |
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commission retrieved successfully",
-  "data": { ... }
-}
-```
-
-**Error Responses:**
-- 404: Commission not found
-
----
-
-### 7. Get Commissions by Agent
-**GET** `/api/commissions/agent/{agentId}`
-
-Retrieves all commissions for a specific agent.
-
-**Access:** Any authenticated user
-
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| agentId | UUID | Agent ID |
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commissions retrieved successfully",
-  "data": [
-    { ... },
-    { ... }
-  ]
-}
-```
-
----
-
-### 8. Get All Commissions (Admin Only)
-**GET** `/api/commissions`
-
-Retrieves all commissions in the system.
-
-**Access:** ADMIN only
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commissions retrieved successfully",
-  "data": [ ... ]
-}
-```
-
----
-
-### 9. Get Commissions by Status (Admin Only)
-**GET** `/api/commissions/status/{status}`
-
-Retrieves all commissions matching a status.
-
-**Access:** ADMIN only
-
-**Path Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| status | String | Commission status (CALCULATED, APPROVED, PROCESSING, PAID, REJECTED, CANCELLED) |
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Commissions retrieved successfully",
-  "data": [ ... ]
-}
-```
-
----
-
-## Commission Config Endpoints — `/api/commission-configs`
-
-### 1. Create Config
 **POST** `/api/commission-configs`
 
 **Access:** ADMIN only
 
-**Request Body:**
 ```json
 {
-  "name": "Standard Agent Rate",
-  "commissionRate": 5.0,
+  "name": "Global Default Rate",
+  "commissionRate": 7.5,
   "type": "DEFAULT",
-  "minAmount": 0.0,
-  "maxAmount": null,
   "appliesTo": "ALL",
-  "isActive": true,
-  "effectiveFrom": "2026-01-01T00:00:00",
-  "effectiveTo": null
+  "isActive": true
 }
 ```
 
-### 2. Update Config
-**PATCH** `/api/commission-configs/{id}`
-
-### 3. Delete Config (Soft)
-**DELETE** `/api/commission-configs/{id}`
-
-Sets `isActive = false`.
-
-### 4. Get Config by ID
-**GET** `/api/commission-configs/{id}`
-
-### 5. List All Configs
-**GET** `/api/commission-configs`
-
-### 6. List Active Configs
-**GET** `/api/commission-configs/active`
-
-### 7. By Type
-**GET** `/api/commission-configs/type/{type}`
-
-`type`: `DEFAULT` or `PERFORMANCE`
-
-### 8. Active by Type
-**GET** `/api/commission-configs/type/{type}/active`
-
-### 9. Shortcuts
-**GET** `/api/commission-configs/default`
-**GET** `/api/commission-configs/performance`
+> Creating a second `DEFAULT` config throws an error. Use `PUT /default` instead.
 
 ---
 
-## Data Models
+### Upsert Default Config
 
-### CommissionCalculateRequest
-```json
-{
-  "orderId": "UUID (required)"
-}
+**PUT** `/api/commission-configs/default`
+
+Creates or updates the single default config. If no default exists, a new one is created. If one exists, it is updated.
+
+```bash
+curl -X PUT http://localhost:8085/api/commission-configs/default \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Global Default",
+    "commissionRate": 7.5,
+    "appliesTo": "ALL"
+  }'
 ```
 
-### CommissionConfigRequest
-```json
-{
-  "name": "String (required)",
-  "commissionRate": "Double (required)",
-  "type": "CommissionType (DEFAULT|PERFORMANCE)",
-  "minAmount": "Double (default: 0)",
-  "maxAmount": "Double or null",
-  "appliesTo": "String (required, e.g. 'ALL' or agent_code)",
-  "isActive": "Boolean (default: true)",
-  "effectiveFrom": "LocalDateTime (required)",
-  "effectiveTo": "LocalDateTime or null"
-}
-```
+---
+
+### Shortcut Endpoint
+
+| Endpoint | Description |
+|----------|-------------|
+| **GET** `/api/commission-configs/default` | Returns the single default config object |
+
+### Standard CRUD Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| **GET** `/api/commission-configs` | List all configs |
+| **GET** `/api/commission-configs/active` | List active configs only |
+| **GET** `/api/commission-configs/{id}` | Get by ID |
+| **PATCH** `/api/commission-configs/{id}` | Update config |
+| **DELETE** `/api/commission-configs/{id}` | Soft-delete (sets `isActive = false`) |
+| **GET** `/api/commission-configs/type/{type}` | Filter by type (only `DEFAULT`) |
+| **GET** `/api/commission-configs/type/{type}/active` | Active configs by type |
+
+---
+
+## Config Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | yes | Display name |
+| commissionRate | number | yes | Rate percentage (e.g., 7.5) |
+| type | string | yes | `DEFAULT` |
+| appliesTo | string | yes | `"ALL"` |
+| minAmount | number | no | Minimum order amount threshold |
+| maxAmount | number | no | Maximum order amount threshold |
+| isActive | boolean | no | Defaults to `true` |
+| effectiveFrom | datetime | no | Start of validity |
+| effectiveTo | datetime | no | End of validity |
+
+---
+
+# Data Models
 
 ### CommissionResponse
+
 ```json
 {
   "id": "UUID",
@@ -382,87 +239,21 @@ Sets `isActive = false`.
 }
 ```
 
----
+### CommissionConfigResponse
 
-## Lifecycle State Machine
-
-```
-  CALCULATED  (auto-created on order placement, or via /calculate)
-      │
-      ▼
-  APPROVED     (admin calls /approve)
-      │
-      ▼
-  PROCESSING   (admin calls /process)
-      │
-      ▼
-  PAID         (admin calls /pay)  → updates agent.totalSales/totalCommission
-      │
-      ▼
-  CANCELLED    (on order cancel)  → reverts agent totals if was PAID
-
-  Any state ──▶ REJECTED  (admin calls /reject?reason=...)
-```
-
----
-
-## Examples
-
-### Full Lifecycle Flow
-```bash
-# Login
-TOKEN=$(curl -s -X POST http://localhost:8085/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@ebee.com","password":"admin123"}' \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
-
-# Create order (auto-creates commission)
-ORDER=$(curl -s -X POST http://localhost:8085/api/orders \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "81c662e0-80e0-450d-b492-adc1c15103c7",
-    "items": [{"productId": "edeaad97-16b6-4328-856b-1919a88ac383", "quantity": 2}]
-  }')
-
-# Get the commission ID
-CID=$(curl -s http://localhost:8085/api/commissions \
-  -H "Authorization: Bearer $TOKEN" \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['data'][-1]['id'])")
-
-# Approve → Process → Pay
-curl -X PUT "http://localhost:8085/api/commissions/$CID/approve" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -X PUT "http://localhost:8085/api/commissions/$CID/process" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -X PUT "http://localhost:8085/api/commissions/$CID/pay" \
-  -H "Authorization: Bearer $TOKEN"
-
-# Check commission status
-curl http://localhost:8085/api/commissions/$CID \
-  -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-## Error Handling
-
-All errors follow the standard ApiResponse format:
 ```json
 {
-  "success": false,
-  "message": "Error description",
-  "data": null
+  "id": "UUID",
+  "name": "String",
+  "commissionRate": "Double",
+  "type": "CommissionType",
+  "minAmount": "Double",
+  "maxAmount": "Double or null",
+  "appliesTo": "String",
+  "isActive": "Boolean",
+  "effectiveFrom": "LocalDateTime",
+  "effectiveTo": "LocalDateTime or null",
+  "createdAt": "LocalDateTime",
+  "updatedAt": "LocalDateTime"
 }
 ```
-
-**Common Error Codes:**
-| Status Code | Description |
-|-------------|-------------|
-| 400 | Bad Request / Illegal state |
-| 401 | Unauthorized - Invalid/missing token |
-| 403 | Forbidden - Insufficient permissions |
-| 404 | Not Found - Resource not found |
-| 500 | Internal Server Error |

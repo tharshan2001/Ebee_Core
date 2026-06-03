@@ -100,10 +100,4 @@ public class CommissionConfigController {
         return ResponseEntity.ok(ApiResponse.success("Default commission config updated successfully", response));
     }
 
-    @GetMapping("/performance")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<CommissionConfigResponse>>> getPerformanceConfigs() {
-        List<CommissionConfigResponse> response = configService.getPerformanceConfigs();
-        return ResponseEntity.ok(ApiResponse.success("Performance commission configs retrieved successfully", response));
-    }
 }

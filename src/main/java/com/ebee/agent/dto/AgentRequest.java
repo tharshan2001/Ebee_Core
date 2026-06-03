@@ -2,7 +2,6 @@ package com.ebee.agent.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,9 +24,6 @@ public class AgentRequest {
     private String district;
 
     private String phoneNumber;
-
-    @NotNull(message = "Commission rate is required")
-    private Double commissionRate;
 
     private String nicNumber;
 

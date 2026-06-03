@@ -8,6 +8,9 @@ import com.ebee.agent.entity.Agent;
 import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.enums.District;
 import com.ebee.agent.repository.AgentRepository;
+import com.ebee.commission.entity.CommissionConfig;
+import com.ebee.commission.enums.CommissionType;
+import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.notification.NotificationService;
@@ -38,6 +41,7 @@ public class AgentService {
     private final S3Service s3Service;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final CommissionConfigRepository commissionConfigRepository;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -67,6 +71,11 @@ public class AgentService {
                 .mustChangePassword(createdByAdmin ? false : true)
                 .build();
 
+        CommissionConfig defaultConfig = commissionConfigRepository
+                .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No active default commission config found. Configure one via PUT /api/commission-configs/default before creating agents."));
+
         User savedUser = userRepository.save(user);
 
         Agent agent = Agent.builder()
@@ -75,7 +84,7 @@ public class AgentService {
                 .address(request.getAddress())
                 .district(district.getDisplayName())
                 .phoneNumber(request.getPhoneNumber())
-                .commissionRate(request.getCommissionRate())
+                .commissionRate(defaultConfig.getCommissionRate())
                 .commissionType(AgentCommissionType.DEFAULT)
                 .nicNumber(request.getNicNumber())
                 .bankAccountNumber(request.getBankAccountNumber())
@@ -227,9 +236,18 @@ public class AgentService {
             agent.setCommissionType(request.getCommissionType());
         }
 
+        if (request.getCommissionRate() != null) {
+            agent.setCommissionRate(request.getCommissionRate());
+        } else if (request.getCommissionType() == AgentCommissionType.DEFAULT) {
+            CommissionConfig defaultConfig = commissionConfigRepository
+                    .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "No active default commission config found. Configure one via PUT /api/commission-configs/default first."));
+            agent.setCommissionRate(defaultConfig.getCommissionRate());
+        }
+
         agent.setAddress(request.getAddress());
         agent.setPhoneNumber(request.getPhoneNumber());
-        agent.setCommissionRate(request.getCommissionRate());
         agent.setNicNumber(request.getNicNumber());
         agent.setBankAccountNumber(request.getBankAccountNumber());
         agent.setBankName(request.getBankName());

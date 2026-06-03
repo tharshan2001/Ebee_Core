@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -75,27 +74,11 @@ public class CommissionCalculationService {
     }
 
     private CommissionConfig findApplicableConfig(Agent agent) {
-        if (agent.getCommissionType() == AgentCommissionType.CUSTOM) {
+        if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
             return null;
         }
 
-        List<CommissionConfig> activeConfigs = configRepository.findByIsActiveTrue();
-
-        CommissionConfig performanceConfig = activeConfigs.stream()
-                .filter(c -> c.getType() == CommissionType.PERFORMANCE)
-                .filter(c -> c.getAppliesTo().equalsIgnoreCase(agent.getAgentCode()))
-                .findFirst()
-                .orElse(null);
-
-        if (performanceConfig != null) {
-            return performanceConfig;
-        }
-
-        return activeConfigs.stream()
-                .filter(c -> c.getType() == CommissionType.DEFAULT)
-                .filter(c -> c.getAppliesTo().equalsIgnoreCase("ALL") ||
-                            c.getAppliesTo().equalsIgnoreCase(agent.getAgentCode()))
-                .findFirst()
+        return configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
                 .orElse(null);
     }
 }

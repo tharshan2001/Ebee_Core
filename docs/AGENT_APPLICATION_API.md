@@ -2,24 +2,19 @@
 
 Public-facing endpoint for prospective agents to submit applications. Admin can list, view, and delete submissions.
 
-## Base URL
-```
-http://localhost:8085
-```
+**Base URL:** `http://localhost:8085/api/agent-applications`
 
 ---
 
 ## Submit Application (Public)
+
 **POST** `/api/agent-applications`
 
 **Access:** Public (no auth required)
 
-**Headers:**
-```
-Content-Type: application/json
-```
+**Headers:** `Content-Type: application/json`
 
-**Request Body:**
+**Request:**
 ```json
 {
   "firstName": "John",
@@ -64,60 +59,28 @@ curl -X POST http://localhost:8085/api/agent-applications \
 
 ---
 
-## Get All Applications (Admin)
+## Admin Endpoints
+
+All admin endpoints require the Authorization header:
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+### Get All Applications
+
 **GET** `/api/agent-applications`
 
-**Access:** ADMIN only
+**Response:** Array of application objects (same format as single item above).
 
-**Headers:**
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+### Get Application by ID
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Applications retrieved successfully",
-  "data": [
-    {
-      "id": "uuid",
-      "firstName": "John",
-      "lastName": "Doe",
-      "email": "john.doe@example.com",
-      "phoneNumber": "0771234567",
-      "createdAt": "2026-06-02T23:30:00",
-      "updatedAt": "2026-06-02T23:30:00"
-    }
-  ]
-}
-```
-
----
-
-## Get Application by ID (Admin)
 **GET** `/api/agent-applications/{id}`
 
-**Access:** ADMIN only
+**Response:** Single application object.
 
-**Headers:**
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+### Delete Application
 
-**Response:** Same as single item in Get All response.
-
----
-
-## Delete Application (Admin)
 **DELETE** `/api/agent-applications/{id}`
-
-**Access:** ADMIN only
-
-**Headers:**
-```
-Authorization: Bearer <JWT_TOKEN>
-```
 
 **Response:**
 ```json
@@ -130,7 +93,8 @@ Authorization: Bearer <JWT_TOKEN>
 ---
 
 ## Workflow
-1. Prospective agent submits application via public endpoint
-2. Admin reviews applications using Get All
-3. Admin creates an agent manually via `POST /api/agents` using the applicant's details, adding `address` and `district` at that time
-4. Admin optionally deletes the application entry
+
+1. Prospective agent submits application via public endpoint.
+2. Admin reviews applications via GET All.
+3. Admin creates an agent manually via `POST /api/agents` using the applicant's details, adding `address` and `district` at that time.
+4. Admin optionally deletes the application entry.

@@ -103,10 +103,6 @@ public class CommissionConfigService {
         return mapper.toConfigResponse(config);
     }
 
-    public List<CommissionConfigResponse> getPerformanceConfigs() {
-        return getConfigsByType(CommissionType.PERFORMANCE);
-    }
-
     private CommissionConfig getConfigEntity(UUID id) {
         return configRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Commission config not found: " + id));

@@ -14,6 +14,7 @@ public class CustomerResponse {
     private String phoneNumber;
     private String email;
     private Integer totalOrders;
+    private AddressResponse address;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

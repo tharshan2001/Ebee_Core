@@ -176,7 +176,45 @@ Retrieves all orders for a specific agent.
 
 ---
 
-### 5. Get All Orders (Admin Only)
+### 5. Get Orders by Customer
+
+**GET** `/api/orders/customer/{customerId}`
+
+Retrieves all orders for a specific customer.
+
+**Access:** ADMIN, AGENT
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| customerId | UUID | Customer ID |
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Orders retrieved successfully",
+  "data": [
+    {
+      "id": "380111f3-301b-4fda-8242-0f852f30acf6",
+      "orderNumber": "ORD-20260508221802",
+      "agentCode": "NEW001",
+      "customerName": "Arun Kumar",
+      "totalAmount": 119.98,
+      "status": "PENDING",
+      "items": [ ... ]
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `404` — Customer not found
+
+---
+
+### 6. Get All Orders (Admin Only)
 **GET** `/api/orders`
 
 Retrieves all orders in the system.
@@ -197,7 +235,7 @@ Retrieves all orders in the system.
 
 ---
 
-### 6. Update Order Status (Admin Only)
+### 7. Update Order Status (Admin Only)
 **PATCH** `/api/orders/{id}/status?status={status}`
 
 Updates the status of an order.
@@ -241,7 +279,7 @@ RETURNED      - Order returned
 
 ---
 
-### 7. Cancel Order (Admin Only)
+### 8. Cancel Order (Admin Only)
 **PATCH** `/api/orders/{id}/cancel`
 
 Cancels an order.

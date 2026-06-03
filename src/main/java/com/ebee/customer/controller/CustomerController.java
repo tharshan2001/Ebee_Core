@@ -43,6 +43,15 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
+            @PathVariable UUID id,
+            @Valid @RequestBody CustomerRequest request) {
+        CustomerResponse response = customerService.updateCustomer(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Customer updated successfully", response));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> getAllCustomers() {

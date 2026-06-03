@@ -157,6 +157,13 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersByCustomerId(UUID customerId) {
+        customerService.getCustomerById(customerId);
+        List<Order> orders = orderRepository.findByCustomerIdWithDetails(customerId);
+        return orderMapper.toResponseList(orders);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
         List<Order> orders = orderRepository.findAllWithDetails();
         return orderMapper.toResponseList(orders);

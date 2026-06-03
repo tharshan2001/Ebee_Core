@@ -1,8 +1,11 @@
 package com.ebee.customer.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.customer.dto.AddressRequest;
+import com.ebee.customer.dto.AddressResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
+import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,45 @@ public class CustomerService {
                 .phoneNumber(request.getPhoneNumber())
                 .email(request.getEmail())
                 .build();
+
+        if (request.getAddress() != null) {
+            customer.setAddress(buildAddress(request.getAddress(), customer));
+        }
+
+        customer = customerRepository.save(customer);
+        return toResponse(customer);
+    }
+
+    @Transactional
+    public CustomerResponse updateCustomer(UUID id, CustomerRequest request) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+
+        if (request.getFirstName() != null) {
+            customer.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            customer.setLastName(request.getLastName());
+        }
+        if (request.getPhoneNumber() != null &&
+            !customer.getPhoneNumber().equals(request.getPhoneNumber()) &&
+            customerRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+            throw new IllegalArgumentException("Customer already exists with phone: " + request.getPhoneNumber());
+        }
+        if (request.getPhoneNumber() != null) {
+            customer.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getEmail() != null) {
+            customer.setEmail(request.getEmail());
+        }
+
+        if (request.getAddress() != null) {
+            if (customer.getAddress() != null) {
+                updateAddress(customer.getAddress(), request.getAddress());
+            } else {
+                customer.setAddress(buildAddress(request.getAddress(), customer));
+            }
+        }
 
         customer = customerRepository.save(customer);
         return toResponse(customer);
@@ -82,6 +124,23 @@ public class CustomerService {
         });
     }
 
+    private Address buildAddress(AddressRequest request, Customer customer) {
+        return Address.builder()
+                .customer(customer)
+                .street(request.getStreet())
+                .city(request.getCity())
+                .district(request.getDistrict())
+                .postalCode(request.getPostalCode())
+                .build();
+    }
+
+    private void updateAddress(Address address, AddressRequest request) {
+        address.setStreet(request.getStreet());
+        address.setCity(request.getCity());
+        address.setDistrict(request.getDistrict());
+        address.setPostalCode(request.getPostalCode());
+    }
+
     private CustomerResponse toResponse(Customer customer) {
         CustomerResponse response = new CustomerResponse();
         response.setId(customer.getId());
@@ -90,6 +149,15 @@ public class CustomerService {
         response.setPhoneNumber(customer.getPhoneNumber());
         response.setEmail(customer.getEmail());
         response.setTotalOrders(customer.getTotalOrders());
+        if (customer.getAddress() != null) {
+            AddressResponse addrResponse = new AddressResponse();
+            addrResponse.setId(customer.getAddress().getId());
+            addrResponse.setStreet(customer.getAddress().getStreet());
+            addrResponse.setCity(customer.getAddress().getCity());
+            addrResponse.setDistrict(customer.getAddress().getDistrict());
+            addrResponse.setPostalCode(customer.getAddress().getPostalCode());
+            response.setAddress(addrResponse);
+        }
         response.setCreatedAt(customer.getCreatedAt());
         response.setUpdatedAt(customer.getUpdatedAt());
         return response;

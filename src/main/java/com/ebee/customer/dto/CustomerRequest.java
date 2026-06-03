@@ -1,5 +1,6 @@
 package com.ebee.customer.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -16,4 +17,7 @@ public class CustomerRequest {
     private String phoneNumber;
 
     private String email;
+
+    @Valid
+    private AddressRequest address;
 }

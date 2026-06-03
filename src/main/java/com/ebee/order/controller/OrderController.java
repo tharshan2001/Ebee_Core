@@ -51,6 +51,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }
 
+    @GetMapping("/customer/{customerId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getOrdersByCustomerId(@PathVariable UUID customerId) {
+        List<OrderResponse> response = orderService.getOrdersByCustomerId(customerId);
+        return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {

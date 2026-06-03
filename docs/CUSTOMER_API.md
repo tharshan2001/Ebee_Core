@@ -12,25 +12,37 @@ Authorization: Bearer <JWT_TOKEN>
 ```
 
 ### Roles
-- `ADMIN` - Full access
-- `AGENT` - Full access
+- `ADMIN` — Full access
+- `AGENT` — Full access
+
+---
+
+## Address
+
+Each customer can have one address managed as a nested object within the customer. Addresses are created and updated through the customer endpoints — there is no separate address CRUD.
+
+### Address Fields
+
+| Field | Type | Max | Notes |
+|-------|------|-----|-------|
+| street | String | 255 | |
+| city | String | 100 | |
+| district | String | 100 | |
+| postalCode | String | 20 | |
+
+Include the `address` object in the JSON body to set it. Omit it (or set `null`) to leave the customer without an address.
 
 ---
 
 ## Endpoints
 
 ### 1. Create Customer
+
 **POST** `/api/customers`
 
 Creates a new customer. Phone number must be unique.
 
 **Access:** ADMIN, AGENT
-
-**Request Headers:**
-```
-Content-Type: application/json
-Authorization: Bearer <JWT_TOKEN>
-```
 
 **Request Body:**
 ```json
@@ -38,17 +50,29 @@ Authorization: Bearer <JWT_TOKEN>
   "firstName": "Arun",
   "lastName": "Kumar",
   "phoneNumber": "+94111111111",
-  "email": "arun@example.com"
+  "email": "arun@example.com",
+  "address": {
+    "street": "123 Main St",
+    "city": "Jaffna",
+    "district": "Jaffna",
+    "postalCode": "40000"
+  }
 }
 ```
 
 **Validation:**
+
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | firstName | String | Yes | |
 | lastName | String | Yes | |
 | phoneNumber | String | Yes | Must be unique |
 | email | String | No | |
+| address | Object | No | Nested address object |
+| address.street | String | No | Max 255 chars |
+| address.city | String | No | Max 100 chars |
+| address.district | String | No | Max 100 chars |
+| address.postalCode | String | No | Max 20 chars |
 
 **Success Response (201 Created):**
 ```json
@@ -56,33 +80,97 @@ Authorization: Bearer <JWT_TOKEN>
   "success": true,
   "message": "Customer created successfully",
   "data": {
-    "id": "16cd9e90-e123-40e1-91a5-d2f00ed0add7",
+    "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
     "firstName": "Arun",
     "lastName": "Kumar",
     "phoneNumber": "+94111111111",
     "email": "arun@example.com",
     "totalOrders": 0,
-    "createdAt": "2026-05-30T11:50:43",
-    "updatedAt": "2026-05-30T11:50:43"
+    "address": {
+      "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
+      "street": "123 Main St",
+      "city": "Jaffna",
+      "district": "Jaffna",
+      "postalCode": "40000"
+    },
+    "createdAt": "2026-06-03T23:58:55",
+    "updatedAt": "2026-06-03T23:58:55"
   }
 }
 ```
 
 **Error Responses:**
-- 400: Customer already exists with phone
-- 401: Unauthorized
-- 403: Forbidden
+- `400` — Customer already exists with phone
+- `401` — Unauthorized
+- `403` — Forbidden
 
 ---
 
-### 2. Get Customer by ID
-**GET** `/api/customers/{id}`
+### 2. Update Customer
 
-Retrieves a customer by UUID.
+**PUT** `/api/customers/{id}`
+
+Updates an existing customer. All fields are optional (only provided fields are updated). Phone number uniqueness is enforced if changed.
+
+**Access:** ADMIN, AGENT
+
+**Request Body:**
+```json
+{
+  "firstName": "Arun",
+  "lastName": "Kumar",
+  "phoneNumber": "+94111111111",
+  "email": "newemail@example.com",
+  "address": {
+    "street": "456 New Rd",
+    "city": "Colombo",
+    "district": "Colombo",
+    "postalCode": "00100"
+  }
+}
+```
+
+If the customer already has an address, it is **updated in place**. If they don't have one, a new address is **created**. To remove an address, send `"address": null`.
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Customer updated successfully",
+  "data": {
+    "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
+    "firstName": "Arun",
+    "lastName": "Kumar",
+    "phoneNumber": "+94111111111",
+    "email": "newemail@example.com",
+    "totalOrders": 0,
+    "address": {
+      "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
+      "street": "456 New Rd",
+      "city": "Colombo",
+      "district": "Colombo",
+      "postalCode": "00100"
+    },
+    "createdAt": "2026-06-03T23:58:55",
+    "updatedAt": "2026-06-03T23:59:10"
+  }
+}
+```
+
+**Error Responses:**
+- `400` — Customer already exists with phone
+- `404` — Customer not found
+
+---
+
+### 3. Get Customer by ID
+
+**GET** `/api/customers/{id}`
 
 **Access:** ADMIN, AGENT
 
 **Path Parameters:**
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | id | UUID | Customer ID |
@@ -93,53 +181,52 @@ Retrieves a customer by UUID.
   "success": true,
   "message": "Customer retrieved successfully",
   "data": {
-    "id": "16cd9e90-e123-40e1-91a5-d2f00ed0add7",
+    "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
     "firstName": "Arun",
     "lastName": "Kumar",
     "phoneNumber": "+94111111111",
     "email": "arun@example.com",
     "totalOrders": 5,
-    "createdAt": "2026-05-30T11:50:43",
-    "updatedAt": "2026-05-30T14:23:50"
+    "address": {
+      "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
+      "street": "123 Main St",
+      "city": "Jaffna",
+      "district": "Jaffna",
+      "postalCode": "40000"
+    },
+    "createdAt": "2026-06-03T23:58:55",
+    "updatedAt": "2026-06-03T23:59:10"
   }
 }
 ```
 
 **Error Responses:**
-- 404: Customer not found
+- `404` — Customer not found
 
 ---
 
-### 3. Get Customer by Phone
-**GET** `/api/customers/phone/{phoneNumber}`
+### 4. Get Customer by Phone
 
-Retrieves a customer by phone number.
+**GET** `/api/customers/phone/{phoneNumber}`
 
 **Access:** ADMIN, AGENT
 
 **Path Parameters:**
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| phoneNumber | String | Phone number (URL-encoded if needed, e.g. `%2B` for `+`) |
+| phoneNumber | String | Phone number (URL-encode `+` as `%2B`) |
 
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Customer retrieved successfully",
-  "data": { ... }
-}
-```
+**Success Response (200 OK):** Same shape as Get by ID.
 
 **Error Responses:**
-- 404: Customer not found with phoneNumber
+- `404` — Customer not found with phoneNumber
 
 ---
 
-### 4. List All Customers
-**GET** `/api/customers`
+### 5. List All Customers
 
-Retrieves all customers.
+**GET** `/api/customers`
 
 **Access:** ADMIN, AGENT
 
@@ -149,8 +236,34 @@ Retrieves all customers.
   "success": true,
   "message": "Customers retrieved successfully",
   "data": [
-    { ... },
-    { ... }
+    {
+      "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
+      "firstName": "Arun",
+      "lastName": "Kumar",
+      "phoneNumber": "+94111111111",
+      "email": "arun@example.com",
+      "totalOrders": 0,
+      "address": {
+        "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
+        "street": "123 Main St",
+        "city": "Jaffna",
+        "district": "Jaffna",
+        "postalCode": "40000"
+      },
+      "createdAt": "2026-06-03T23:58:55",
+      "updatedAt": "2026-06-03T23:58:55"
+    },
+    {
+      "id": "7bc5d61f-f4d4-4154-be94-5bedbfc41416",
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "phoneNumber": "+94771234598",
+      "email": null,
+      "totalOrders": 0,
+      "address": null,
+      "createdAt": "2026-06-03T23:59:00",
+      "updatedAt": "2026-06-03T23:59:00"
+    }
   ]
 }
 ```
@@ -159,13 +272,35 @@ Retrieves all customers.
 
 ## Data Models
 
+### AddressRequest
+```json
+{
+  "street": "String (optional, max 255)",
+  "city": "String (optional, max 100)",
+  "district": "String (optional, max 100)",
+  "postalCode": "String (optional, max 20)"
+}
+```
+
+### AddressResponse
+```json
+{
+  "id": "UUID",
+  "street": "String or null",
+  "city": "String or null",
+  "district": "String or null",
+  "postalCode": "String or null"
+}
+```
+
 ### CustomerRequest
 ```json
 {
   "firstName": "String (required)",
   "lastName": "String (required)",
   "phoneNumber": "String (required, unique)",
-  "email": "String (optional)"
+  "email": "String (optional)",
+  "address": "AddressRequest (optional)"
 }
 ```
 
@@ -178,6 +313,7 @@ Retrieves all customers.
   "phoneNumber": "String",
   "email": "String or null",
   "totalOrders": "Integer",
+  "address": "AddressResponse or null",
   "createdAt": "LocalDateTime",
   "updatedAt": "LocalDateTime"
 }
@@ -187,7 +323,8 @@ Retrieves all customers.
 
 ## Examples
 
-### Create and Lookup Customer
+### Create, Update, and Lookup Customer
+
 ```bash
 # Login
 TOKEN=$(curl -s -X POST http://localhost:8085/api/auth/login \
@@ -195,14 +332,38 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/auth/login \
   -d '{"email":"admin@ebee.com","password":"admin123"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
 
-# Create customer
+# Create customer with address
 curl -X POST http://localhost:8085/api/customers \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Ranil",
     "lastName": "Wickramasinghe",
-    "phoneNumber": "+94771234567"
+    "phoneNumber": "+94771234567",
+    "address": {
+      "street": "123 Main St",
+      "city": "Jaffna",
+      "district": "Jaffna",
+      "postalCode": "40000"
+    }
+  }'
+
+# Update address
+ID=$(curl -s http://localhost:8085/api/customers \
+  -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json;print(json.load(sys.stdin)['data'][0]['id'])")
+curl -X PUT "http://localhost:8085/api/customers/$ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Ranil",
+    "lastName": "Wickramasinghe",
+    "phoneNumber": "+94771234567",
+    "address": {
+      "street": "456 New Rd",
+      "city": "Colombo",
+      "district": "Colombo",
+      "postalCode": "00100"
+    }
   }'
 
 # Lookup by phone
@@ -228,10 +389,11 @@ All errors follow the standard ApiResponse format:
 ```
 
 **Common Error Codes:**
-| Status Code | Description |
-|-------------|-------------|
-| 400 | Bad Request - Invalid input / Duplicate phone |
-| 401 | Unauthorized - Invalid/missing token |
-| 403 | Forbidden - Insufficient permissions |
-| 404 | Not Found - Resource not found |
+
+| Status | Description |
+|--------|-------------|
+| 400 | Bad Request — Invalid input / Duplicate phone |
+| 401 | Unauthorized — Invalid/missing token |
+| 403 | Forbidden — Insufficient permissions |
+| 404 | Not Found — Resource not found |
 | 500 | Internal Server Error |

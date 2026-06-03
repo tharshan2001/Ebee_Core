@@ -39,6 +39,9 @@ public class Customer {
     @Builder.Default
     private Integer totalOrders = 0;
 
+    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Address address;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -41,6 +41,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Agent Applications | [AGENT_APPLICATION_API.md](AGENT_APPLICATION_API.md) | Public (submit), ADMIN (manage) |
 | Customers | [CUSTOMER_API.md](CUSTOMER_API.md) | ADMIN, AGENT |
 | Orders | [ORDER_API.md](ORDER_API.md) | ADMIN, AGENT |
+| Categories | [CATEGORY_API.md](CATEGORY_API.md) | ADMIN (mutate), any (read) |
 | Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN (mutate), any (read) |
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
 

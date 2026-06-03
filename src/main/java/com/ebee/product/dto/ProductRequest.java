@@ -2,6 +2,7 @@ package com.ebee.product.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +21,7 @@ public class ProductRequest {
     private String description;
 
     @NotBlank(message = "Category is required")
+    @Size(max = 100, message = "Category must not exceed 100 characters")
     private String category;
 
     @Positive(message = "Price must be positive")

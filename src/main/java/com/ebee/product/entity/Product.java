@@ -39,7 +39,7 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String category;
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -58,6 +58,7 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "product", orphanRemoval = true)
     private List<ProductImage> images = new ArrayList<>();
 

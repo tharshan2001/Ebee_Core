@@ -27,4 +27,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.sku = :sku")
     Optional<Product> findBySkuWithRelations(@Param("sku") String sku);
+
+    List<Product> findByCategoryIgnoreCase(String category);
 }

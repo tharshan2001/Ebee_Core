@@ -13,6 +13,16 @@ All product endpoints require ADMIN role:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
+## Category Validation
+
+The `category` field must match an **active** category name managed via the [Categories API](CATEGORY_API.md). If the category is missing, misspelled, or has been soft-deleted, the API returns `400 Category not found`.
+
+You can list all valid categories for the dropdown:
+
+```bash
+curl http://localhost:8085/api/categories -H "Authorization: Bearer <TOKEN>"
+```
+
 ---
 
 ## Endpoints

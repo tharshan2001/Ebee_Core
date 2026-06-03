@@ -4,7 +4,7 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
 import com.ebee.product.service.ProductService;
-import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/products")
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class ProductController {
 
     private final ProductService productService;
+    private final Validator validator;
 
     @PostMapping(consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
@@ -46,6 +49,7 @@ public class ProductController {
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
+        validate(request);
 
         ProductResponse response = productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -98,9 +102,17 @@ public class ProductController {
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
+        validate(request);
 
         ProductResponse response = productService.updateProduct(id, request);
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
+    }
+
+    @GetMapping("/category/{category}")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getProductsByCategory(
+            @PathVariable String category) {
+        List<ProductResponse> response = productService.getProductsByCategory(category);
+        return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
     }
 
     @PostMapping("/{id}/images")
@@ -118,5 +130,15 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully"));
+    }
+
+    private void validate(ProductRequest request) {
+        Set<jakarta.validation.ConstraintViolation<ProductRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            String message = violations.stream()
+                    .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                    .collect(Collectors.joining("; "));
+            throw new IllegalArgumentException(message);
+        }
     }
 }

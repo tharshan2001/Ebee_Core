@@ -1,5 +1,6 @@
 package com.ebee.product.service;
 
+import com.ebee.category.service.CategoryService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.inventory.mapper.InventoryMapper;
@@ -38,12 +39,15 @@ public class ProductService {
     private final InventoryService inventoryService;
     private final InventoryMapper inventoryMapper;
     private final EntityManager entityManager;
+    private final CategoryService categoryService;
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) throws IOException {
         if (productRepository.existsBySku(request.getSku())) {
             throw new IllegalArgumentException("SKU already exists: " + request.getSku());
         }
+
+        categoryService.findByNameOrThrow(request.getCategory());
 
         Product product = productMapper.toEntity(request);
         Product savedProduct = productRepository.save(product);
@@ -91,6 +95,11 @@ public class ProductService {
         return buildResponsesWithBatchImages(products);
     }
 
+    public List<ProductResponse> getProductsByCategory(String category) {
+        List<Product> products = productRepository.findByCategoryIgnoreCase(category);
+        return buildResponsesWithBatchImages(products);
+    }
+
     public List<ProductResponse> getActiveProducts() {
         List<Product> products = productRepository.findAllWithInventory().stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
@@ -106,6 +115,7 @@ public class ProductService {
                         products.stream().map(Product::getId).toList()
                 )
                 .stream()
+                .filter(pi -> pi.getProduct() != null)
                 .collect(Collectors.groupingBy(
                         pi -> pi.getProduct().getId(),
                         Collectors.mapping(ProductImage::getImageUrl, Collectors.toList())
@@ -142,6 +152,7 @@ public class ProductService {
             product.setDescription(request.getDescription());
         }
         if (request.getCategory() != null) {
+            categoryService.findByNameOrThrow(request.getCategory());
             product.setCategory(request.getCategory());
         }
         if (request.getPrice() != null) {
@@ -220,9 +231,9 @@ public class ProductService {
 
     private ProductResponse toResponseWithRelations(Product product) {
         ProductResponse response = productMapper.toResponse(product);
-        List<String> imageUrls = product.getImages().stream()
-                .map(ProductImage::getImageUrl)
-                .toList();
+        List<String> imageUrls = product.getImages() != null
+                ? product.getImages().stream().map(ProductImage::getImageUrl).toList()
+                : List.of();
         response.setImageUrls(imageUrls);
         if (product.getInventory() != null) {
             response.setInventory(inventoryMapper.toResponse(product.getInventory()));

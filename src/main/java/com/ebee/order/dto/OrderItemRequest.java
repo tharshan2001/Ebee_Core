@@ -8,8 +8,8 @@ import lombok.Data;
 @Data
 public class OrderItemRequest {
 
-    @NotBlank(message = "Product SKU is required")
-    private String productSku;
+    @NotBlank(message = "Product item code is required")
+    private String productItemCode;
 
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")

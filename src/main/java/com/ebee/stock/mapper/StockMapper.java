@@ -12,7 +12,7 @@ public interface StockMapper {
 
     @Mapping(target = "productId", source = "inventory.product.id")
     @Mapping(target = "productName", source = "inventory.product.name")
-    @Mapping(target = "productSku", source = "inventory.product.sku")
+    @Mapping(target = "productItemCode", source = "inventory.product.itemCode")
     @Mapping(target = "createdById", source = "createdBy.id")
     @Mapping(target = "createdByName", expression = "java(stock.getCreatedBy() != null ? stock.getCreatedBy().getFirstName() + \" \" + stock.getCreatedBy().getLastName() : null)")
     @Mapping(target = "createdByEmail", source = "createdBy.email")

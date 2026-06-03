@@ -9,6 +9,8 @@ import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.inventory.service.InventoryService;
+import com.ebee.commission.entity.Commission;
+import com.ebee.notification.NotificationService;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
@@ -31,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +50,7 @@ public class OrderService {
     private final CommissionCalculationService commissionCalculationService;
     private final CommissionLifecycleService commissionLifecycleService;
     private final CustomerService customerService;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -87,8 +91,8 @@ public class OrderService {
         AtomicInteger sequence = new AtomicInteger(1);
 
         for (OrderItemRequest itemRequest : request.getItems()) {
-            Product product = productRepository.findBySku(itemRequest.getProductSku())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", itemRequest.getProductSku()));
+            Product product = productRepository.findByItemCode(itemRequest.getProductItemCode())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "itemCode", itemRequest.getProductItemCode()));
 
             if (!Boolean.TRUE.equals(product.getIsActive())) {
                 throw new IllegalArgumentException("Product is not active: " + product.getName());
@@ -123,13 +127,16 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
         Order savedOrder = orderRepository.save(order);
 
+        Commission commission = null;
         if (agent != null) {
-            commissionCalculationService.calculateCommissionForOrder(savedOrder);
+            commission = commissionCalculationService.calculateCommissionForOrder(savedOrder);
         }
 
         if (customer != null) {
             customerService.incrementTotalOrders(customer.getId());
         }
+
+        sendOrderCreatedNotifications(savedOrder, commission);
 
         return orderMapper.toResponse(savedOrder);
     }
@@ -171,7 +178,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse updateOrderStatus(UUID id, OrderStatus status) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
@@ -180,12 +187,15 @@ public class OrderService {
 
         order.setStatus(status);
         Order updatedOrder = orderRepository.save(order);
+
+        sendOrderStatusNotifications(updatedOrder);
+
         return orderMapper.toResponse(updatedOrder);
     }
 
     @Transactional
     public OrderResponse cancelOrder(UUID id) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
@@ -211,6 +221,151 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
+
+        sendOrderCancelledNotifications(updatedOrder);
+
         return orderMapper.toResponse(updatedOrder);
+    }
+
+    private String buildItemSummary(Order order) {
+        return order.getItems().stream()
+                .map(item -> item.getProduct().getName() + " (x" + item.getQuantity() + ")")
+                .collect(Collectors.joining(", "));
+    }
+
+    private String customerDisplayName(Customer customer) {
+        return customer.getFirstName() + " " + customer.getLastName();
+    }
+
+    private void sendOrderCreatedNotifications(Order order, Commission commission) {
+        String itemSummary = buildItemSummary(order);
+
+        if (order.getCustomer() != null) {
+            String customerSubject = "Order Placed – " + order.getOrderNumber();
+            String customerMessage = """
+                    Dear %s,
+                    
+                    Your order %s has been placed successfully.
+                    
+                    Items: %s
+                    Total: LKR %.2f
+                    
+                    We will notify you once it's confirmed.
+                    Thank you for choosing Ebee!
+                    """.formatted(
+                    customerDisplayName(order.getCustomer()),
+                    order.getOrderNumber(),
+                    itemSummary,
+                    order.getTotalAmount()
+            );
+            notificationService.notifyCustomer(order.getCustomer(), customerSubject, customerMessage);
+        }
+
+        if (order.getAgent() != null) {
+            String agentSubject = "New Order Assigned – " + order.getOrderNumber();
+            String customerInfo = order.getCustomer() != null
+                    ? "Customer: " + customerDisplayName(order.getCustomer())
+                    : "Customer: Walk-in";
+            String commissionInfo = commission != null
+                    ? "Commission: LKR %.2f (%.2f%% rate)".formatted(
+                            commission.getCommissionAmount(), commission.getCommissionRate())
+                    : "";
+            String agentMessage = """
+                    Dear %s,
+                    
+                    A new order %s has been assigned to you.
+                    
+                    %s
+                    Items: %s
+                    Total: LKR %.2f
+                    %s
+                    
+                    Please process the order at your earliest convenience.
+                    """.formatted(
+                    order.getAgent().getUser().getFirstName(),
+                    order.getOrderNumber(),
+                    customerInfo,
+                    itemSummary,
+                    order.getTotalAmount(),
+                    commissionInfo
+            );
+            notificationService.notifyAgent(order.getAgent(), agentSubject, agentMessage);
+        }
+    }
+
+    private void sendOrderStatusNotifications(Order order) {
+        if (order.getCustomer() != null) {
+            String statusMessage = switch (order.getStatus()) {
+                case CONFIRMED -> "has been confirmed and is being prepared.";
+                case PROCESSING -> "is now being processed.";
+                case SHIPPED -> "has been shipped and is on its way!";
+                case DELIVERED -> "has been delivered. Thank you for shopping with us!";
+                default -> null;
+            };
+
+            if (statusMessage != null) {
+                String subject = "Order " + order.getStatus().name() + " – " + order.getOrderNumber();
+                String message = "Dear %s,\n\nYour order %s %s".formatted(
+                        customerDisplayName(order.getCustomer()),
+                        order.getOrderNumber(),
+                        statusMessage
+                );
+                notificationService.notifyCustomer(order.getCustomer(), subject, message);
+            }
+        }
+
+        if (order.getAgent() != null) {
+            String statusMessage = switch (order.getStatus()) {
+                case CONFIRMED -> "has been confirmed.";
+                case PROCESSING -> "is now being processed.";
+                case SHIPPED -> "has been shipped.";
+                case DELIVERED -> "has been delivered.";
+                default -> null;
+            };
+
+            if (statusMessage != null) {
+                String customerInfo = order.getCustomer() != null
+                        ? customerDisplayName(order.getCustomer())
+                        : "Walk-in";
+                String subject = "Order " + order.getStatus().name() + " – " + order.getOrderNumber();
+                String message = "Dear %s,\n\nOrder %s for %s %s".formatted(
+                        order.getAgent().getUser().getFirstName(),
+                        order.getOrderNumber(),
+                        customerInfo,
+                        statusMessage
+                );
+                notificationService.notifyAgent(order.getAgent(), subject, message);
+            }
+        }
+    }
+
+    private void sendOrderCancelledNotifications(Order order) {
+        if (order.getCustomer() != null) {
+            String subject = "Order Cancelled – " + order.getOrderNumber();
+            String message = """
+                    Dear %s,
+                    
+                    Your order %s has been cancelled.
+                    
+                    If you need assistance, please contact our support team.
+                    """.formatted(
+                    customerDisplayName(order.getCustomer()),
+                    order.getOrderNumber()
+            );
+            notificationService.notifyCustomer(order.getCustomer(), subject, message);
+        }
+
+        if (order.getAgent() != null) {
+            String customerInfo = order.getCustomer() != null
+                    ? customerDisplayName(order.getCustomer())
+                    : "Walk-in";
+            String subject = "Order Cancelled – " + order.getOrderNumber();
+            String message = "Dear %s,\n\nOrder %s for %s has been cancelled.".formatted(
+                    order.getAgent().getUser().getFirstName(),
+                    order.getOrderNumber(),
+                    customerInfo
+            );
+            notificationService.notifyAgent(order.getAgent(), subject, message);
+        }
     }
 }

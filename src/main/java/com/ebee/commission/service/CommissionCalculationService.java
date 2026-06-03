@@ -11,6 +11,7 @@ import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
+import com.ebee.notification.NotificationService;
 import com.ebee.order.entity.Order;
 import com.ebee.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class CommissionCalculationService {
     private final CommissionConfigRepository configRepository;
     private final OrderRepository orderRepository;
     private final CommissionMapper mapper;
+    private final NotificationService notificationService;
 
     @Transactional
     public CommissionResponse calculateCommission(CommissionCalculateRequest request) {
@@ -39,6 +41,29 @@ public class CommissionCalculationService {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Order not found: " + request.getOrderId()));
 
         Commission commission = calculateCommissionForOrder(order);
+
+        Agent agent = commission.getAgent();
+        String subject = "Commission Calculated – Order " + order.getOrderNumber();
+        String message = """
+                Dear %s,
+                
+                A commission of LKR %.2f has been calculated for order %s.
+                
+                Order Amount: LKR %.2f
+                Rate: %.2f%%
+                Commission: LKR %.2f
+                
+                The commission will be processed once approved.
+                """.formatted(
+                agent.getUser().getFirstName(),
+                commission.getCommissionAmount(),
+                order.getOrderNumber(),
+                order.getTotalAmount(),
+                commission.getCommissionRate(),
+                commission.getCommissionAmount()
+        );
+        notificationService.notifyAgent(agent, subject, message);
+
         return mapper.toResponse(commission);
     }
 

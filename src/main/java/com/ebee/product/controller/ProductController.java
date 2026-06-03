@@ -32,7 +32,7 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @RequestParam("name") String name,
-            @RequestParam("sku") String sku,
+            @RequestParam("itemCode") String itemCode,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("category") String category,
             @RequestParam("price") BigDecimal price,
@@ -41,7 +41,7 @@ public class ProductController {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
-        request.setSku(sku);
+        request.setItemCode(itemCode);
         request.setDescription(description);
         request.setCategory(category);
         request.setPrice(price);
@@ -62,9 +62,9 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Product retrieved successfully", response));
     }
 
-    @GetMapping("/sku/{sku}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getProductBySku(@PathVariable String sku) {
-        ProductResponse response = productService.getProductBySku(sku);
+    @GetMapping("/item-code/{itemCode}")
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductByItemCode(@PathVariable String itemCode) {
+        ProductResponse response = productService.getProductByItemCode(itemCode);
         return ResponseEntity.ok(ApiResponse.success("Product retrieved successfully", response));
     }
 
@@ -85,7 +85,7 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable UUID id,
             @RequestParam(value = "name", required = false) String name,
-            @RequestParam(value = "sku", required = false) String sku,
+            @RequestParam(value = "itemCode", required = false) String itemCode,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "price", required = false) BigDecimal price,
@@ -94,7 +94,7 @@ public class ProductController {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
-        request.setSku(sku);
+        request.setItemCode(itemCode);
         request.setDescription(description);
         request.setCategory(category);
         request.setPrice(price);

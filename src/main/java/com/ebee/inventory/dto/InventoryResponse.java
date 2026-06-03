@@ -13,7 +13,7 @@ public class InventoryResponse {
     private UUID id;
     private UUID productId;
     private String productName;
-    private String productSku;
+    private String productItemCode;
     private Integer quantity;
     private Integer reservedQuantity;
     private Integer availableQuantity;

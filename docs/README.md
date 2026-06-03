@@ -82,7 +82,7 @@ curl -X POST http://localhost:8085/api/orders \
   -d '{
     "agentCode": "JF-008",
     "customerPhoneNumber": "+94771234567",
-    "items": [{"productSku": "PA-001", "quantity": 2}]
+    "items": [{"productItemCode": "PA-001", "quantity": 2}]
   }'
 ```
 

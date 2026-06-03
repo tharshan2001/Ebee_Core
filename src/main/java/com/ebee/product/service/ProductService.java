@@ -43,8 +43,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponse createProduct(ProductRequest request) throws IOException {
-        if (productRepository.existsBySku(request.getSku())) {
-            throw new IllegalArgumentException("SKU already exists: " + request.getSku());
+        if (productRepository.existsByItemCode(request.getItemCode())) {
+            throw new IllegalArgumentException("Item code already exists: " + request.getItemCode());
         }
 
         categoryService.findByNameOrThrow(request.getCategory());
@@ -84,9 +84,9 @@ public class ProductService {
         return toResponseWithRelations(product);
     }
 
-    public ProductResponse getProductBySku(String sku) {
-        Product product = productRepository.findBySkuWithRelations(sku)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", sku));
+    public ProductResponse getProductByItemCode(String itemCode) {
+        Product product = productRepository.findByItemCodeWithRelations(itemCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "itemCode", itemCode));
         return toResponseWithRelations(product);
     }
 
@@ -141,12 +141,12 @@ public class ProductService {
         if (request.getName() != null) {
             product.setName(request.getName());
         }
-        if (request.getSku() != null) {
-            if (!product.getSku().equals(request.getSku()) &&
-                productRepository.existsBySkuAndIdNot(request.getSku(), id)) {
-                throw new IllegalArgumentException("SKU already exists: " + request.getSku());
+        if (request.getItemCode() != null) {
+            if (!product.getItemCode().equals(request.getItemCode()) &&
+                productRepository.existsByItemCodeAndIdNot(request.getItemCode(), id)) {
+                throw new IllegalArgumentException("Item code already exists: " + request.getItemCode());
             }
-            product.setSku(request.getSku());
+            product.setItemCode(request.getItemCode());
         }
         if (request.getDescription() != null) {
             product.setDescription(request.getDescription());

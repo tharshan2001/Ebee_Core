@@ -40,7 +40,7 @@ Authorization: Bearer <JWT_TOKEN>
   "notes": "Optional order notes",
   "items": [
     {
-      "productSku": "PA-001",
+      "productItemCode": "PA-001",
       "quantity": 2
     }
   ]
@@ -54,7 +54,7 @@ Authorization: Bearer <JWT_TOKEN>
 | customerPhoneNumber | String | No | Links to existing customer; fails if phone not found |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
-| items[].productSku | String | Yes | Must match an active product's SKU |
+| items[].productItemCode | String | Yes | Must match an active product's item code |
 | items[].quantity | Integer | Yes | Positive integer |
 
 **Success Response (201 Created):**
@@ -83,7 +83,7 @@ Authorization: Bearer <JWT_TOKEN>
         "id": "d09a3e09-486a-46ad-bcec-e03be4468600",
         "productId": "171ab477-cba6-4589-934d-01906d480852",
         "productName": "Updated Product A",
-        "productSku": "PROD-A",
+        "productItemCode": "PROD-A",
         "quantity": 2,
         "unitPrice": 59.99,
         "subtotal": 119.98
@@ -312,7 +312,7 @@ Cancels an order.
   "notes": "String (optional)",
   "items": [
     {
-      "productSku": "String (required, e.g. PA-001)",
+      "productItemCode": "String (required, e.g. PA-001)",
       "quantity": "Integer (required, positive)"
     }
   ]
@@ -342,7 +342,7 @@ Cancels an order.
       "id": "UUID",
       "productId": "UUID",
       "productName": "String",
-      "productSku": "String",
+      "productItemCode": "String",
       "quantity": "Integer",
       "unitPrice": "BigDecimal",
       "subtotal": "BigDecimal"
@@ -408,7 +408,7 @@ curl -X POST http://localhost:8085/api/orders \
     "notes": "Customer requested express delivery",
     "items": [
       {
-        "productSku": "PA-001",
+        "productItemCode": "PA-001",
         "quantity": 3
       }
     ]
@@ -441,7 +441,7 @@ curl -X POST http://localhost:8085/api/orders \
     "notes": "Customer order",
     "items": [
       {
-        "productSku": "PA-001",
+        "productItemCode": "PA-001",
         "quantity": 1
       }
     ]

@@ -1,4 +1,4 @@
-# Product API Reference
+````# Product API Reference
 
 ## Base URL
 
@@ -40,7 +40,7 @@ curl http://localhost:8085/api/categories -H "Authorization: Bearer <TOKEN>"
     {
       "id": "171ab477-cba6-4589-934d-01906d480852",
       "name": "Updated Product A",
-      "sku": "PA-001",
+      "itemCode": "PA-001",
       "description": "Updated description",
       "category": "Electronics",
       "price": 59.99,
@@ -55,4 +55,5 @@ curl http://localhost:8085/api/categories -H "Authorization: Bearer <TOKEN>"
 }
 ```
 
-> Products are referenced by `sku` (e.g., `PA-001`) when creating orders, not by UUID.
+> Products are referenced by `itemCode` (e.g., `PA-001`) when creating orders, not by UUID.
+````

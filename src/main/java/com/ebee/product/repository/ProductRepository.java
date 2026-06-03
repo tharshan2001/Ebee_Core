@@ -13,11 +13,11 @@ import java.util.UUID;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
-    Optional<Product> findBySku(String sku);
+    Optional<Product> findByItemCode(String itemCode);
 
-    boolean existsBySku(String sku);
+    boolean existsByItemCode(String itemCode);
 
-    boolean existsBySkuAndIdNot(String sku, UUID id);
+    boolean existsByItemCodeAndIdNot(String itemCode, UUID id);
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithRelations(@Param("id") UUID id);
@@ -25,8 +25,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory")
     List<Product> findAllWithInventory();
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.sku = :sku")
-    Optional<Product> findBySkuWithRelations(@Param("sku") String sku);
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
+    Optional<Product> findByItemCodeWithRelations(@Param("itemCode") String itemCode);
 
     List<Product> findByCategoryIgnoreCase(String category);
 }

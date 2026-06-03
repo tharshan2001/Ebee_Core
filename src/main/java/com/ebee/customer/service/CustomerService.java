@@ -8,18 +8,22 @@ import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.repository.CustomerRepository;
+import com.ebee.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -39,6 +43,9 @@ public class CustomerService {
         }
 
         customer = customerRepository.save(customer);
+
+        sendWelcomeNotification(customer);
+
         return toResponse(customer);
     }
 
@@ -139,6 +146,31 @@ public class CustomerService {
         address.setCity(request.getCity());
         address.setDistrict(request.getDistrict());
         address.setPostalCode(request.getPostalCode());
+    }
+
+    private void sendWelcomeNotification(Customer customer) {
+        try {
+            String subject = "Welcome to Ebee — Customer Registration Successful";
+            String message = """
+                    Dear %s %s,
+                    
+                    Welcome to Ebee! Your customer account has been successfully registered.
+                    
+                    We look forward to serving you.
+                    
+                    %s
+                    
+                    Best regards,
+                    Ebee Team
+                    """.formatted(
+                    customer.getFirstName(),
+                    customer.getLastName(),
+                    customer.getAddress() != null ? "Address: " + customer.getAddress().getStreet() + ", " + customer.getAddress().getCity() : "No address provided"
+            );
+            notificationService.notifyCustomer(customer, subject, message);
+        } catch (Exception e) {
+            log.warn("Failed to send welcome notification to customer {}: {}", customer.getPhoneNumber(), e.getMessage());
+        }
     }
 
     private CustomerResponse toResponse(Customer customer) {

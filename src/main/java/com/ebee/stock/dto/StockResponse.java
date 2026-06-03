@@ -12,7 +12,7 @@ public class StockResponse {
     private UUID id;
     private UUID productId;
     private String productName;
-    private String productSku;
+    private String productItemCode;
     private Integer quantityChange;
     private Integer quantityBefore;
     private Integer quantityAfter;

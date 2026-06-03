@@ -18,7 +18,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "products", uniqueConstraints = {
-    @UniqueConstraint(columnNames = "sku")
+    @UniqueConstraint(columnNames = "item_code")
 })
 @Data
 @NoArgsConstructor
@@ -33,8 +33,8 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true)
-    private String sku;
+    @Column(name = "item_code", nullable = false, unique = true)
+    private String itemCode;
 
     @Column(columnDefinition = "TEXT")
     private String description;

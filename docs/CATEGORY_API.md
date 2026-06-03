@@ -159,7 +159,7 @@ When creating or updating a product, the `category` field is validated against *
 ```bash
 curl -X POST http://localhost:8085/api/products \
   -H "Authorization: Bearer <TOKEN>" \
-  -F "name=Chair" -F "sku=CH001" -F "category=Furniture" -F "price=150" -F "costPrice=80"
+  -F "name=Chair" -F "itemCode=CH001" -F "category=Furniture" -F "price=150" -F "costPrice=80"
 ```
 
 If the category does not exist or has been soft-deleted, the API returns:

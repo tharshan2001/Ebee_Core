@@ -13,7 +13,7 @@ public class ProductResponse {
 
     private UUID id;
     private String name;
-    private String sku;
+    private String itemCode;
     private String description;
     private String category;
     private BigDecimal price;

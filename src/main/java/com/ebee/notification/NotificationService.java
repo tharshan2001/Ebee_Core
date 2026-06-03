@@ -55,7 +55,7 @@ public class NotificationService {
         }
     }
 
-    public void notifyCustomer(Customer customer, String message) {
+    public void notifyCustomer(Customer customer, String subject, String message) {
         if (customer.getPhoneNumber() != null) {
             SmsRequest smsReq = SmsRequest.builder()
                     .phoneNumbers(List.of(customer.getPhoneNumber()))
@@ -70,7 +70,7 @@ public class NotificationService {
         if (customer.getEmail() != null) {
             EmailRequest emailReq = EmailRequest.builder()
                     .to(customer.getEmail())
-                    .subject("Ebee Notification")
+                    .subject(subject)
                     .body(message)
                     .html(false)
                     .build();

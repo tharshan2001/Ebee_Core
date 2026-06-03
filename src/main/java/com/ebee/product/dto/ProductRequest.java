@@ -15,8 +15,8 @@ public class ProductRequest {
     @NotBlank(message = "Product name is required")
     private String name;
 
-    @NotBlank(message = "SKU is required")
-    private String sku;
+    @NotBlank(message = "Item code is required")
+    private String itemCode;
 
     private String description;
 

@@ -19,7 +19,7 @@ public class InventoryMapper {
                 .id(inventory.getId())
                 .productId(inventory.getProduct().getId())
                 .productName(inventory.getProduct().getName())
-                .productSku(inventory.getProduct().getSku())
+                .productItemCode(inventory.getProduct().getItemCode())
                 .quantity(inventory.getQuantity())
                 .reservedQuantity(inventory.getReservedQuantity())
                 .availableQuantity(availableQty)

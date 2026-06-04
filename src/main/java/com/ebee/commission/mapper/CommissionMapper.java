@@ -16,6 +16,7 @@ public interface CommissionMapper {
     Commission toEntity(CommissionRequest request);
 
     @Mapping(target = "agentId", source = "agent.id")
+    @Mapping(target = "agentCode", source = "agent.agentCode")
     @Mapping(target = "agentName", expression = "java(commission.getAgent().getUser().getFirstName() + \" \" + commission.getAgent().getUser().getLastName())")
     @Mapping(target = "orderId", source = "order.id")
     @Mapping(target = "orderNumber", source = "order.orderNumber")

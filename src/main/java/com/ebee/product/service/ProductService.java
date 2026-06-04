@@ -151,7 +151,7 @@ public class ProductService {
         if (request.getDescription() != null) {
             product.setDescription(request.getDescription());
         }
-        if (request.getCategory() != null) {
+        if (request.getCategory() != null && !request.getCategory().equals(product.getCategory())) {
             categoryService.findByNameOrThrow(request.getCategory());
             product.setCategory(request.getCategory());
         }

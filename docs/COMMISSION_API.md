@@ -59,7 +59,9 @@ Calculates commission for an existing order. Commissions are also auto-created w
   "data": {
     "id": "08eb3353-cef0-438a-b782-6c5304c393d7",
     "agentId": "81c662e0-80e0-450d-b492-adc1c15103c7",
+    "agentCode": "COL-001",
     "agentName": "Anton Abitharshan",
+    "agentTotalSales": 180.00,
     "orderId": "8169f41f-4834-46d2-8d30-9fbfb103466a",
     "orderNumber": "ORD-20260530114354",
     "orderAmount": 180.00,
@@ -99,7 +101,7 @@ APPROVED    (admin calls /approve)
 PROCESSING  (admin calls /process)
     │
     ▼
-PAID        (admin calls /pay)  →  updates agent totalSales / totalCommission
+PAID        (admin calls /pay)  →  updates agent totalSales / totalCommission (also persisted instantly)
     │
     ▼
 CANCELLED   (on order cancel)   →  reverts agent totals if was PAID
@@ -119,6 +121,8 @@ Any state ──→ REJECTED (admin calls /reject?reason=...)
 | **GET** `/api/commissions/status/{status}` | ADMIN only | Filter by status |
 
 Status values: `CALCULATED`, `APPROVED`, `PROCESSING`, `PAID`, `REJECTED`, `CANCELLED`.
+
+> `agentTotalSales` is computed dynamically — the sum of all non-cancelled/non-rejected order amounts for that agent. It reflects total sales regardless of payment status.
 
 ---
 
@@ -222,7 +226,9 @@ curl -X PUT http://localhost:8085/api/commission-configs/default \
 {
   "id": "UUID",
   "agentId": "UUID",
+  "agentCode": "String",
   "agentName": "String",
+  "agentTotalSales": "BigDecimal",
   "orderId": "UUID",
   "orderNumber": "String",
   "orderAmount": "BigDecimal",

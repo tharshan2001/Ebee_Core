@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,26 +24,36 @@ public class CommissionQueryService {
     private final CommissionMapper mapper;
 
     public List<CommissionResponse> getCommissionsByAgent(UUID agentId) {
+        BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);
         return commissionRepository.findByAgentId(agentId).stream()
-                .map(mapper::toResponse)
+                .map(c -> enrichWithAgentTotals(mapper.toResponse(c), totalSales))
                 .collect(Collectors.toList());
     }
 
     public List<CommissionResponse> getCommissionsByStatus(CommissionStatus status) {
         return commissionRepository.findByStatus(status).stream()
-                .map(mapper::toResponse)
+                .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
                 .collect(Collectors.toList());
     }
 
     public CommissionResponse getCommissionById(UUID id) {
         Commission commission = commissionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Commission not found: " + id));
-        return mapper.toResponse(commission);
+        BigDecimal totalSales = commissionRepository.sumSalesByAgentId(commission.getAgent().getId());
+        return enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
     }
 
     public List<CommissionResponse> getAllCommissions() {
         return commissionRepository.findAll().stream()
-                .map(mapper::toResponse)
+                .map(c -> {
+                    BigDecimal totalSales = commissionRepository.sumSalesByAgentId(c.getAgent().getId());
+                    return enrichWithAgentTotals(mapper.toResponse(c), totalSales);
+                })
                 .collect(Collectors.toList());
+    }
+
+    private CommissionResponse enrichWithAgentTotals(CommissionResponse response, BigDecimal totalSales) {
+        response.setAgentTotalSales(totalSales);
+        return response;
     }
 }

@@ -14,6 +14,7 @@ public class CommissionResponse {
     private UUID agentId;
     private String agentCode;
     private String agentName;
+    private BigDecimal agentTotalSales;
     private UUID orderId;
     private String orderNumber;
     private BigDecimal orderAmount;

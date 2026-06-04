@@ -24,4 +24,7 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
 
     @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.agent.id = :agentId AND c.status NOT IN ('CANCELLED', 'REJECTED')")
     BigDecimal sumCommissionAmountByAgentId(@Param("agentId") UUID agentId);
+
+    @Query("SELECT COALESCE(SUM(c.orderAmount), 0) FROM Commission c WHERE c.agent.id = :agentId AND c.status NOT IN ('CANCELLED', 'REJECTED')")
+    BigDecimal sumSalesByAgentId(@Param("agentId") UUID agentId);
 }

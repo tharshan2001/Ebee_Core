@@ -11,6 +11,7 @@ import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.repository.CommissionConfigRepository;
+import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.notification.NotificationService;
@@ -42,6 +43,7 @@ public class AgentService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
     private final CommissionConfigRepository commissionConfigRepository;
+    private final CommissionRepository commissionRepository;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -318,7 +320,7 @@ public class AgentService {
         response.setCommissionRate(agent.getCommissionRate());
         response.setCommissionType(agent.getCommissionType());
         response.setTotalSales(agent.getTotalSales());
-        response.setTotalCommission(agent.getTotalCommission());
+        response.setTotalCommission(commissionRepository.sumCommissionAmountByAgentId(agent.getId()).doubleValue());
         response.setIsActive(agent.getIsActive());
         response.setUserStatus(agent.getUser().getStatus());
 

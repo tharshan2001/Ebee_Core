@@ -1,9 +1,6 @@
 package com.ebee.auth.controller;
 
-import com.ebee.auth.dto.AuthResponse;
-import com.ebee.auth.dto.ChangePasswordRequest;
-import com.ebee.auth.dto.LoginRequest;
-import com.ebee.auth.dto.RegisterRequest;
+import com.ebee.auth.dto.*;
 import com.ebee.auth.service.AuthService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.common.response.ApiResponse;
@@ -16,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -118,5 +117,27 @@ public class AuthController {
         String email = jwtService.extractEmailFromToken(token);
         authService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success("OTP sent to your email and phone"));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<Map<String, String>>> verifyOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+        String resetToken = authService.verifyOtp(request.getEmail(), request.getOtp());
+        return ResponseEntity.ok(ApiResponse.success("OTP verified successfully",
+                Map.of("resetToken", resetToken)));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getResetToken(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 }

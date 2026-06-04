@@ -15,5 +15,8 @@ public class UserProfileResponse {
     private String lastName;
     private String phoneNumber;
     private RoleType role;
+    private String profilePictureUrl;
+    private Boolean loginAlertsEnabled;
+    private Boolean phoneVerified;
     private LocalDateTime createdAt;
 }

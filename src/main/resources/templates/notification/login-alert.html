@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background: #1a73e8; padding: 20px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .content { padding: 30px; }
+        .alert-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 16px; margin: 16px 0; }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>New Login Detected</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{firstName}},</p>
+            <p>A new login was detected on your Ebee account.</p>
+            <div class="alert-box">
+                <p><strong>Time:</strong> {{loginTime}}</p>
+                <p><strong>Account:</strong> {{email}}</p>
+            </div>
+            <p>If this was you, no action is needed.</p>
+            <p>If you did not perform this login, please change your password immediately.</p>
+        </div>
+        <div class="footer">
+            <p>Ebee - Kismet Plus</p>
+        </div>
+    </div>
+</body>
+</html>

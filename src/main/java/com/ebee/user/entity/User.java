@@ -63,6 +63,23 @@ public class User {
     @Column(name = "password_changed_at")
     private LocalDateTime passwordChangedAt;
 
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
+
+    @Column(name = "profile_picture_name")
+    private String profilePictureName;
+
+    @Column(name = "profile_picture_type")
+    private String profilePictureType;
+
+    @Column(name = "login_alerts_enabled", nullable = false)
+    @Builder.Default
+    private Boolean loginAlertsEnabled = true;
+
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private Boolean phoneVerified = false;
+
     @OneToMany(mappedBy = "user")
     private List<Agent> agents = new ArrayList<>();
 

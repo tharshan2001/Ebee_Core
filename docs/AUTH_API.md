@@ -52,3 +52,145 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 **Access:** Public (uses `refresh_token` cookie)
 
 Uses the `refresh_token` HTTP-only cookie (set on login) to issue a new access token.
+
+---
+
+## Change Password
+
+**POST** `/api/auth/change-password`
+
+**Access:** Authenticated users
+
+**Request:**
+```json
+{
+  "currentPassword": "admin123",
+  "newPassword": "newSecurePass456"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password changed successfully",
+  "data": null
+}
+```
+
+---
+
+## Forgot Password (Request OTP)
+
+**POST** `/api/auth/forgot-password`
+
+**Access:** Public (no auth required)
+
+Sends a 6-digit OTP to the user's email and phone number (if available). OTP expires in 5 minutes.
+
+**Request:**
+```json
+{
+  "email": "admin@ebee.com"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "OTP sent to your email and phone",
+  "data": null
+}
+```
+
+**Error (unknown email):**
+```json
+{
+  "success": false,
+  "message": "User not found with email: 'unknown@test.com'",
+  "data": null
+}
+```
+
+---
+
+## Verify OTP
+
+**POST** `/api/auth/verify-otp`
+
+**Access:** Public (no auth required)
+
+Verifies the OTP and returns a short-lived **reset token** (JWT, 5 min expiry) for the reset-password step.
+
+**Request:**
+```json
+{
+  "email": "admin@ebee.com",
+  "otp": "483291"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "OTP verified successfully",
+  "data": {
+    "resetToken": "eyJhbGciOiJIUzI1NiJ9..."
+  }
+}
+```
+
+**Error (invalid/expired OTP):**
+```json
+{
+  "success": false,
+  "message": "Invalid or expired OTP",
+  "data": null
+}
+```
+
+---
+
+## Reset Password
+
+**POST** `/api/auth/reset-password`
+
+**Access:** Public (no auth required)
+
+Uses the reset token from verify-otp to set a new password. The reset token is a stateless JWT that expires in 5 minutes.
+
+**Request:**
+```json
+{
+  "resetToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "newPassword": "myNewSecurePassword"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully",
+  "data": null
+}
+```
+
+**Error (invalid/expired reset token):**
+```json
+{
+  "success": false,
+  "message": "Invalid or expired reset token",
+  "data": null
+}
+```
+
+---
+
+## Complete Reset Flow (end-to-end)
+
+1. `POST /api/auth/forgot-password` with `email` → OTP sent via email + SMS
+2. `POST /api/auth/verify-otp` with `email` + `otp` → returns `resetToken`
+3. `POST /api/auth/reset-password` with `resetToken` + `newPassword` → password updated

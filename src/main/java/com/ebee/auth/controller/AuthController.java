@@ -55,7 +55,20 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<Void>> logout(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        String email = null;
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            email = jwtService.extractEmailFromToken(token);
+        }
+
+        if (email != null) {
+            authService.logout(email);
+        }
+
         Cookie jwtCookie = new Cookie("jwt_token", null);
         jwtCookie.setHttpOnly(true);
         jwtCookie.setPath("/");

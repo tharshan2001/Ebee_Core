@@ -5,6 +5,7 @@ import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.notification.NotificationService;
+import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
@@ -97,6 +98,59 @@ public class AuthService {
         }
     }
 
+    private void sendLogoutAlert(User user) {
+        if (!Boolean.TRUE.equals(user.getLoginAlertsEnabled())) {
+            return;
+        }
+
+        try {
+            String time = LocalDateTime.now().toString();
+            String subject = "Ebee - Logout Detected";
+
+            notificationService.sendEmail(EmailRequest.builder()
+                    .to(user.getEmail())
+                    .subject(subject)
+                    .body("You have been logged out of your Ebee account.\n\nTime: " + time
+                            + "\n\nIf this was not you, please change your password immediately.")
+                    .html(false)
+                    .build());
+
+            if (user.getPhoneNumber() != null) {
+                notificationService.sendSms(SmsRequest.builder()
+                        .phoneNumbers(List.of(user.getPhoneNumber()))
+                        .message("Ebee: You have been logged out of your account at " + time)
+                        .build());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send logout alert to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    private void sendPasswordChangedAlert(User user) {
+        try {
+            String time = LocalDateTime.now().toString();
+            String subject = "Ebee - Password Changed";
+
+            notificationService.sendEmail(EmailRequest.builder()
+                    .to(user.getEmail())
+                    .subject(subject)
+                    .body("Your Ebee account password was changed.\n\nTime: " + time
+                            + "\n\nIf you did not make this change, please contact support immediately.")
+                    .html(false)
+                    .build());
+
+            if (user.getPhoneNumber() != null) {
+                notificationService.sendSms(SmsRequest.builder()
+                        .phoneNumbers(List.of(user.getPhoneNumber()))
+                        .message("Ebee: Your account password was changed at " + time
+                                + ". If this was not you, contact support.")
+                        .build());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send password changed alert to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
     @Transactional
     public UserResponse register(RegisterRequest request) {
         UserRequest userRequest = new UserRequest();
@@ -140,6 +194,12 @@ public class AuthService {
                 .build();
     }
 
+    public void logout(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        sendLogoutAlert(user);
+    }
+
     @Transactional
     public void changePassword(String email, String currentPassword, String newPassword) {
         User user = userRepository.findByEmail(email)
@@ -153,6 +213,8 @@ public class AuthService {
         user.setMustChangePassword(false);
         user.setPasswordChangedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
+
+        sendPasswordChangedAlert(user);
     }
 
     public void forgotPassword(String email) {
@@ -184,6 +246,8 @@ public class AuthService {
         user.setMustChangePassword(false);
         user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
+
+        sendPasswordChangedAlert(user);
     }
 
     private String generateResetToken(User user) {

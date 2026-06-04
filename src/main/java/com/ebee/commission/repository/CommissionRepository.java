@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,4 +28,10 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
 
     @Query("SELECT COALESCE(SUM(c.orderAmount), 0) FROM Commission c WHERE c.agent.id = :agentId AND c.status NOT IN ('CANCELLED', 'REJECTED')")
     BigDecimal sumSalesByAgentId(@Param("agentId") UUID agentId);
+
+    @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.status NOT IN ('CANCELLED', 'REJECTED')")
+    BigDecimal sumAllCommissionLocked();
+
+    @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.status NOT IN ('CANCELLED', 'REJECTED') AND c.createdAt >= :start AND c.createdAt < :end")
+    BigDecimal sumCommissionLockedByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,4 +39,32 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByStatus(com.ebee.order.enums.OrderStatus status);
 
     boolean existsByOrderNumber(String orderNumber);
+
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    BigDecimal sumRevenueByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    Long countOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT a.id, a.agentCode, a.user.firstName, a.user.lastName, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o LEFT JOIN o.agent a LEFT JOIN a.user WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY a.id, a.agentCode, a.user.firstName, a.user.lastName")
+    List<Object[]> findSalesByAgent(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0), COUNT(o) FROM Order o WHERE o.agent.id = :agentId AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    List<Object[]> findSalesSummaryByAgent(@Param("agentId") UUID agentId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_TRUNC('day', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('day', o.created_at) ORDER BY period", nativeQuery = true)
+    List<Object[]> findDailyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_TRUNC('month', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('month', o.created_at) ORDER BY period", nativeQuery = true)
+    List<Object[]> findMonthlyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_TRUNC('year', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('year', o.created_at) ORDER BY period", nativeQuery = true)
+    List<Object[]> findYearlyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end")
+    Long countOrdersByDateRangeAllStatuses(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.status = 'DELIVERED' AND o.deliveredAt >= :start AND o.deliveredAt < :end")
+    Long countDeliveredByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
 }

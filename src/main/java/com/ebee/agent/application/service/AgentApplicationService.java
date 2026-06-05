@@ -4,10 +4,14 @@ import com.ebee.agent.application.dto.AgentApplicationRequest;
 import com.ebee.agent.application.dto.AgentApplicationResponse;
 import com.ebee.agent.application.entity.AgentApplication;
 import com.ebee.agent.application.repository.AgentApplicationRepository;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.notification.NotificationService;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.sender.EmailSender;
 import com.ebee.notification.template.NotificationTemplateService;
+import com.ebee.user.enums.RoleType;
+import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,8 @@ public class AgentApplicationService {
     private final AgentApplicationRepository repository;
     private final EmailSender emailSender;
     private final NotificationTemplateService templateService;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public AgentApplicationResponse create(AgentApplicationRequest request) {
@@ -38,6 +44,13 @@ public class AgentApplicationService {
         AgentApplication saved = repository.save(application);
 
         sendConfirmationEmail(request);
+
+        String alertTitle = "New Agent Application";
+        String alertMessage = request.getFirstName() + " " + request.getLastName()
+                + " (" + request.getEmail() + ") has submitted an agent application.";
+        userRepository.findByRole(RoleType.ADMIN).forEach(admin ->
+                notificationService.createInternalAlert(admin, alertTitle, alertMessage,
+                        AlertType.AGENT_APPROVED, saved.getId(), "agent_application"));
 
         return mapToResponse(saved);
     }

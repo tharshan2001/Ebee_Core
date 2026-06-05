@@ -12,6 +12,7 @@ import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.notification.NotificationService;
@@ -26,10 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -50,7 +52,7 @@ public class AgentService {
     private final SecureRandom random = new SecureRandom();
 
     @Transactional
-    public AgentWithCredentialsResponse createAgent(AgentRequest request, boolean createdByAdmin) throws IOException {
+    public AgentWithCredentialsResponse createAgent(AgentRequest request, boolean createdByAdmin) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
@@ -95,15 +97,33 @@ public class AgentService {
                 .isActive(true)
                 .build();
 
-        if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
-            String nicUrl = s3Service.uploadFile(request.getNicDocument(), "agents/nic");
+        List<CompletableFuture<String>> uploadFutures = new ArrayList<>();
+        boolean hasNicDoc = request.getNicDocument() != null && !request.getNicDocument().isEmpty();
+        boolean hasPassbookDoc = request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty();
+
+        if (hasNicDoc) {
+            uploadFutures.add(s3Service.uploadFile(request.getNicDocument(), "agents/nic"));
+        } else {
+            uploadFutures.add(CompletableFuture.completedFuture(null));
+        }
+
+        if (hasPassbookDoc) {
+            uploadFutures.add(s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook"));
+        } else {
+            uploadFutures.add(CompletableFuture.completedFuture(null));
+        }
+
+        CompletableFuture.allOf(uploadFutures.toArray(new CompletableFuture[0])).join();
+
+        if (hasNicDoc) {
+            String nicUrl = uploadFutures.get(0).join();
             agent.setNicDocumentUrl(nicUrl);
             agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
             agent.setNicDocumentType(request.getNicDocument().getContentType());
         }
 
-        if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
-            String passbookUrl = s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook");
+        if (hasPassbookDoc) {
+            String passbookUrl = uploadFutures.get(1).join();
             agent.setBankPassbookDocumentUrl(passbookUrl);
             agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
             agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
@@ -151,6 +171,11 @@ public class AgentService {
 
         agent.setIsActive(true);
         Agent savedAgent = agentRepository.save(agent);
+
+        sendAgentStatusNotification(agent, "Approved",
+                "Congratulations! Your agent application has been approved. You can now log in and start selling.",
+                true);
+
         return mapToResponse(savedAgent);
     }
 
@@ -165,6 +190,11 @@ public class AgentService {
 
         agent.setIsActive(false);
         Agent savedAgent = agentRepository.save(agent);
+
+        sendAgentStatusNotification(agent, "Rejected",
+                "Your agent application has been rejected. Please contact support for more information.",
+                false);
+
         return mapToResponse(savedAgent);
     }
 
@@ -180,6 +210,11 @@ public class AgentService {
 
         agent.setIsActive(true);
         Agent savedAgent = agentRepository.save(agent);
+
+        sendAgentStatusNotification(agent, "Activated",
+                "Your account has been activated. You can now log in and access the system.",
+                true);
+
         return mapToResponse(savedAgent);
     }
 
@@ -195,6 +230,11 @@ public class AgentService {
 
         agent.setIsActive(false);
         Agent savedAgent = agentRepository.save(agent);
+
+        sendAgentStatusNotification(agent, "Deactivated",
+                "Your account has been deactivated. If you believe this is an error, please contact support.",
+                true);
+
         return mapToResponse(savedAgent);
     }
 
@@ -218,7 +258,7 @@ public class AgentService {
     }
 
     @Transactional
-    public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) throws IOException {
+    public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
 
@@ -255,25 +295,40 @@ public class AgentService {
         agent.setBankName(request.getBankName());
         agent.setBankBranch(request.getBankBranch());
 
-        // Handle NIC document upload to S3
-        if (request.getNicDocument() != null && !request.getNicDocument().isEmpty()) {
-            // Delete old file if exists
+        List<CompletableFuture<Void>> deleteFutures = new ArrayList<>();
+        List<CompletableFuture<String>> uploadFutures = new ArrayList<>();
+
+        boolean hasNicDoc = request.getNicDocument() != null && !request.getNicDocument().isEmpty();
+        boolean hasPassbookDoc = request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty();
+
+        if (hasNicDoc) {
             if (agent.getNicDocumentUrl() != null) {
                 s3Service.deleteFile(agent.getNicDocumentUrl());
             }
-            String nicUrl = s3Service.uploadFile(request.getNicDocument(), "agents/nic");
+            uploadFutures.add(s3Service.uploadFile(request.getNicDocument(), "agents/nic"));
+        }
+
+        if (hasPassbookDoc) {
+            if (agent.getBankPassbookDocumentUrl() != null) {
+                s3Service.deleteFile(agent.getBankPassbookDocumentUrl());
+            }
+            uploadFutures.add(s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook"));
+        }
+
+        if (!uploadFutures.isEmpty()) {
+            CompletableFuture.allOf(uploadFutures.toArray(new CompletableFuture[0])).join();
+        }
+
+        int futureIndex = 0;
+        if (hasNicDoc) {
+            String nicUrl = uploadFutures.get(futureIndex++).join();
             agent.setNicDocumentUrl(nicUrl);
             agent.setNicDocumentName(request.getNicDocument().getOriginalFilename());
             agent.setNicDocumentType(request.getNicDocument().getContentType());
         }
 
-        // Handle Bank Passbook document upload to S3
-        if (request.getBankPassbookDocument() != null && !request.getBankPassbookDocument().isEmpty()) {
-            // Delete old file if exists
-            if (agent.getBankPassbookDocumentUrl() != null) {
-                s3Service.deleteFile(agent.getBankPassbookDocumentUrl());
-            }
-            String passbookUrl = s3Service.uploadFile(request.getBankPassbookDocument(), "agents/passbook");
+        if (hasPassbookDoc) {
+            String passbookUrl = uploadFutures.get(futureIndex).join();
             agent.setBankPassbookDocumentUrl(passbookUrl);
             agent.setBankPassbookDocumentName(request.getBankPassbookDocument().getOriginalFilename());
             agent.setBankPassbookDocumentType(request.getBankPassbookDocument().getContentType());
@@ -340,6 +395,27 @@ public class AgentService {
         return response;
     }
 
+    private void sendAgentStatusNotification(Agent agent, String statusLabel, String message, boolean includeSms) {
+        String subject = "Agent Account " + statusLabel + " – Ebee";
+        try {
+            notificationService.notifyAgent(agent, subject, message);
+        } catch (Exception e) {
+            log.warn("Failed to send {} notification to agent {}: {}", statusLabel.toLowerCase(),
+                    agent.getAgentCode(), e.getMessage());
+        }
+
+        AlertType alertType = switch (statusLabel) {
+            case "Approved" -> AlertType.AGENT_APPROVED;
+            case "Rejected" -> AlertType.AGENT_REJECTED;
+            case "Activated" -> AlertType.AGENT_ACTIVATED;
+            case "Deactivated" -> AlertType.AGENT_DEACTIVATED;
+            default -> null;
+        };
+        if (alertType != null && agent.getUser() != null) {
+            notificationService.createInternalAlert(agent.getUser(), subject, message, alertType, agent.getId(), "agent");
+        }
+    }
+
     private void sendWelcomeNotification(String firstName, String lastName, String agentCode,
                                           String password, Agent agent) {
         try {
@@ -362,6 +438,7 @@ public class AgentService {
                     Ebee Team
                     """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), password);
             notificationService.notifyAgent(agent, subject, message);
+            notificationService.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
         }

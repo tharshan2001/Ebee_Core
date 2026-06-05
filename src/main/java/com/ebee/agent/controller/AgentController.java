@@ -38,7 +38,7 @@ public class AgentController {
             @RequestParam(value = "bankPassbookDocument", required = false) MultipartFile bankPassbookDocument,
             @RequestParam(value = "bankAccountNumber", required = false) String bankAccountNumber,
             @RequestParam(value = "bankName", required = false) String bankName,
-            @RequestParam(value = "bankBranch", required = false) String bankBranch) throws java.io.IOException {
+            @RequestParam(value = "bankBranch", required = false) String bankBranch) {
 
         AgentRequest request = new AgentRequest();
         request.setEmail(email);
@@ -127,7 +127,7 @@ public class AgentController {
             @RequestParam(value = "bankPassbookDocument", required = false) MultipartFile bankPassbookDocument,
             @RequestParam(value = "bankAccountNumber", required = false) String bankAccountNumber,
             @RequestParam(value = "bankName", required = false) String bankName,
-            @RequestParam(value = "bankBranch", required = false) String bankBranch) throws java.io.IOException {
+            @RequestParam(value = "bankBranch", required = false) String bankBranch) {
 
         AgentUpdateRequest request = new AgentUpdateRequest();
         request.setAgentCode(agentCode);

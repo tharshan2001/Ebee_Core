@@ -2,6 +2,7 @@ package com.ebee.commission.service;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.enums.AgentCommissionType;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -63,6 +64,8 @@ public class CommissionCalculationService {
                 commission.getCommissionAmount()
         );
         notificationService.notifyAgent(agent, subject, message);
+        notificationService.createInternalAlert(agent.getUser(), subject, message,
+                AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
 
         return mapper.toResponse(commission);
     }

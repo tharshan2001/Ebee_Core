@@ -3,14 +3,14 @@ package com.ebee.common.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-import java.io.IOException;
-import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -25,12 +25,13 @@ public class S3Service {
     @Value("${aws.region}")
     private String region;
 
-    public String uploadFile(MultipartFile file, String folder) throws IOException {
+    @Async
+    public CompletableFuture<String> uploadFile(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
-            return null;
+            return CompletableFuture.completedFuture(null);
         }
 
-        String fileName = folder + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
+        String fileName = folder + "/" + java.util.UUID.randomUUID() + "-" + file.getOriginalFilename();
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -42,14 +43,19 @@ public class S3Service {
             s3Client.putObject(putObjectRequest,
                     software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.getBytes()));
 
-            return "https://s3." + region + ".amazonaws.com/" + bucketName + "/" + fileName;
+            String url = "https://s3." + region + ".amazonaws.com/" + bucketName + "/" + fileName;
+            return CompletableFuture.completedFuture(url);
 
         } catch (S3Exception e) {
+            log.error("Failed to upload file to S3: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file to S3", e);
+        } catch (Exception e) {
             log.error("Failed to upload file to S3: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to upload file to S3", e);
         }
     }
 
+    @Async
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) {
             return;

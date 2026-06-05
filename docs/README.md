@@ -44,6 +44,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Categories | [CATEGORY_API.md](CATEGORY_API.md) | ADMIN (mutate), any (read) |
 | Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN (mutate), any (read) |
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
+| Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |
 
 ---
 

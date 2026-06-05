@@ -2,6 +2,7 @@ package com.ebee.order.service;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -291,6 +292,8 @@ public class OrderService {
                     commissionInfo
             );
             notificationService.notifyAgent(order.getAgent(), agentSubject, agentMessage);
+            notificationService.createInternalAlert(order.getAgent().getUser(), agentSubject, agentMessage,
+                    AlertType.ORDER_CREATED, order.getId(), "order");
         }
     }
 
@@ -301,6 +304,7 @@ public class OrderService {
                 case PROCESSING -> "is now being processed.";
                 case SHIPPED -> "has been shipped and is on its way!";
                 case DELIVERED -> "has been delivered. Thank you for shopping with us!";
+                case RETURNED -> "has been returned. Please contact support if you have any questions.";
                 default -> null;
             };
 
@@ -321,6 +325,7 @@ public class OrderService {
                 case PROCESSING -> "is now being processed.";
                 case SHIPPED -> "has been shipped.";
                 case DELIVERED -> "has been delivered.";
+                case RETURNED -> "has been returned.";
                 default -> null;
             };
 
@@ -336,6 +341,8 @@ public class OrderService {
                         statusMessage
                 );
                 notificationService.notifyAgent(order.getAgent(), subject, message);
+                notificationService.createInternalAlert(order.getAgent().getUser(), subject, message,
+                        AlertType.ORDER_STATUS_CHANGED, order.getId(), "order");
             }
         }
     }
@@ -367,6 +374,8 @@ public class OrderService {
                     customerInfo
             );
             notificationService.notifyAgent(order.getAgent(), subject, message);
+            notificationService.createInternalAlert(order.getAgent().getUser(), subject, message,
+                    AlertType.ORDER_CANCELLED, order.getId(), "order");
         }
     }
 }

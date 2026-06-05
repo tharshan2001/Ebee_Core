@@ -15,8 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,7 +45,7 @@ public class ProfileService {
     }
 
     @Transactional
-    public ProfilePhotoResponse uploadPhoto(String email, MultipartFile file) throws IOException {
+    public ProfilePhotoResponse uploadPhoto(String email, MultipartFile file) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
@@ -55,7 +53,7 @@ public class ProfileService {
             s3Service.deleteFile(user.getProfilePictureUrl());
         }
 
-        String url = s3Service.uploadFile(file, "profiles");
+        String url = s3Service.uploadFile(file, "profiles").join();
         user.setProfilePictureUrl(url);
         user.setProfilePictureName(file.getOriginalFilename());
         user.setProfilePictureType(file.getContentType());

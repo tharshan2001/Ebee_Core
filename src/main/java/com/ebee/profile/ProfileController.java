@@ -13,8 +13,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-
 @RestController
 @RequestMapping("/api/profile")
 @RequiredArgsConstructor
@@ -39,7 +37,7 @@ public class ProfileController {
     @PutMapping(value = "/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ProfilePhotoResponse>> uploadPhoto(
             Authentication authentication,
-            @RequestParam("file") MultipartFile file) throws IOException {
+            @RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("File is empty"));
         }

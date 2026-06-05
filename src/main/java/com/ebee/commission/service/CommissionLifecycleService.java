@@ -1,6 +1,7 @@
 package com.ebee.commission.service;
 
 import com.ebee.agent.entity.Agent;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
@@ -104,6 +105,19 @@ public class CommissionLifecycleService {
         String subject = "Commission " + statusLabel + " – Order " + commission.getOrder().getOrderNumber();
         String fullMessage = "Dear %s,\n\n%s".formatted(agent.getUser().getFirstName(), message);
         notificationService.notifyAgent(agent, subject, fullMessage);
+
+        AlertType alertType = switch (statusLabel) {
+            case "Approved" -> AlertType.COMMISSION_APPROVED;
+            case "Processing" -> AlertType.COMMISSION_PROCESSING;
+            case "Paid" -> AlertType.COMMISSION_PAID;
+            case "Rejected" -> AlertType.COMMISSION_REJECTED;
+            case "Cancelled" -> AlertType.COMMISSION_CANCELLED;
+            default -> null;
+        };
+        if (alertType != null) {
+            notificationService.createInternalAlert(agent.getUser(), subject, fullMessage,
+                    alertType, commission.getId(), "commission");
+        }
     }
 
     private Commission getCommissionEntity(UUID id) {

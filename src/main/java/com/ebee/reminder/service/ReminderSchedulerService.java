@@ -1,5 +1,6 @@
 package com.ebee.reminder.service;
 
+import com.ebee.alert.enums.AlertType;
 import com.ebee.notification.NotificationService;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
@@ -52,6 +53,9 @@ public class ReminderSchedulerService {
                     sendSms(reminder, message);
                 }
 
+                notificationService.createInternalAlert(reminder.getUser(), subject, message,
+                        AlertType.REMINDER_DUE, reminder.getId(), "reminder");
+
                 reminder.setAlertSent(true);
                 reminder.setNotifiedAt(LocalDateTime.now());
                 reminderRepository.save(reminder);
@@ -82,6 +86,9 @@ public class ReminderSchedulerService {
                     sendSms(reminder, "Ebee: \"" + reminder.getTitle() + "\" in 5 minutes"
                             + (reminder.getReminderTime() != null ? " at " + reminder.getReminderTime() : ""));
                 }
+
+                notificationService.createInternalAlert(reminder.getUser(), subject, message,
+                        AlertType.REMINDER_DUE, reminder.getId(), "reminder");
 
                 reminder.setEarlyAlertSent(true);
                 reminderRepository.save(reminder);

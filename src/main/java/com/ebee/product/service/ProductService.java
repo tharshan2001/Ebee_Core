@@ -20,10 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,7 +43,7 @@ public class ProductService {
     private final CategoryService categoryService;
 
     @Transactional
-    public ProductResponse createProduct(ProductRequest request) throws IOException {
+    public ProductResponse createProduct(ProductRequest request) {
         if (productRepository.existsByItemCode(request.getItemCode())) {
             throw new IllegalArgumentException("Item code already exists: " + request.getItemCode());
         }
@@ -59,13 +60,23 @@ public class ProductService {
         log.info("Inventory created for product: {}", productId);
 
         if (request.getImages() != null && !request.getImages().isEmpty()) {
-            int sortOrder = 0;
-            for (MultipartFile image : request.getImages()) {
-                if (sortOrder >= 10) break;
-                if (image != null && !image.isEmpty()) {
-                    String imageUrl = s3Service.uploadFile(image, "products/" + productId);
-                    log.info("Uploaded image to: {}", imageUrl);
+            List<CompletableFuture<String>> futures = new ArrayList<>();
+            List<MultipartFile> imageList = request.getImages().stream()
+                    .filter(img -> img != null && !img.isEmpty())
+                    .limit(10)
+                    .toList();
 
+            for (MultipartFile image : imageList) {
+                futures.add(s3Service.uploadFile(image, "products/" + productId));
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+            int sortOrder = 0;
+            for (int i = 0; i < imageList.size(); i++) {
+                String imageUrl = futures.get(i).join();
+                if (imageUrl != null) {
+                    MultipartFile image = imageList.get(i);
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
                             UUID.randomUUID(), productId, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
@@ -134,7 +145,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponse updateProduct(UUID id, ProductRequest request) throws IOException {
+    public ProductResponse updateProduct(UUID id, ProductRequest request) {
         Product product = productRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
@@ -164,13 +175,25 @@ public class ProductService {
 
         boolean imagesInserted = false;
         if (request.getImages() != null && !request.getImages().isEmpty()) {
-            int sortOrder = product.getImages().size();
+            int baseSortOrder = product.getImages().size();
 
-            for (MultipartFile image : request.getImages()) {
-                if (sortOrder >= 10) break;
-                if (image != null && !image.isEmpty()) {
-                    String imageUrl = s3Service.uploadFile(image, "products/" + id);
+            List<CompletableFuture<String>> futures = new ArrayList<>();
+            List<MultipartFile> imageList = request.getImages().stream()
+                    .filter(img -> img != null && !img.isEmpty())
+                    .limit(10 - baseSortOrder)
+                    .toList();
 
+            for (MultipartFile image : imageList) {
+                futures.add(s3Service.uploadFile(image, "products/" + id));
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+            int sortOrder = baseSortOrder;
+            for (int i = 0; i < imageList.size(); i++) {
+                String imageUrl = futures.get(i).join();
+                if (imageUrl != null) {
+                    MultipartFile image = imageList.get(i);
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
                             UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
@@ -189,7 +212,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponse addImagesToProduct(UUID id, List<MultipartFile> images) throws IOException {
+    public ProductResponse addImagesToProduct(UUID id, List<MultipartFile> images) {
         Product product = productRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
@@ -199,14 +222,26 @@ public class ProductService {
             throw new IllegalStateException("Product already has maximum of 10 images");
         }
 
-        for (MultipartFile image : images) {
-            if (sortOrder >= 10) break;
-            if (image != null && !image.isEmpty()) {
-                String imageUrl = s3Service.uploadFile(image, "products/" + id);
+        List<CompletableFuture<String>> futures = new ArrayList<>();
+        List<MultipartFile> imageList = images.stream()
+                .filter(img -> img != null && !img.isEmpty())
+                .limit(10 - sortOrder)
+                .toList();
 
+        for (MultipartFile image : imageList) {
+            futures.add(s3Service.uploadFile(image, "products/" + id));
+        }
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        int currentSortOrder = sortOrder;
+        for (int i = 0; i < imageList.size(); i++) {
+            String imageUrl = futures.get(i).join();
+            if (imageUrl != null) {
+                MultipartFile image = imageList.get(i);
                 jdbcTemplate.update(
                         "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                        UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
+                        UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), currentSortOrder++
                 );
             }
         }

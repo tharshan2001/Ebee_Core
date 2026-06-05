@@ -93,7 +93,9 @@ public class CustomerService {
                             .lastName(lastName)
                             .phoneNumber(phoneNumber)
                             .build();
-                    return customerRepository.save(customer);
+                    customer = customerRepository.save(customer);
+                    sendWelcomeNotification(customer);
+                    return customer;
                 });
     }
 

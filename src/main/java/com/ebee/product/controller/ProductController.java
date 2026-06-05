@@ -12,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -37,7 +36,7 @@ public class ProductController {
             @RequestParam("category") String category,
             @RequestParam("price") BigDecimal price,
             @RequestParam("costPrice") BigDecimal costPrice,
-            @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
+            @RequestParam(value = "images", required = false) MultipartFile[] images) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -90,7 +89,7 @@ public class ProductController {
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "price", required = false) BigDecimal price,
             @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
-            @RequestParam(value = "images", required = false) MultipartFile[] images) throws IOException {
+            @RequestParam(value = "images", required = false) MultipartFile[] images) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -119,7 +118,7 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> uploadProductImages(
             @PathVariable UUID id,
-            @RequestParam("images") MultipartFile[] images) throws IOException {
+            @RequestParam("images") MultipartFile[] images) {
 
         ProductResponse response = productService.addImagesToProduct(id, Arrays.asList(images));
         return ResponseEntity.ok(ApiResponse.success("Images uploaded successfully", response));

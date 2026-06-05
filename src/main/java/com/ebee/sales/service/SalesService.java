@@ -154,7 +154,8 @@ public class SalesService {
             count = toLong(row[1]);
         }
 
-        BigDecimal commission = commissionRepository.sumCommissionAmountByAgentId(agentId);
+        BigDecimal commission = commissionRepository.sumCommissionAmountByAgentIdAndDateRange(agentId,
+                toStartDateTime(startDate), toEndDateTime(endDate));
 
         return SalesByAgentDetailResponse.builder()
                 .agentId(agent.getId())

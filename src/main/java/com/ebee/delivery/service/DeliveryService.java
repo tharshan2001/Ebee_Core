@@ -3,6 +3,7 @@ package com.ebee.delivery.service;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
+import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.notification.NotificationService;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
@@ -11,9 +12,12 @@ import com.ebee.delivery.repository.DeliveryRepository;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
+import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.entity.Order;
+import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -21,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +40,8 @@ public class DeliveryService {
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
     private final NotificationService notificationService;
+    private final InventoryService inventoryService;
+    private final CommissionLifecycleService commissionLifecycleService;
 
     @Transactional
     public void initializeDelivery(Order order) {
@@ -141,6 +148,22 @@ public class DeliveryService {
 
         if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
             freeDriverIfAssigned(order);
+        }
+
+        if (newStatus == DeliveryStatus.FAILED_PERMANENT) {
+            for (OrderItem item : order.getItems()) {
+                inventoryService.recordOrderStock(
+                        item.getProduct().getId(),
+                        item.getQuantity(),
+                        StockMovementType.RETURN,
+                        "Delivery permanently failed - Order " + order.getOrderNumber()
+                );
+            }
+            commissionLifecycleService.cancelCommissionForOrder(order.getId());
+            order.setStatus(OrderStatus.PENDING);
+            order.setDeliveryAssignedTo(null);
+            order.setDeliveryScheduledDate(null);
+            order.setDeliveryNotes(null);
         }
 
         Order savedOrder = orderRepository.save(order);

@@ -1,0 +1,136 @@
+# Driver Module API
+
+Drivers extend the User entity with delivery-specific attributes (license, contact, availability).
+
+All `{id}` path parameters are UUIDs in the standard 36-character format (e.g., `f47ac10b-58cc-4372-a567-0e02b2c3d479`). Plain numeric values will be rejected.
+
+---
+
+## Availability Lifecycle
+
+```
+AVAILABLE ──assign delivery──▶ ON_TRIP ──deliver──▶ AVAILABLE
+     ↘  OFFLINE   (manual)
+     ↘  SUSPENDED (manual)
+```
+
+Available values: `AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`.
+
+---
+
+## Auto-Management
+
+- **Delivery assigned** → driver availability auto-set to `ON_TRIP`
+- **Delivery DELIVERED** → driver availability auto-returned to `AVAILABLE`
+- **Trip created with driver** → driver must be `AVAILABLE` (validated)
+- **Driver assigned to trip** → driver must be `AVAILABLE` (validated)
+
+This ensures a driver cannot be double-booked — they are `ON_TRIP` from the moment a delivery is assigned until it is marked `DELIVERED`.
+
+---
+
+## Endpoints
+
+### Create Driver
+
+Creates a User (with role `DRIVER`) and a Driver profile in one request. No pre-existing user is needed.
+
+```
+POST /api/drivers
+Auth: ADMIN
+Content-Type: application/json
+Body:
+{
+    "email": "driver@example.com",
+    "firstName": "Driver",
+    "lastName": "One",
+    "phoneNumber": "+94771234567",
+    "licenseNumber": "B1234567",
+    "contactNumber": "+94771234567"
+}
+```
+
+All fields except `phoneNumber`, `licenseNumber`, and `contactNumber` are required.
+
+**Success Response (201):**
+```json
+{
+    "success": true,
+    "message": "Driver created successfully",
+    "data": {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "userId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "email": "driver@example.com",
+        "firstName": "Driver",
+        "lastName": "One",
+        "licenseNumber": "B1234567",
+        "contactNumber": "+94771234567",
+        "availability": "AVAILABLE",
+        "isActive": true,
+        "createdAt": "2026-06-06T10:30:00",
+        "generatedPassword": "aB3$xY9!pQ2@"
+    }
+}
+```
+
+The `generatedPassword` is only returned on creation. The driver must change it on first login.
+
+### List Drivers
+
+```
+GET /api/drivers?availability=AVAILABLE
+Auth: ADMIN, DRIVER
+```
+
+Optional filter: `availability` (`AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`).
+
+### List Available Drivers
+
+```
+GET /api/drivers/available
+Auth: ADMIN, DRIVER
+```
+
+Shorthand for `GET /api/drivers?availability=AVAILABLE`.
+
+### Get Driver Detail
+
+```
+GET /api/drivers/{id}
+Auth: ADMIN, DRIVER
+```
+
+`{id}` — the driver's UUID (returned at creation).
+
+### Update Driver
+
+```
+PATCH /api/drivers/{id}
+Auth: ADMIN
+Body:
+{
+    "email": "driver@example.com",
+    "firstName": "Driver",
+    "lastName": "One",
+    "phoneNumber": "+94771234567",
+    "licenseNumber": "B7654321",
+    "contactNumber": "+94771234678"
+}
+```
+
+Note: `email`, `firstName`, `lastName` update the underlying User record.
+
+### Update Availability
+
+```
+PATCH /api/drivers/{id}/availability
+Auth: ADMIN, DRIVER
+Body:
+{
+    "availability": "ON_TRIP"
+}
+```
+
+Valid values: `AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`.
+
+

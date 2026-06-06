@@ -9,6 +9,7 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.service.CustomerService;
+import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.commission.entity.Commission;
 import com.ebee.notification.NotificationService;
@@ -85,6 +86,10 @@ public class OrderService {
                 .status(OrderStatus.PENDING)
                 .items(new ArrayList<>())
                 .build();
+
+        if (customer.getAddress() != null && customer.getAddress().getDistrict() != null) {
+            order.setDistrict(customer.getAddress().getDistrict());
+        }
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         AtomicInteger sequence = new AtomicInteger(1);
@@ -185,8 +190,12 @@ public class OrderService {
         }
 
         order.setStatus(status);
+        if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
+            order.setDeliveryStatus(DeliveryStatus.PENDING);
+        }
         if (status == OrderStatus.DELIVERED) {
             order.setDeliveredAt(LocalDateTime.now());
+            order.setDeliveryStatus(DeliveryStatus.DELIVERED);
         }
         Order updatedOrder = orderRepository.save(order);
 

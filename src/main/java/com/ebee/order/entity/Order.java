@@ -2,6 +2,8 @@ package com.ebee.order.entity;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.customer.entity.Customer;
+import com.ebee.delivery.entity.DeliveryTrip;
+import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -13,6 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,4 +74,25 @@ public class Order {
 
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
+
+    @Column
+    private String district;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status")
+    private DeliveryStatus deliveryStatus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_assigned_to")
+    private User deliveryAssignedTo;
+
+    @Column(name = "delivery_scheduled_date")
+    private LocalDate deliveryScheduledDate;
+
+    @Column(name = "delivery_notes", columnDefinition = "TEXT")
+    private String deliveryNotes;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trip_id")
+    private DeliveryTrip trip;
 }

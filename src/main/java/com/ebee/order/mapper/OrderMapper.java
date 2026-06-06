@@ -20,6 +20,13 @@ public interface OrderMapper {
     @Mapping(target = "customerPhone", source = "customer.phoneNumber")
     @Mapping(target = "createdById", source = "createdBy.id")
     @Mapping(target = "createdByName", expression = "java(order.getCreatedBy() != null ? order.getCreatedBy().getFirstName() + \" \" + order.getCreatedBy().getLastName() : null)")
+    @Mapping(target = "district", source = "district")
+    @Mapping(target = "deliveryStatus", source = "deliveryStatus")
+    @Mapping(target = "deliveryAssignedToId", source = "deliveryAssignedTo.id")
+    @Mapping(target = "deliveryAssignedToName", expression = "java(order.getDeliveryAssignedTo() != null ? order.getDeliveryAssignedTo().getFirstName() + \" \" + order.getDeliveryAssignedTo().getLastName() : null)")
+    @Mapping(target = "deliveryScheduledDate", source = "deliveryScheduledDate")
+    @Mapping(target = "deliveryNotes", source = "deliveryNotes")
+    @Mapping(target = "tripId", source = "trip.id")
     OrderResponse toResponse(Order order);
 
     List<OrderResponse> toResponseList(List<Order> orders);

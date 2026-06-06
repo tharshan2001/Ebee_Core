@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ebee is a commission-based order management system for Sri Lanka. This API covers order processing, agent management with district-based registration, commission calculation, customer management, and agent application intake.
+Ebee is a commission-based order management system for Sri Lanka. This API covers order processing, agent management, commission calculation, customer management, agent applications, and delivery tracking with district-based trip routing and driver management.
 
 ---
 
@@ -46,6 +46,9 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
 | Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |
 | Messages | [MESSAGE_API.md](MESSAGE_API.md) | ADMIN |
+| Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
+| Delivery Trips | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
+| Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
 
 ---
 
@@ -95,6 +98,58 @@ curl -X PATCH "http://localhost:8085/api/orders/<ORDER_ID>/status?status=CONFIRM
   -H "Authorization: Bearer <TOKEN>"
 ```
 
+### 6. Ship Order (auto-inits delivery)
+
+```bash
+curl -X PATCH "http://localhost:8085/api/orders/<ORDER_ID>/status?status=SHIPPED" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+Order delivery status is auto-set to `PENDING`.
+
+### 7. Assign Driver to Delivery
+
+```bash
+curl -X PATCH "http://localhost:8085/api/deliveries/<ORDER_ID>/assign" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{"driverId": "<DRIVER_USER_ID>"}'
+```
+
+Driver availability is auto-set to `ON_TRIP`.
+
+### 8. Create Delivery Trip
+
+```bash
+curl -X POST "http://localhost:8085/api/delivery-trips" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{
+    "tripDate": "2026-06-10",
+    "district": "Colombo"
+  }'
+```
+
+### 9. Assign Order to Trip
+
+```bash
+curl -X POST "http://localhost:8085/api/delivery-trips/<TRIP_ID>/orders/<ORDER_ID>" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+Order district must match trip district.
+
+### 10. Update Delivery Status
+
+```bash
+curl -X PATCH "http://localhost:8085/api/deliveries/<ORDER_ID>/status" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{"status": "DELIVERED"}'
+```
+
+Driver availability is auto-returned to `AVAILABLE` and order status is set to `DELIVERED`.
+
 ---
 
 ## Standard Response Format
@@ -140,7 +195,9 @@ All endpoints return a consistent JSON envelope:
 | Agent | `JF-008` | PERFORMANCE type, rate 7.5% |
 | Agent | `JF-009` | DEFAULT type, rate 5.0% |
 | Product | `PA-001` | $60.00, active, stock ~125 |
-| Customer | `+94771234567` | Ranil Wickramasinghe |
+| Customer | `+94771234567` | Ranil Wickramasinghe, Vavuniya |
+| Driver | `driver1@ebee.com` | Driver One, Colombo |
+| Driver | `driver@test.com` | Driver Test, Kandy |
 | Default config | — | 7.5% global rate for DEFAULT agents |
 
 ---

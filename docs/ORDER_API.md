@@ -263,6 +263,13 @@ CANCELLED     - Order cancelled
 RETURNED      - Order returned
 ```
 
+**Delivery side-effects:**
+| Status change | Delivery affected |
+|---------------|------------------|
+| `SHIPPED` | Auto-initializes `deliveryStatus = PENDING` (if not already set) |
+| `DELIVERED` | Auto-sets `deliveryStatus = DELIVERED` + records `deliveredAt` |
+| Others | No effect |
+
 **Success Response (200 OK):**
 ```json
 {
@@ -337,6 +344,13 @@ Cancels an order.
   "createdByName": "String",
   "createdAt": "LocalDateTime",
   "updatedAt": "LocalDateTime",
+  "district": "String",
+  "deliveryStatus": "DeliveryStatus or null",
+  "deliveryAssignedToId": "UUID or null",
+  "deliveryAssignedToName": "String or null",
+  "deliveryScheduledDate": "LocalDate or null",
+  "deliveryNotes": "String or null",
+  "tripId": "UUID or null",
   "items": [
     {
       "id": "UUID",

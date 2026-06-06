@@ -1,9 +1,11 @@
 package com.ebee.order.dto;
 
+import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.enums.OrderStatus;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -27,4 +29,12 @@ public class OrderResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<OrderItemResponse> items;
+
+    private String district;
+    private DeliveryStatus deliveryStatus;
+    private UUID deliveryAssignedToId;
+    private String deliveryAssignedToName;
+    private LocalDate deliveryScheduledDate;
+    private String deliveryNotes;
+    private UUID tripId;
 }

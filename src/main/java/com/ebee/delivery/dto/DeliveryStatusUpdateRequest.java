@@ -8,4 +8,6 @@ import lombok.Data;
 public class DeliveryStatusUpdateRequest {
     @NotNull
     private DeliveryStatus status;
+
+    private String reason;
 }

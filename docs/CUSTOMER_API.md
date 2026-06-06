@@ -27,10 +27,10 @@ Each customer can have one address managed as a nested object within the custome
 |-------|------|-----|-------|
 | street | String | 255 | |
 | city | String | 100 | |
-| district | String | 100 | |
+| district | String | — | Must be one of the supported districts (see [Agent API](AGENT_API.md#supported-districts)) |
 | postalCode | String | 20 | |
 
-Include the `address` object in the JSON body to set it. Omit it (or set `null`) to leave the customer without an address.
+`district` is validated against the enum — invalid values return 400 with `"Invalid district: ..."`. Include the `address` object in the JSON body to set it. Omit it (or set `null`) to leave the customer without an address.
 
 ---
 
@@ -71,7 +71,7 @@ Creates a new customer. Phone number must be unique.
 | address | Object | No | Nested address object |
 | address.street | String | No | Max 255 chars |
 | address.city | String | No | Max 100 chars |
-| address.district | String | No | Max 100 chars |
+| address.district | String | No | Must be a supported district (see table in [Agent API](AGENT_API.md#supported-districts)), case-insensitive |
 | address.postalCode | String | No | Max 20 chars |
 
 **Success Response (201 Created):**
@@ -123,9 +123,9 @@ Updates an existing customer. All fields are optional (only provided fields are 
   "email": "newemail@example.com",
   "address": {
     "street": "456 New Rd",
-    "city": "Colombo",
-    "district": "Colombo",
-    "postalCode": "00100"
+    "city": "Batticaloa City",
+    "district": "Batticaloa",
+    "postalCode": "30000"
   }
 }
 ```
@@ -147,9 +147,9 @@ If the customer already has an address, it is **updated in place**. If they don'
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "456 New Rd",
-      "city": "Colombo",
-      "district": "Colombo",
-      "postalCode": "00100"
+      "city": "Batticaloa City",
+      "district": "Batticaloa",
+      "postalCode": "30000"
     },
     "createdAt": "2026-06-03T23:58:55",
     "updatedAt": "2026-06-03T23:59:10"
@@ -360,9 +360,9 @@ curl -X PUT "http://localhost:8085/api/customers/$ID" \
     "phoneNumber": "+94771234567",
     "address": {
       "street": "456 New Rd",
-      "city": "Colombo",
-      "district": "Colombo",
-      "postalCode": "00100"
+      "city": "Batticaloa City",
+      "district": "Batticaloa",
+      "postalCode": "30000"
     }
   }'
 

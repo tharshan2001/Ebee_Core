@@ -21,4 +21,5 @@ public class DeliveryResponse {
     private String notes;
     private LocalDateTime deliveredAt;
     private UUID tripId;
+    private String deliveryFailureReason;
 }

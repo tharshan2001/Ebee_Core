@@ -344,7 +344,7 @@ Cancels an order.
   "createdByName": "String",
   "createdAt": "LocalDateTime",
   "updatedAt": "LocalDateTime",
-  "district": "String",
+  "district": "String or null (derived from customer's address district, see supported districts in Agent API)",
   "deliveryStatus": "DeliveryStatus or null",
   "deliveryAssignedToId": "UUID or null",
   "deliveryAssignedToName": "String or null",
@@ -497,3 +497,4 @@ All errors follow the standard ApiResponse format:
 6. **Auto-Commission:** If the order has an agent, a commission is auto-created in `CALCULATED` status using the best matching commission config or agent's default rate
 7. **Customer Identification:** Provide `customerPhoneNumber` to link the order to an existing customer; fails with 404 if the phone is not found
 8. **Cancel Rollback:** Cancelling an order restores stock AND rolls back the associated commission (reverts agent totals if the commission was paid)
+9. **District Derivation:** The `district` field in the response is derived from the customer's address district and is read-only. Only the [supported districts](AGENT_API.md#supported-districts) are valid. See the Delivery API for delivery-specific operations.

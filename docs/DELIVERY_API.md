@@ -37,10 +37,13 @@ Delivery tracking is embedded in the Order entity — each order has delivery fi
 
 ```
 PENDING ──▶ ASSIGNED ──▶ PICKED_UP ──▶ IN_TRANSIT ──▶ DELIVERED
-                                                        ↘ FAILED
+  ▲                                                     ↘ FAILED ──▶ FAILED_PERMANENT
+  └────────────────────── retry ──────────────────────────┘
 ```
 
-Guard: `DELIVERED` and `FAILED` are terminal — no further updates allowed.
+Guards:
+- `DELIVERED` and `FAILED_PERMANENT` are terminal — no further updates allowed.
+- `FAILED` can transition to `PENDING` (retry) or `FAILED_PERMANENT` (terminal).
 
 ### TripStatus
 
@@ -70,7 +73,7 @@ Guards:
 | Action | Guards |
 |--------|--------|
 | Assign Driver to Delivery | delivery status must be `PENDING`, user must have `DRIVER` role, driver must be `AVAILABLE` |
-| Update Delivery Status | current status must not be `DELIVERED` or `FAILED` |
+| Update Delivery Status | current status must not be `DELIVERED` or `FAILED_PERMANENT`; `FAILED` can transition to `PENDING` (retry) or `FAILED_PERMANENT` (terminal) |
 | Assign Order to Trip | delivery must be initialized (`deliveryStatus != null`), order not already assigned to a trip, order district must match trip district |
 | Create Trip with Driver | driver must be `AVAILABLE` |
 
@@ -78,12 +81,13 @@ Guards:
 
 ## Auto-Initialization
 
-- **District**: automatically set from the customer's address district when the order is created.
+- **District**: automatically derived from the customer's address district. Only the supported districts are valid (see [Agent API](AGENT_API.md#supported-districts)).
 - **Delivery**: automatically initialized to `PENDING` when the order status changes to `SHIPPED`.
 - **Delivered (from delivery)**: when delivery status is updated to `DELIVERED`, order status also updates to `DELIVERED`.
 - **Delivered (from order)**: when order status is updated to `DELIVERED`, delivery status also sets to `DELIVERED`.
 - **Driver ON_TRIP**: automatically set when a delivery is assigned to the driver.
-- **Driver AVAILABLE**: automatically restored when a delivery is marked `DELIVERED`.
+- **Driver AVAILABLE**: automatically restored when a delivery is marked `DELIVERED` or `FAILED`.
+- **deliveryFailureReason**: set when delivery status is updated to `FAILED`; cleared on retry (`FAILED` → `PENDING`).
 
 ---
 
@@ -97,14 +101,15 @@ All delivery endpoints return a delivery-specific response (not the full order o
     "orderNumber": "ORD-20260606123456",
     "customerName": "Ranil Wickramasinghe",
     "customerPhone": "+94771234567",
-    "district": "Colombo",
+    "district": "Batticaloa",
     "status": "PENDING",
     "driverId": "uuid or null",
     "driverName": "Driver One or null",
     "scheduledDate": "2026-06-10 or null",
     "notes": "Handle with care or null",
     "deliveredAt": "2026-06-10T14:30:00 or null",
-    "tripId": "uuid or null"
+    "tripId": "uuid or null",
+    "deliveryFailureReason": "Customer not available or null"
 }
 ```
 
@@ -132,12 +137,27 @@ Body:
 }
 ```
 
-Fails if current status is `DELIVERED` or `FAILED`.
+Fails if current status is `DELIVERED` or `FAILED_PERMANENT`.
+
+`FAILED` deliveries can transition to:
+- `PENDING` — retry (clears failure reason and driver assignment)
+- `FAILED_PERMANENT` — mark as terminal failure (keeps the reason)
+
+When setting a failure status, an optional `reason` field can be included:
+
+```json
+{
+    "status": "FAILED",
+    "reason": "Customer not available after 3 attempts"
+}
+```
+
+The reason is stored in `deliveryFailureReason` on the order, included in customer notifications and admin alerts, and cleared automatically on retry.
 
 ### List Deliveries
 
 ```
-GET /api/deliveries?status=PENDING&district=Colombo&tripId=uuid
+GET /api/deliveries?status=PENDING&district=Batticaloa&tripId=uuid
 Auth: ADMIN, DRIVER
 ```
 
@@ -173,7 +193,7 @@ Auth: ADMIN
 Body:
 {
     "tripDate": "2026-06-07",
-    "district": "Colombo",
+    "district": "Batticaloa",
     "driverId": "uuid",
     "notes": "Morning run"
 }
@@ -184,7 +204,7 @@ Body:
 ### List Trips
 
 ```
-GET /api/delivery-trips?status=PLANNED&district=Colombo
+GET /api/delivery-trips?status=PLANNED&district=Batticaloa
 Auth: ADMIN, DRIVER
 ```
 
@@ -242,9 +262,9 @@ Auth: ADMIN
 ```
 1. Order created     → district auto-set from customer address
 2. Order → SHIPPED   → deliveryStatus = PENDING
-3. Admin views       → "10 pending deliveries in Colombo"
-4. Admin creates     → Trip (date=tomorrow, district=Colombo)
-5. Admin assigns     → 10 Colombo orders to the trip
+3. Admin views       → "10 pending deliveries in Batticaloa"
+4. Admin creates     → Trip (date=tomorrow, district=Batticaloa)
+5. Admin assigns     → 10 Batticaloa orders to the trip
 6. Driver picks up   → trip IN_PROGRESS, orders PICKED_UP
 7. Driver delivers   → each order individually marked DELIVERED
 8. All done          → trip COMPLETED

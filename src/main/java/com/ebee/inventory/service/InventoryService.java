@@ -1,7 +1,9 @@
 package com.ebee.inventory.service;
 
+import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.notification.NotificationService;
 import com.ebee.inventory.dto.InventoryResponse;
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.inventory.mapper.InventoryMapper;
@@ -15,6 +17,7 @@ import com.ebee.stock.enums.StockMovementType;
 import com.ebee.stock.mapper.StockMapper;
 import com.ebee.stock.repository.StockRepository;
 import com.ebee.user.entity.User;
+import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class InventoryService {
     private final InventoryMapper inventoryMapper;
     private final StockMapper stockMapper;
     private final SecurityService securityService;
+    private final NotificationService notificationService;
 
     @Transactional
     public InventoryResponse createInventory(UUID productId, Integer initialQuantity, Integer reorderLevel) {
@@ -52,6 +56,7 @@ public class InventoryService {
                 .build();
 
         Inventory saved = inventoryRepository.save(inventory);
+        checkAndNotifyLowStock(saved);
         return inventoryMapper.toResponse(saved);
     }
 
@@ -97,6 +102,7 @@ public class InventoryService {
         recordStockMovement(inventory, request.getQuantityChange(), quantityBefore, quantityAfter, 
                           request.getMovementType(), request.getNotes());
 
+        checkAndNotifyLowStock(inventory);
         return inventoryMapper.toResponse(inventory);
     }
 
@@ -117,6 +123,7 @@ public class InventoryService {
         inventoryRepository.save(inventory);
 
         Stock stock = recordStockMovement(inventory, quantityChange, quantityBefore, quantityAfter, movementType, notes);
+        checkAndNotifyLowStock(inventory);
         return stockMapper.toResponse(stock);
     }
 
@@ -162,6 +169,7 @@ public class InventoryService {
         inventory.setQuantity(inventory.getQuantity() - quantity);
 
         Inventory saved = inventoryRepository.save(inventory);
+        checkAndNotifyLowStock(saved);
         return inventoryMapper.toResponse(saved);
     }
 
@@ -202,5 +210,24 @@ public class InventoryService {
         
         List<Stock> stocks = stockRepository.findByInventoryIdOrderByCreatedAtDesc(inventory.getId());
         return stockMapper.toResponseList(stocks);
+    }
+
+    private void checkAndNotifyLowStock(Inventory inventory) {
+        if (inventory.getReorderLevel() == null) {
+            return;
+        }
+        if (inventory.getQuantity() > inventory.getReorderLevel()) {
+            return;
+        }
+        String productName = inventory.getProduct().getName();
+        String subject = "Low Stock Alert – " + productName;
+        String message = "Stock for %s is below reorder level. Current: %d, Reorder Level: %d".formatted(
+                productName, inventory.getQuantity(), inventory.getReorderLevel());
+        List<User> admins = userRepository.findByRole(RoleType.ADMIN);
+        for (User admin : admins) {
+            notificationService.notifyUser(admin, subject, message);
+            notificationService.createInternalAlert(admin, subject, message,
+                    AlertType.LOW_STOCK, inventory.getId(), "inventory");
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.ebee.driver.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.notification.NotificationService;
 import com.ebee.driver.dto.AvailabilityRequest;
 import com.ebee.driver.dto.DriverRequest;
 import com.ebee.driver.dto.DriverResponse;
@@ -28,6 +29,7 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -62,6 +64,19 @@ public class DriverService {
                 .build();
 
         Driver savedDriver = driverRepository.save(driver);
+
+        String subject = "Welcome to Ebee – Driver Login Credentials";
+        String message = """
+                Dear %s,
+                
+                Your driver account has been created.
+                
+                Email: %s
+                Password: %s
+                
+                Please log in and change your password.
+                """.formatted(savedUser.getFirstName(), savedUser.getEmail(), generatedPassword);
+        notificationService.notifyUser(savedUser, subject, message);
 
         return DriverWithCredentialsResponse.builder()
                 .id(savedDriver.getId())

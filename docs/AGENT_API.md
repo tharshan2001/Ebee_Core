@@ -25,6 +25,8 @@ Agents are assigned to one of these North & East Sri Lanka districts. The distri
 
 **Agent code format:** `{PREFIX}-{SEQ}` (e.g., `BC-003`, `JF-001`). Sequences are per-district — each district starts at `001`.
 
+`district` is validated against the enum — creating or updating with an invalid value returns 400 with `"Invalid district: ..."`. The check is case-insensitive (e.g. `"jaffna"` or `"Jaffna"` both work).
+
 ---
 
 ## Commission Types

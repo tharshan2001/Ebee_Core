@@ -1,6 +1,8 @@
 package com.ebee.delivery.service;
 
+import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.notification.NotificationService;
 import com.ebee.delivery.dto.TripRequest;
 import com.ebee.delivery.dto.TripResponse;
 import com.ebee.delivery.entity.DeliveryTrip;
@@ -32,6 +34,7 @@ public class TripService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final OrderMapper orderMapper;
+    private final NotificationService notificationService;
 
     @Transactional
     public TripResponse createTrip(TripRequest request) {
@@ -60,6 +63,16 @@ public class TripService {
                 .build();
 
         DeliveryTrip savedTrip = tripRepository.save(trip);
+
+        if (driver != null) {
+            String subject = "Trip Scheduled – " + savedTrip.getDistrict();
+            String msg = "Dear %s,\n\nA new trip to %s has been scheduled for %s.".formatted(
+                    driver.getFirstName(), savedTrip.getDistrict(), savedTrip.getTripDate());
+            notificationService.notifyUser(driver, subject, msg);
+            notificationService.createInternalAlert(driver, subject, msg,
+                    AlertType.TRIP_CREATED, savedTrip.getId(), "trip");
+        }
+
         return toTripResponse(savedTrip);
     }
 
@@ -74,6 +87,18 @@ public class TripService {
 
         trip.setStatus(status);
         DeliveryTrip savedTrip = tripRepository.save(trip);
+
+        if (savedTrip.getAssignedDriver() != null) {
+            String subject = "Trip " + status.name() + " – " + savedTrip.getDistrict();
+            String msg = "Dear %s,\n\nYour trip to %s on %s is now %s.".formatted(
+                    savedTrip.getAssignedDriver().getFirstName(),
+                    savedTrip.getDistrict(), savedTrip.getTripDate(),
+                    status.name().toLowerCase().replace('_', ' '));
+            notificationService.notifyUser(savedTrip.getAssignedDriver(), subject, msg);
+            notificationService.createInternalAlert(savedTrip.getAssignedDriver(), subject, msg,
+                    AlertType.TRIP_STATUS_CHANGED, savedTrip.getId(), "trip");
+        }
+
         return toTripResponse(savedTrip);
     }
 
@@ -99,6 +124,14 @@ public class TripService {
 
         trip.setAssignedDriver(driver);
         DeliveryTrip savedTrip = tripRepository.save(trip);
+
+        String subject = "Driver Assigned to Trip – " + savedTrip.getDistrict();
+        String msg = "Dear %s,\n\nYou have been assigned to a trip to %s on %s.".formatted(
+                driver.getFirstName(), savedTrip.getDistrict(), savedTrip.getTripDate());
+        notificationService.notifyUser(driver, subject, msg);
+        notificationService.createInternalAlert(driver, subject, msg,
+                AlertType.TRIP_STATUS_CHANGED, savedTrip.getId(), "trip");
+
         return toTripResponse(savedTrip);
     }
 
@@ -125,6 +158,16 @@ public class TripService {
 
         order.setTrip(trip);
         orderRepository.save(order);
+
+        if (trip.getAssignedDriver() != null) {
+            String subject = "Order Added to Trip – " + order.getOrderNumber();
+            String msg = "Dear %s,\n\nOrder %s has been added to your trip to %s on %s.".formatted(
+                    trip.getAssignedDriver().getFirstName(),
+                    order.getOrderNumber(), trip.getDistrict(), trip.getTripDate());
+            notificationService.notifyUser(trip.getAssignedDriver(), subject, msg);
+            notificationService.createInternalAlert(trip.getAssignedDriver(), subject, msg,
+                    AlertType.TRIP_ORDER_ASSIGNED, trip.getId(), "trip");
+        }
 
         return toTripResponse(trip);
     }

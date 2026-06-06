@@ -126,7 +126,7 @@ curl -X POST "http://localhost:8085/api/delivery-trips" \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{
     "tripDate": "2026-06-10",
-    "district": "Colombo"
+    "district": "Batticaloa"
   }'
 ```
 

@@ -2,7 +2,9 @@ package com.ebee.delivery.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.alert.enums.AlertType;
 import com.ebee.delivery.dto.DeliveryResponse;
+import com.ebee.notification.NotificationService;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.repository.DeliveryRepository;
@@ -32,6 +34,7 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
+    private final NotificationService notificationService;
 
     @Transactional
     public void initializeDelivery(Order order) {
@@ -70,6 +73,19 @@ public class DeliveryService {
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
         Order savedOrder = orderRepository.save(order);
 
+        String subject = "Delivery Assigned – " + savedOrder.getOrderNumber();
+        String driverMsg = "Dear %s,\n\nYou have been assigned to deliver order %s in %s.".formatted(
+                driver.getFirstName(), savedOrder.getOrderNumber(), savedOrder.getDistrict());
+        notificationService.notifyUser(driver, subject, driverMsg);
+        notificationService.createInternalAlert(driver, subject, driverMsg,
+                AlertType.DELIVERY_ASSIGNED, savedOrder.getId(), "order");
+
+        if (savedOrder.getCustomer() != null) {
+            String customerMsg = "Dear %s,\n\nYour order %s has been assigned to a driver for delivery.".formatted(
+                    savedOrder.getCustomer().getFirstName(), savedOrder.getOrderNumber());
+            notificationService.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
+        }
+
         return toDeliveryResponse(savedOrder);
     }
 
@@ -85,8 +101,34 @@ public class DeliveryService {
             throw new IllegalArgumentException("Delivery has not been initialized for this order");
         }
 
-        if (currentStatus == DeliveryStatus.DELIVERED || currentStatus == DeliveryStatus.FAILED) {
-            throw new IllegalArgumentException("Cannot update status of a " + currentStatus.name().toLowerCase() + " delivery");
+        if (currentStatus == DeliveryStatus.DELIVERED || currentStatus == DeliveryStatus.FAILED_PERMANENT) {
+            throw new IllegalArgumentException("Cannot update status of a " +
+                    (currentStatus == DeliveryStatus.DELIVERED ? "delivered" : "permanently failed") + " delivery");
+        }
+
+        if (currentStatus == DeliveryStatus.FAILED
+                && newStatus != DeliveryStatus.PENDING
+                && newStatus != DeliveryStatus.FAILED_PERMANENT) {
+            throw new IllegalArgumentException("Failed delivery can only be retried (PENDING) or marked permanent (FAILED_PERMANENT)");
+        }
+
+        if (newStatus == DeliveryStatus.FAILED) {
+            order.setDeliveryFailureReason(request.getReason());
+        }
+
+        if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.PENDING) {
+            order.setDeliveryFailureReason(null);
+            order.setDeliveryAssignedTo(null);
+        }
+
+        if (newStatus == DeliveryStatus.FAILED_PERMANENT && !securityService.isAdmin()) {
+            throw new SecurityException("Only admins can mark a delivery as permanently failed");
+        }
+
+        if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.FAILED_PERMANENT) {
+            if (request.getReason() != null) {
+                order.setDeliveryFailureReason(request.getReason());
+            }
         }
 
         order.setDeliveryStatus(newStatus);
@@ -94,18 +136,67 @@ public class DeliveryService {
         if (newStatus == DeliveryStatus.DELIVERED) {
             order.setDeliveredAt(LocalDateTime.now());
             order.setStatus(OrderStatus.DELIVERED);
+            freeDriverIfAssigned(order);
+        }
 
-            if (order.getDeliveryAssignedTo() != null) {
-                driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())
-                        .ifPresent(d -> {
-                            d.setAvailability(DriverAvailability.AVAILABLE);
-                            driverRepository.save(d);
-                        });
-            }
+        if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
+            freeDriverIfAssigned(order);
         }
 
         Order savedOrder = orderRepository.save(order);
+
+        if (savedOrder.getCustomer() != null) {
+            String customerName = savedOrder.getCustomer().getFirstName();
+            String customerMsg = switch (newStatus) {
+                case PICKED_UP -> "Dear %s,\n\nYour order %s has been picked up by the driver.".formatted(
+                        customerName, savedOrder.getOrderNumber());
+                case IN_TRANSIT -> "Dear %s,\n\nYour order %s is on its way for delivery!".formatted(
+                        customerName, savedOrder.getOrderNumber());
+                case FAILED -> {
+                    String reason = savedOrder.getDeliveryFailureReason();
+                    String base = "Dear %s,\n\nUnfortunately, delivery of your order %s has failed.".formatted(
+                            customerName, savedOrder.getOrderNumber());
+                    yield reason != null ? base + "\nReason: " + reason : base;
+                }
+                case FAILED_PERMANENT -> {
+                    String reason = savedOrder.getDeliveryFailureReason();
+                    String base = "Dear %s,\n\nDelivery of your order %s has been permanently failed.".formatted(
+                            customerName, savedOrder.getOrderNumber());
+                    yield reason != null ? base + "\nReason: " + reason : base;
+                }
+                default -> null;
+            };
+            if (customerMsg != null) {
+                String subject = "Delivery " + newStatus.name() + " – " + savedOrder.getOrderNumber();
+                notificationService.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
+            }
+        }
+
+        if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
+            String prefix = newStatus == DeliveryStatus.FAILED_PERMANENT ? "Delivery Permanently Failed" : "Delivery Failed";
+            String subject = prefix + " – " + savedOrder.getOrderNumber();
+            String reason = savedOrder.getDeliveryFailureReason();
+            String msg = reason != null
+                    ? "Delivery of order %s has %sfailed.\nReason: %s"
+                    .formatted(savedOrder.getOrderNumber(),
+                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "", reason)
+                    : "Delivery of order %s has %sfailed."
+                    .formatted(savedOrder.getOrderNumber(),
+                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
+            notificationService.createInternalAlert(savedOrder.getCreatedBy(), subject, msg,
+                    AlertType.DELIVERY_FAILED, savedOrder.getId(), "order");
+        }
+
         return toDeliveryResponse(savedOrder);
+    }
+
+    private void freeDriverIfAssigned(Order order) {
+        if (order.getDeliveryAssignedTo() == null) return;
+        driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())
+                .ifPresent(d -> {
+                    d.setAvailability(DriverAvailability.AVAILABLE);
+                    driverRepository.save(d);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -167,6 +258,7 @@ public class DeliveryService {
         if (order.getTrip() != null) {
             response.setTripId(order.getTrip().getId());
         }
+        response.setDeliveryFailureReason(order.getDeliveryFailureReason());
         return response;
     }
 }

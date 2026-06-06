@@ -99,6 +99,9 @@ public class Order {
     @Column(name = "delivery_notes", columnDefinition = "TEXT")
     private String deliveryNotes;
 
+    @Column(name = "delivery_failure_reason", columnDefinition = "TEXT")
+    private String deliveryFailureReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id")
     private DeliveryTrip trip;

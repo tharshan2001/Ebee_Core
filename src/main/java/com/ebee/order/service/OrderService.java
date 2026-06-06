@@ -299,6 +299,31 @@ public class OrderService {
             notificationService.notifyAgent(order.getAgent(), agentSubject, agentMessage);
             notificationService.createInternalAlert(order.getAgent().getUser(), agentSubject, agentMessage,
                     AlertType.ORDER_CREATED, order.getId(), "order");
+
+            if (commission != null) {
+                String commissionSubject = "Commission Calculated – Order " + order.getOrderNumber();
+                String commissionMsg = """
+                        Dear %s,
+                        
+                        A commission of LKR %.2f has been calculated for order %s.
+                        
+                        Order Amount: LKR %.2f
+                        Rate: %.2f%%
+                        Commission: LKR %.2f
+                        
+                        The commission will be processed once approved.
+                        """.formatted(
+                        order.getAgent().getUser().getFirstName(),
+                        commission.getCommissionAmount(),
+                        order.getOrderNumber(),
+                        order.getTotalAmount(),
+                        commission.getCommissionRate(),
+                        commission.getCommissionAmount()
+                );
+                notificationService.notifyAgent(order.getAgent(), commissionSubject, commissionMsg);
+                notificationService.createInternalAlert(order.getAgent().getUser(), commissionSubject, commissionMsg,
+                        AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
+            }
         }
     }
 

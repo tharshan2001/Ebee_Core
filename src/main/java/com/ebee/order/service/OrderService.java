@@ -87,10 +87,6 @@ public class OrderService {
                 .items(new ArrayList<>())
                 .build();
 
-        if (customer.getAddress() != null && customer.getAddress().getDistrict() != null) {
-            order.setDistrict(customer.getAddress().getDistrict());
-        }
-
         BigDecimal totalAmount = BigDecimal.ZERO;
         AtomicInteger sequence = new AtomicInteger(1);
 

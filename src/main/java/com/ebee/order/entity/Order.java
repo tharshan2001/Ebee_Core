@@ -75,8 +75,13 @@ public class Order {
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
 
-    @Column
-    private String district;
+    @Transient
+    public String getDistrict() {
+        if (customer == null || customer.getAddress() == null) {
+            return null;
+        }
+        return customer.getAddress().getDistrict();
+    }
 
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_status")

@@ -2,10 +2,10 @@ package com.ebee.delivery.controller;
 
 import com.ebee.common.response.ApiResponse;
 import com.ebee.delivery.dto.AssignDriverRequest;
+import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.service.DeliveryService;
-import com.ebee.order.dto.OrderResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,43 +24,43 @@ public class DeliveryController {
 
     @PatchMapping("/{orderId}/assign")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<OrderResponse>> assignDelivery(
+    public ResponseEntity<ApiResponse<DeliveryResponse>> assignDelivery(
             @PathVariable UUID orderId,
             @Valid @RequestBody AssignDriverRequest request) {
-        OrderResponse response = deliveryService.assignDelivery(orderId, request.getDriverId());
+        DeliveryResponse response = deliveryService.assignDelivery(orderId, request.getDriverId());
         return ResponseEntity.ok(ApiResponse.success("Delivery assigned successfully", response));
     }
 
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<OrderResponse>> updateDeliveryStatus(
+    public ResponseEntity<ApiResponse<DeliveryResponse>> updateDeliveryStatus(
             @PathVariable UUID orderId,
             @Valid @RequestBody DeliveryStatusUpdateRequest request) {
-        OrderResponse response = deliveryService.updateDeliveryStatus(orderId, request);
+        DeliveryResponse response = deliveryService.updateDeliveryStatus(orderId, request);
         return ResponseEntity.ok(ApiResponse.success("Delivery status updated successfully", response));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getDeliveries(
+    public ResponseEntity<ApiResponse<List<DeliveryResponse>>> getDeliveries(
             @RequestParam(required = false) DeliveryStatus status,
             @RequestParam(required = false) String district,
             @RequestParam(required = false) UUID tripId) {
-        List<OrderResponse> responses = deliveryService.getDeliveries(status, district, tripId);
+        List<DeliveryResponse> responses = deliveryService.getDeliveries(status, district, tripId);
         return ResponseEntity.ok(ApiResponse.success("Deliveries retrieved successfully", responses));
     }
 
     @GetMapping("/mine")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyDeliveries() {
-        List<OrderResponse> responses = deliveryService.getMyDeliveries();
+    public ResponseEntity<ApiResponse<List<DeliveryResponse>>> getMyDeliveries() {
+        List<DeliveryResponse> responses = deliveryService.getMyDeliveries();
         return ResponseEntity.ok(ApiResponse.success("My deliveries retrieved successfully", responses));
     }
 
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<OrderResponse>> getDeliveryDetail(@PathVariable UUID orderId) {
-        OrderResponse response = deliveryService.getDeliveryDetail(orderId);
+    public ResponseEntity<ApiResponse<DeliveryResponse>> getDeliveryDetail(@PathVariable UUID orderId) {
+        DeliveryResponse response = deliveryService.getDeliveryDetail(orderId);
         return ResponseEntity.ok(ApiResponse.success("Delivery retrieved successfully", response));
     }
 }

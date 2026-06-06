@@ -89,6 +89,25 @@ Guards:
 
 ## Delivery Endpoints
 
+All delivery endpoints return a delivery-specific response (not the full order object):
+
+```json
+{
+    "orderId": "uuid",
+    "orderNumber": "ORD-20260606123456",
+    "customerName": "Ranil Wickramasinghe",
+    "customerPhone": "+94771234567",
+    "district": "Colombo",
+    "status": "PENDING",
+    "driverId": "uuid or null",
+    "driverName": "Driver One or null",
+    "scheduledDate": "2026-06-10 or null",
+    "notes": "Handle with care or null",
+    "deliveredAt": "2026-06-10T14:30:00 or null",
+    "tripId": "uuid or null"
+}
+```
+
 ### Assign Driver
 
 ```

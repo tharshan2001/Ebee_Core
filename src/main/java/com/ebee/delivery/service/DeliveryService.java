@@ -2,16 +2,15 @@ package com.ebee.delivery.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.repository.DeliveryRepository;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
-import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.entity.Order;
 import com.ebee.order.enums.OrderStatus;
-import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
@@ -32,7 +31,6 @@ public class DeliveryService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
-    private final OrderMapper orderMapper;
     private final SecurityService securityService;
 
     @Transactional
@@ -43,7 +41,7 @@ public class DeliveryService {
     }
 
     @Transactional
-    public OrderResponse assignDelivery(UUID orderId, UUID driverId) {
+    public DeliveryResponse assignDelivery(UUID orderId, UUID driverId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -72,11 +70,11 @@ public class DeliveryService {
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
         Order savedOrder = orderRepository.save(order);
 
-        return orderMapper.toResponse(savedOrder);
+        return toDeliveryResponse(savedOrder);
     }
 
     @Transactional
-    public OrderResponse updateDeliveryStatus(UUID orderId, DeliveryStatusUpdateRequest request) {
+    public DeliveryResponse updateDeliveryStatus(UUID orderId, DeliveryStatusUpdateRequest request) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -107,39 +105,38 @@ public class DeliveryService {
         }
 
         Order savedOrder = orderRepository.save(order);
-        return orderMapper.toResponse(savedOrder);
+        return toDeliveryResponse(savedOrder);
     }
 
     @Transactional(readOnly = true)
-    public List<OrderResponse> getDeliveries(DeliveryStatus status, String district, UUID tripId) {
+    public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district, UUID tripId) {
         List<Order> orders;
         if (tripId != null) {
             orders = deliveryRepository.findByTripId(tripId);
-        } else if (district != null && status != null) {
-            orders = orderRepository.findAll().stream()
-                    .filter(o -> district.equals(o.getDistrict()) && status == o.getDeliveryStatus())
-                    .toList();
         } else if (status != null) {
             orders = deliveryRepository.findByDeliveryStatus(status);
-        } else if (district != null) {
-            orders = deliveryRepository.findByDistrict(district);
         } else {
             orders = orderRepository.findAll().stream()
                     .filter(o -> o.getDeliveryStatus() != null)
                     .toList();
         }
-        return orderMapper.toResponseList(orders);
+        if (district != null && !district.isBlank()) {
+            orders = orders.stream()
+                    .filter(o -> district.equals(o.getDistrict()))
+                    .toList();
+        }
+        return orders.stream().map(this::toDeliveryResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<OrderResponse> getMyDeliveries() {
+    public List<DeliveryResponse> getMyDeliveries() {
         UUID userId = securityService.getCurrentUserId();
         List<Order> orders = deliveryRepository.findByDeliveryAssignedToId(userId);
-        return orderMapper.toResponseList(orders);
+        return orders.stream().map(this::toDeliveryResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public OrderResponse getDeliveryDetail(UUID orderId) {
+    public DeliveryResponse getDeliveryDetail(UUID orderId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -147,6 +144,29 @@ public class DeliveryService {
             throw new ResourceNotFoundException("Delivery", "orderId", orderId);
         }
 
-        return orderMapper.toResponse(order);
+        return toDeliveryResponse(order);
+    }
+
+    private DeliveryResponse toDeliveryResponse(Order order) {
+        DeliveryResponse response = new DeliveryResponse();
+        response.setOrderId(order.getId());
+        response.setOrderNumber(order.getOrderNumber());
+        if (order.getCustomer() != null) {
+            response.setCustomerName(order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName());
+            response.setCustomerPhone(order.getCustomer().getPhoneNumber());
+        }
+        response.setDistrict(order.getDistrict());
+        response.setStatus(order.getDeliveryStatus());
+        if (order.getDeliveryAssignedTo() != null) {
+            response.setDriverId(order.getDeliveryAssignedTo().getId());
+            response.setDriverName(order.getDeliveryAssignedTo().getFirstName() + " " + order.getDeliveryAssignedTo().getLastName());
+        }
+        response.setScheduledDate(order.getDeliveryScheduledDate());
+        response.setNotes(order.getDeliveryNotes());
+        response.setDeliveredAt(order.getDeliveredAt());
+        if (order.getTrip() != null) {
+            response.setTripId(order.getTrip().getId());
+        }
+        return response;
     }
 }

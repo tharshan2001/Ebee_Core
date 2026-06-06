@@ -1,0 +1,24 @@
+package com.ebee.delivery.dto;
+
+import com.ebee.delivery.enums.DeliveryStatus;
+import lombok.Data;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+public class DeliveryResponse {
+    private UUID orderId;
+    private String orderNumber;
+    private String customerName;
+    private String customerPhone;
+    private String district;
+    private DeliveryStatus status;
+    private UUID driverId;
+    private String driverName;
+    private LocalDate scheduledDate;
+    private String notes;
+    private LocalDateTime deliveredAt;
+    private UUID tripId;
+}

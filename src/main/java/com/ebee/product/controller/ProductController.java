@@ -124,6 +124,13 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Images uploaded successfully", response));
     }
 
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ProductResponse>> activateProduct(@PathVariable UUID id) {
+        ProductResponse response = productService.activateProduct(id);
+        return ResponseEntity.ok(ApiResponse.success("Product activated successfully", response));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {

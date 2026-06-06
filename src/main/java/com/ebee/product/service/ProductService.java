@@ -251,6 +251,20 @@ public class ProductService {
     }
 
     @Transactional
+    public ProductResponse activateProduct(UUID id) {
+        Product product = productRepository.findByIdWithRelations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        if (Boolean.TRUE.equals(product.getIsActive())) {
+            throw new IllegalArgumentException("Product is already active");
+        }
+
+        product.setIsActive(true);
+        Product savedProduct = productRepository.save(product);
+        return toResponseWithRelations(savedProduct);
+    }
+
+    @Transactional
     public void deleteProduct(UUID id) {
         Product product = productRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));

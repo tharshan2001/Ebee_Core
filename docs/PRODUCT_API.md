@@ -55,5 +55,70 @@ curl http://localhost:8085/api/categories -H "Authorization: Bearer <TOKEN>"
 }
 ```
 
+---
+
+### Delete Product (Soft-Delete)
+
+**DELETE** `/api/products/{id}`
+
+Deactivates a product by setting `isActive = false`. This is a soft-delete — the product record remains in the database but is excluded from `GET /active` results and cannot be used in new orders.
+
+**Auth:** ADMIN
+
+```bash
+curl -X DELETE http://localhost:8085/api/products/<UUID> \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product deleted successfully",
+  "data": null
+}
+```
+
+---
+
+### Activate Product (Re-activation)
+
+**PATCH** `/api/products/{id}/activate`
+
+Re-activates a previously deactivated (soft-deleted) product. Only works if the product is currently deactivated.
+
+**Auth:** ADMIN
+
+```bash
+curl -X PATCH http://localhost:8085/api/products/<UUID>/activate \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Product activated successfully",
+  "data": {
+    "id": "746f35da-dbee-4e2b-a7ab-23fcc4e79a13",
+    "name": "Browser",
+    "itemCode": "BRW001",
+    "isActive": true,
+    ...
+  }
+}
+```
+
+**Error Response (400) — already active:**
+```json
+{
+  "success": false,
+  "message": "Product is already active",
+  "data": null
+}
+```
+
+---
+
 > Products are referenced by `itemCode` (e.g., `PA-001`) when creating orders, not by UUID.
 ````

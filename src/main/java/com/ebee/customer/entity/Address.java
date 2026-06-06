@@ -1,5 +1,6 @@
 package com.ebee.customer.entity;
 
+import com.ebee.common.enums.District;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,7 +35,7 @@ public class Address {
     private String city;
 
     @Column(length = 100)
-    private String district;
+    private District district;
 
     @Column(name = "postal_code", length = 20)
     private String postalCode;

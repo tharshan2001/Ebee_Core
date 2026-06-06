@@ -1,5 +1,6 @@
 package com.ebee.customer.service;
 
+import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
@@ -134,19 +135,25 @@ public class CustomerService {
     }
 
     private Address buildAddress(AddressRequest request, Customer customer) {
-        return Address.builder()
+        Address.AddressBuilder builder = Address.builder()
                 .customer(customer)
                 .street(request.getStreet())
                 .city(request.getCity())
-                .district(request.getDistrict())
-                .postalCode(request.getPostalCode())
-                .build();
+                .postalCode(request.getPostalCode());
+
+        if (request.getDistrict() != null) {
+            builder.district(District.fromDisplayName(request.getDistrict()));
+        }
+
+        return builder.build();
     }
 
     private void updateAddress(Address address, AddressRequest request) {
         address.setStreet(request.getStreet());
         address.setCity(request.getCity());
-        address.setDistrict(request.getDistrict());
+        if (request.getDistrict() != null) {
+            address.setDistrict(District.fromDisplayName(request.getDistrict()));
+        }
         address.setPostalCode(request.getPostalCode());
     }
 
@@ -188,7 +195,9 @@ public class CustomerService {
             addrResponse.setId(customer.getAddress().getId());
             addrResponse.setStreet(customer.getAddress().getStreet());
             addrResponse.setCity(customer.getAddress().getCity());
-            addrResponse.setDistrict(customer.getAddress().getDistrict());
+            addrResponse.setDistrict(customer.getAddress().getDistrict() != null
+                    ? customer.getAddress().getDistrict().getDisplayName()
+                    : null);
             addrResponse.setPostalCode(customer.getAddress().getPostalCode());
             response.setAddress(addrResponse);
         }

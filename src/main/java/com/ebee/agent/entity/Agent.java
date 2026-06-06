@@ -1,6 +1,7 @@
 package com.ebee.agent.entity;
 
 import com.ebee.agent.enums.AgentCommissionType;
+import com.ebee.common.enums.District;
 import com.ebee.order.entity.Order;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -59,7 +60,7 @@ public class Agent {
     private String address;
 
     @Column(length = 50)
-    private String district;
+    private District district;
 
     @Column(name = "nic_number")
     private String nicNumber;

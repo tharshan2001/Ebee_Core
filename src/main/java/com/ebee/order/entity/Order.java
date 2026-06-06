@@ -1,6 +1,7 @@
 package com.ebee.order.entity;
 
 import com.ebee.agent.entity.Agent;
+import com.ebee.common.enums.District;
 import com.ebee.customer.entity.Customer;
 import com.ebee.delivery.entity.DeliveryTrip;
 import com.ebee.delivery.enums.DeliveryStatus;
@@ -80,7 +81,8 @@ public class Order {
         if (customer == null || customer.getAddress() == null) {
             return null;
         }
-        return customer.getAddress().getDistrict();
+        District d = customer.getAddress().getDistrict();
+        return d != null ? d.getDisplayName() : null;
     }
 
     @Enumerated(EnumType.STRING)

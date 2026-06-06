@@ -6,7 +6,7 @@ import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.enums.AgentCommissionType;
-import com.ebee.agent.enums.District;
+import com.ebee.common.enums.District;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
@@ -86,7 +86,7 @@ public class AgentService {
                 .user(savedUser)
                 .agentCode(agentCode)
                 .address(request.getAddress())
-                .district(district.getDisplayName())
+                .district(district)
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(defaultConfig.getCommissionRate())
                 .commissionType(AgentCommissionType.DEFAULT)
@@ -144,7 +144,7 @@ public class AgentService {
                 .lastName(savedUser.getLastName())
                 .agentCode(savedAgent.getAgentCode())
                 .address(savedAgent.getAddress())
-                .district(savedAgent.getDistrict())
+                .district(savedAgent.getDistrict() != null ? savedAgent.getDistrict().getDisplayName() : null)
                 .phoneNumber(savedAgent.getPhoneNumber())
                 .commissionRate(savedAgent.getCommissionRate())
                 .commissionType(savedAgent.getCommissionType())
@@ -270,8 +270,7 @@ public class AgentService {
         agent.setAgentCode(request.getAgentCode());
 
         if (request.getDistrict() != null) {
-            District.fromDisplayName(request.getDistrict());
-            agent.setDistrict(request.getDistrict());
+            agent.setDistrict(District.fromDisplayName(request.getDistrict()));
         }
 
         if (request.getCommissionType() != null) {
@@ -370,7 +369,7 @@ public class AgentService {
         response.setFullName(agent.getUser().getFirstName() + " " + agent.getUser().getLastName());
         response.setAgentCode(agent.getAgentCode());
         response.setAddress(agent.getAddress());
-        response.setDistrict(agent.getDistrict());
+        response.setDistrict(agent.getDistrict() != null ? agent.getDistrict().getDisplayName() : null);
         response.setPhoneNumber(agent.getPhoneNumber());
         response.setCommissionRate(agent.getCommissionRate());
         response.setCommissionType(agent.getCommissionType());

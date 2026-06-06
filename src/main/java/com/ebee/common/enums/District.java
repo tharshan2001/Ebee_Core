@@ -1,4 +1,4 @@
-package com.ebee.agent.enums;
+package com.ebee.common.enums;
 
 import java.util.Arrays;
 

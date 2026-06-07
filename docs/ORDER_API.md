@@ -32,7 +32,7 @@ Content-Type: application/json
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Request Body:**
+**Request Body (Agent Order):**
 ```json
 {
   "agentCode": "AG-001",
@@ -47,15 +47,30 @@ Authorization: Bearer <JWT_TOKEN>
 }
 ```
 
+**Request Body (Direct Order — Admin only, no agentCode):**
+```json
+{
+  "customerPhoneNumber": "+94771234567",
+  "items": [
+    {
+      "productItemCode": "PA-001",
+      "quantity": 2
+    }
+  ]
+}
+```
+
 **Validation:**
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| agentCode | String | Yes (for non-admin) | Must match an active agent's code |
+| agentCode | String | Yes (for non-admin) | Must match an active agent's code; admin can omit to create a **direct order** |
 | customerPhoneNumber | String | Yes | Must match an existing customer's phone number |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
 | items[].productItemCode | String | Yes | Must match an active product's item code |
 | items[].quantity | Integer | Yes | Positive integer |
+
+**Note on Direct Orders:** When an admin creates an order without `agentCode`, the order is marked as `orderSource: "DIRECT"`. The `agentId` and `agentCode` in the response will be `null`, and `agentName` will show `"Direct Order"`. No commission is calculated for direct orders.
 
 **Success Response (201 Created):**
 ```json
@@ -351,6 +366,7 @@ Cancels an order.
   "deliveryScheduledDate": "LocalDate or null",
   "deliveryNotes": "String or null",
   "tripId": "UUID or null",
+  "orderSource": "AGENT or DIRECT",
   "items": [
     {
       "id": "UUID",
@@ -494,7 +510,8 @@ All errors follow the standard ApiResponse format:
 3. **Agent Validation:** Only active agents can have orders created for them
 4. **Product Validation:** Only active products can be ordered
 5. **Authorization:** Agents can only see orders they created, admins see all
-6. **Auto-Commission:** If the order has an agent, a commission is auto-created in `CALCULATED` status using the best matching commission config or agent's default rate
+6. **Auto-Commission:** If the order has an agent, a commission is auto-created in `CALCULATED` status using the best matching commission config or agent's default rate. Direct orders (`orderSource: DIRECT`) do not generate commissions.
 7. **Customer Identification:** Provide `customerPhoneNumber` to link the order to an existing customer; fails with 404 if the phone is not found
 8. **Cancel Rollback:** Cancelling an order restores stock AND rolls back the associated commission (reverts agent totals if the commission was paid)
 9. **District Derivation:** The `district` field in the response is derived from the customer's address district and is read-only. Only the [supported districts](AGENT_API.md#supported-districts) are valid. See the Delivery API for delivery-specific operations.
+10. **OrderSource:** Each order has an `orderSource` field — `AGENT` (created with an agentCode) or `DIRECT` (admin order without an agent). This is set at creation time and cannot be changed.

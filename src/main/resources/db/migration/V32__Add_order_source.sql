@@ -1,0 +1,3 @@
+ALTER TABLE orders ADD COLUMN order_source VARCHAR(50) NOT NULL DEFAULT 'AGENT';
+UPDATE orders SET order_source = 'DIRECT' WHERE agent_id IS NULL;
+ALTER TABLE orders ALTER COLUMN agent_id DROP NOT NULL;

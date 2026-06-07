@@ -5,6 +5,7 @@ import com.ebee.common.enums.District;
 import com.ebee.customer.entity.Customer;
 import com.ebee.delivery.entity.DeliveryTrip;
 import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -35,7 +36,7 @@ public class Order {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agent_id", nullable = false)
+    @JoinColumn(name = "agent_id")
     private Agent agent;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -101,6 +102,11 @@ public class Order {
 
     @Column(name = "delivery_failure_reason", columnDefinition = "TEXT")
     private String deliveryFailureReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_source", nullable = false)
+    @Builder.Default
+    private OrderSource orderSource = OrderSource.AGENT;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id")

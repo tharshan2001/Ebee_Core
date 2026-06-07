@@ -18,6 +18,7 @@ import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
+import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
@@ -84,6 +85,7 @@ public class OrderService {
                 .orderNumber(orderNumber)
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
+                .orderSource(agent != null ? OrderSource.AGENT : OrderSource.DIRECT)
                 .items(new ArrayList<>())
                 .build();
 

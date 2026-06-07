@@ -1,6 +1,7 @@
 package com.ebee.order.dto;
 
 import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import lombok.Data;
 
@@ -37,4 +38,5 @@ public class OrderResponse {
     private LocalDate deliveryScheduledDate;
     private String deliveryNotes;
     private UUID tripId;
+    private OrderSource orderSource;
 }

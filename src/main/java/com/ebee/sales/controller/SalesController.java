@@ -1,5 +1,6 @@
 package com.ebee.sales.controller;
 
+import com.ebee.common.enums.District;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.sales.dto.*;
 import com.ebee.sales.service.SalesService;
@@ -45,6 +46,19 @@ public class SalesController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         List<SalesByAgentResponse> response = salesService.getSalesByAgent(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Sales by agent retrieved successfully", response));
+    }
+
+    @GetMapping("/leaderboard")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<List<AgentLeaderboardResponse>>> getLeaderboard(
+            @RequestParam(defaultValue = "revenue") String metric,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) District district,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        List<AgentLeaderboardResponse> response = salesService.getLeaderboard(
+                metric, limit, district, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success("Leaderboard retrieved successfully", response));
     }
 
     @GetMapping("/by-product")

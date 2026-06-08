@@ -3,6 +3,7 @@ package com.ebee.sales.service;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.repository.CommissionRepository;
+import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.order.repository.OrderItemRepository;
 import com.ebee.order.repository.OrderRepository;
@@ -19,8 +20,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -137,6 +142,83 @@ public class SalesService {
         }
 
         return list;
+    }
+
+    public List<AgentLeaderboardResponse> getLeaderboard(
+            String metric, int limit, District district,
+            LocalDate startDate, LocalDate endDate) {
+        List<Object[]> results = orderRepository.findSalesByAgent(
+                toStartDateTime(startDate), toEndDateTime(endDate));
+        List<AgentLeaderboardResponse> entries = new ArrayList<>();
+
+        for (Object[] row : results) {
+            UUID agentId = (UUID) row[0];
+            if (agentId == null) continue;
+
+            String firstName = (String) row[2];
+            String lastName = (String) row[3];
+            Long orders = toLong(row[4]);
+            BigDecimal revenue = toBigDecimal(row[5]);
+
+            entries.add(AgentLeaderboardResponse.builder()
+                    .agentId(agentId)
+                    .agentCode((String) row[1])
+                    .agentName((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""))
+                    .totalOrders(orders)
+                    .totalRevenue(revenue)
+                    .avgOrderValue(orders > 0
+                            ? revenue.divide(BigDecimal.valueOf(orders), 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO)
+                    .build());
+        }
+
+        if (entries.isEmpty()) {
+            return entries;
+        }
+
+        List<UUID> agentIds = entries.stream()
+                .map(AgentLeaderboardResponse::getAgentId)
+                .collect(Collectors.toList());
+
+        List<Object[]> commissionResults = commissionRepository.sumCommissionByAgentIds(
+                agentIds, toStartDateTime(startDate), toEndDateTime(endDate));
+        Map<UUID, BigDecimal> commissionMap = new HashMap<>();
+        for (Object[] cr : commissionResults) {
+            commissionMap.put((UUID) cr[0], toBigDecimal(cr[1]));
+        }
+
+        Map<UUID, String> districtMap = agentRepository.findAllById(agentIds).stream()
+                .collect(Collectors.toMap(Agent::getId, a -> a.getDistrict() != null ? a.getDistrict().name() : ""));
+
+        for (AgentLeaderboardResponse entry : entries) {
+            entry.setTotalCommission(commissionMap.getOrDefault(entry.getAgentId(), BigDecimal.ZERO));
+            entry.setDistrict(districtMap.getOrDefault(entry.getAgentId(), ""));
+        }
+
+        if (district != null) {
+            entries = entries.stream()
+                    .filter(e -> district.name().equals(e.getDistrict()))
+                    .collect(Collectors.toList());
+        }
+
+        Comparator<AgentLeaderboardResponse> comparator = switch (metric != null ? metric : "revenue") {
+            case "orders" -> Comparator.comparingLong(AgentLeaderboardResponse::getTotalOrders);
+            case "commission" -> Comparator.comparing(AgentLeaderboardResponse::getTotalCommission);
+            case "avgOrderValue" -> Comparator.comparing(AgentLeaderboardResponse::getAvgOrderValue);
+            default -> Comparator.comparing(AgentLeaderboardResponse::getTotalRevenue);
+        };
+
+        entries.sort(comparator.reversed());
+
+        if (limit > 0 && limit < entries.size()) {
+            entries = entries.subList(0, limit);
+        }
+
+        for (int i = 0; i < entries.size(); i++) {
+            entries.get(i).setRank(i + 1);
+        }
+
+        return entries;
     }
 
     public SalesByAgentDetailResponse getSalesByAgentDetail(UUID agentId, LocalDate startDate, LocalDate endDate) {

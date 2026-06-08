@@ -14,7 +14,16 @@
 }
 ```
 
-**Response:**
+Optionally validate the user's role matches by including `role`:
+```json
+{
+  "email": "admin@ebee.com",
+  "password": "admin123",
+  "role": "ADMIN"
+}
+```
+
+**Response (role matches or omitted):**
 ```json
 {
   "success": true,
@@ -30,6 +39,15 @@
     "mustChangePassword": true,
     "expiresAt": "2026-06-02T22:17:53"
   }
+}
+```
+
+**Error (role mismatch):** `403` with no token issued
+```json
+{
+  "success": false,
+  "message": "Access denied. You do not have permission to perform this action.",
+  "data": null
 }
 ```
 

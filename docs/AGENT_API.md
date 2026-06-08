@@ -284,3 +284,26 @@ curl -X DELETE http://localhost:8085/api/agents/{id} \
   "message": "Agent deleted successfully"
 }
 ```
+
+---
+
+### Reset Agent Password
+
+**POST** `/api/agents/{id}/reset-password`
+
+**Access:** ADMIN only
+
+Resets the agent's password to a new randomly generated value. The new password is sent to the agent's email. The agent will be forced to change their password on next login (`mustChangePassword = true`).
+
+```bash
+curl -X POST http://localhost:8085/api/agents/{id}/reset-password \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully. The new password has been sent to the agent's email."
+}
+```

@@ -1,34 +1,31 @@
 # Delivery Module API
 
-Delivery tracking is embedded in the Order entity — each order has delivery fields (status, assigned driver, scheduled date, notes, district) and an optional Trip assignment.
+Delivery tracking is embedded in the Order entity — each order has delivery fields (status, assigned driver, scheduled date, notes, district).
 
 ---
 
 ## System Overview
 
 ```
-┌──────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ CUSTOMER │────▶│    ORDER    │────▶│  DELIVERY   │────▶│    TRIP     │
-│          │     │             │     │             │     │             │
-│ address  │     │ district    │     │ status      │     │ district    │
-│  └───┐   │     │  (auto-set  │     │ assigned_to │     │ trip_date   │
-│      │   │     │   from      │     │  └───┐      │     │ driver      │
-│      ▼   │     │   customer) │     │      │      │     │  └───┐      │
-│ district │     │             │     │      ▼      │     │      ▼      │
-└──────────┘     └─────────────┘     │   USER      │     │   USER      │
-                                     │  (DRIVER)   │     │  (DRIVER)   │
-                                     └──────┬──────┘     └──────┬──────┘
-                                            │                   │
-                                            └───────────────────┘
-                                                  DRIVERS
-                                              ┌──────────┐
-                                              │ LICENSE  │
-                                              │ CONTACT  │
-                                              │ AVAIL    │
-                                              │  STATUS  │
-                                              └──────────┘
+┌──────────┐     ┌─────────────┐     ┌─────────────┐
+│ CUSTOMER │────▶│    ORDER    │────▶│  DELIVERY   │
+│          │     │             │     │             │
+│ address  │     │ district    │     │ status      │
+│  └───┐   │     │  (auto-set  │     │ assigned_to │
+│      │   │     │   from      │     │  └───┐      │
+│      ▼   │     │   customer) │     │      │      │
+│ district │     │             │     │      ▼      │
+└──────────┘     └─────────────┘     │   USER      │
+                                     │  (DRIVER)   │
+                                     └─────────────┘
+                                          DRIVERS
+                                      ┌──────────┐
+                                      │ LICENSE  │
+                                      │ CONTACT  │
+                                      │ AVAIL    │
+                                      │  STATUS  │
+                                      └──────────┘
 ```
-
 ---
 
 ## State Transitions
@@ -45,15 +42,6 @@ Guards:
 - `DELIVERED` and `FAILED_PERMANENT` are terminal — no further updates allowed.
 - `FAILED` can transition to `PENDING` (retry) or `FAILED_PERMANENT` (terminal).
 
-### TripStatus
-
-```
-PLANNED ──▶ IN_PROGRESS ──▶ COMPLETED
-                            ↘ CANCELLED
-```
-
-Guard: `COMPLETED` and `CANCELLED` are terminal — no further updates allowed.
-
 ### DriverAvailability (auto-managed by delivery)
 
 ```
@@ -62,9 +50,7 @@ AVAILABLE ──assign delivery──▶ ON_TRIP ──deliver──▶ AVAILABL
      ↘  SUSPENDED (manual)
 ```
 
-Guards:
-- Delivery assignment fails if driver is not `AVAILABLE`.
-- Trip creation/assignment fails if driver is not `AVAILABLE`.
+Guard: Delivery assignment fails if driver is not `AVAILABLE`.
 
 ---
 
@@ -74,8 +60,6 @@ Guards:
 |--------|--------|
 | Assign Driver to Delivery | delivery status must be `PENDING`, user must have `DRIVER` role, driver must be `AVAILABLE` |
 | Update Delivery Status | current status must not be `DELIVERED` or `FAILED_PERMANENT`; `FAILED` can transition to `PENDING` (retry) or `FAILED_PERMANENT` (terminal) |
-| Assign Order to Trip | delivery must be initialized (`deliveryStatus != null`), order not already assigned to a trip, order district must match trip district |
-| Create Trip with Driver | driver must be `AVAILABLE` |
 
 ---
 
@@ -88,6 +72,7 @@ Guards:
 - **Driver ON_TRIP**: automatically set when a delivery is assigned to the driver.
 - **Driver AVAILABLE**: automatically restored when a delivery is marked `DELIVERED` or `FAILED`.
 - **deliveryFailureReason**: set when delivery status is updated to `FAILED`; cleared on retry (`FAILED` → `PENDING`).
+- **Commission auto-approve**: when delivery status is updated to `DELIVERED`, the associated commission (if any) is auto-approved. Direct orders have no commission and are unaffected.
 
 ---
 
@@ -108,10 +93,36 @@ All delivery endpoints return a delivery-specific response (not the full order o
     "scheduledDate": "2026-06-10 or null",
     "notes": "Handle with care or null",
     "deliveredAt": "2026-06-10T14:30:00 or null",
-    "tripId": "uuid or null",
     "deliveryFailureReason": "Customer not available or null"
 }
 ```
+
+### List Deliveries
+
+```
+GET /api/deliveries?status=PENDING&district=Batticaloa
+Auth: ADMIN, DRIVER
+```
+
+All filters optional.
+
+### My Deliveries
+
+```
+GET /api/deliveries/mine
+Auth: ADMIN, DRIVER
+```
+
+Returns deliveries assigned to the current user.
+
+### Delivery Detail
+
+```
+GET /api/deliveries/{orderId}
+Auth: ADMIN, DRIVER
+```
+
+Fails if the order has no delivery.
 
 ### Assign Driver
 
@@ -154,107 +165,6 @@ When setting a failure status, an optional `reason` field can be included:
 
 The reason is stored in `deliveryFailureReason` on the order, included in customer notifications and admin alerts, and cleared automatically on retry.
 
-### List Deliveries
-
-```
-GET /api/deliveries?status=PENDING&district=Batticaloa&tripId=uuid
-Auth: ADMIN, DRIVER
-```
-
-All filters optional.
-
-### My Deliveries
-
-```
-GET /api/deliveries/mine
-Auth: ADMIN, DRIVER
-```
-
-Returns deliveries assigned to the current user.
-
-### Delivery Detail
-
-```
-GET /api/deliveries/{orderId}
-Auth: ADMIN, DRIVER
-```
-
-Fails if the order has no delivery.
-
----
-
-## Trip Endpoints
-
-### Create Trip
-
-```
-POST /api/delivery-trips
-Auth: ADMIN
-Body:
-{
-    "tripDate": "2026-06-07",
-    "district": "Batticaloa",
-    "driverId": "uuid",
-    "notes": "Morning run"
-}
-```
-
-`driverId` is optional.
-
-### List Trips
-
-```
-GET /api/delivery-trips?status=PLANNED&district=Batticaloa
-Auth: ADMIN, DRIVER
-```
-
-All filters optional.
-
-### Trip Detail
-
-```
-GET /api/delivery-trips/{id}
-Auth: ADMIN, DRIVER
-```
-
-Returns trip info plus list of assigned orders.
-
-### Update Trip Status
-
-```
-PATCH /api/delivery-trips/{id}/status?status=IN_PROGRESS
-Auth: ADMIN, DRIVER
-```
-
-Fails if current status is `COMPLETED` or `CANCELLED`.
-
-### Assign Driver to Trip
-
-```
-PATCH /api/delivery-trips/{id}/driver
-Auth: ADMIN
-Body:
-{
-    "driverId": "uuid"
-}
-```
-
-### Assign Order to Trip
-
-```
-POST /api/delivery-trips/{tripId}/orders/{orderId}
-Auth: ADMIN
-```
-
-Fails if order district does not match trip district, or if order is already assigned to a trip.
-
-### Remove Order from Trip
-
-```
-DELETE /api/delivery-trips/{tripId}/orders/{orderId}
-Auth: ADMIN
-```
-
 ---
 
 ## Typical Workflow
@@ -263,9 +173,6 @@ Auth: ADMIN
 1. Order created     → district auto-set from customer address
 2. Order → SHIPPED   → deliveryStatus = PENDING
 3. Admin views       → "10 pending deliveries in Batticaloa"
-4. Admin creates     → Trip (date=tomorrow, district=Batticaloa)
-5. Admin assigns     → 10 Batticaloa orders to the trip
-6. Driver picks up   → trip IN_PROGRESS, orders PICKED_UP
-7. Driver delivers   → each order individually marked DELIVERED
-8. All done          → trip COMPLETED
+4. Admin assigns     → driver to each delivery
+5. Driver delivers   → each order marked PICKED_UP → IN_TRANSIT → DELIVERED
 ```

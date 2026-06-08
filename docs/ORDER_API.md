@@ -35,7 +35,6 @@ Authorization: Bearer <JWT_TOKEN>
 **Request Body (Agent Order):**
 ```json
 {
-  "agentCode": "AG-001",
   "customerPhoneNumber": "+94771234567",
   "notes": "Optional order notes",
   "items": [
@@ -46,6 +45,7 @@ Authorization: Bearer <JWT_TOKEN>
   ]
 }
 ```
+*Note: `agentCode` is resolved automatically from the authenticated agent's JWT. Do not include it in the request.*
 
 **Request Body (Direct Order — Admin only, no agentCode):**
 ```json
@@ -63,8 +63,8 @@ Authorization: Bearer <JWT_TOKEN>
 **Validation:**
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| agentCode | String | Yes (for non-admin) | Must match an active agent's code; admin can omit to create a **direct order** |
 | customerPhoneNumber | String | Yes | Must match an existing customer's phone number |
+| agentCode | String | No (admin only) | Admin can set to create order for a specific agent; omit for a **direct order**. Ignored for non-admin — resolved automatically from JWT |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
 | items[].productItemCode | String | Yes | Must match an active product's item code |
@@ -229,7 +229,31 @@ Retrieves all orders for a specific customer.
 
 ---
 
-### 6. Get All Orders (Admin Only)
+### 6. Get My Orders (Agent Only)
+**GET** `/api/orders/my`
+
+Retrieves orders belonging to the currently authenticated agent (resolved from the JWT token).
+
+**Access:** AGENT only
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Orders retrieved successfully",
+  "data": [
+    { ... },
+    { ... }
+  ]
+}
+```
+
+**Error Responses:**
+- `404` — No agent profile found for the current user
+
+---
+
+### 7. Get All Orders (Admin Only)
 **GET** `/api/orders`
 
 Retrieves all orders in the system.
@@ -250,10 +274,10 @@ Retrieves all orders in the system.
 
 ---
 
-### 7. Update Order Status (Admin Only)
+### 8. Update Order Status (Admin Only)
 **PATCH** `/api/orders/{id}/status?status={status}`
 
-Updates the status of an order.
+Updates the order status up to `SHIPPED`. Once shipped, all further status transitions (DELIVERED, RETURNED, etc.) are handled through the delivery system.
 
 **Access:** ADMIN only
 
@@ -267,23 +291,31 @@ Updates the status of an order.
 |-----------|------|-------------|
 | status | OrderStatus | New status value |
 
-**Order Status Values:**
-```
-PENDING       - Order created, awaiting confirmation
-CONFIRMED     - Order confirmed by admin
-PROCESSING    - Order is being processed
-SHIPPED       - Order has been shipped
-DELIVERED     - Order delivered to customer
-CANCELLED     - Order cancelled
-RETURNED      - Order returned
-```
+**Allowed target statuses:**
+| Status | Notes |
+|--------|-------|
+| `CONFIRMED` | Confirm order |
+| `PROCESSING` | Start processing |
+| `SHIPPED` | Mark shipped — auto-initializes `deliveryStatus = PENDING` |
 
-**Delivery side-effects:**
-| Status change | Delivery affected |
-|---------------|------------------|
+**Blocked target statuses (use delivery/cancel endpoints instead):**
+| Status | Alternative endpoint |
+|--------|---------------------|
+| `DELIVERED` | Use `PATCH /api/deliveries/{id}/status` with `DELIVERED` |
+| `RETURNED` | Use delivery system |
+| `CANCELLED` | Use `PATCH /api/orders/{id}/cancel` |
+
+**Blocked current states (terminal):**
+| State | Reason |
+|-------|--------|
+| `DELIVERED` | Terminal — cannot be changed |
+| `CANCELLED` | Terminal — cannot be changed |
+| `RETURNED` | Terminal — cannot be changed |
+
+**Delivery initialization:**
+| If status is set to | Delivery effect |
+|--------------------|----------------|
 | `SHIPPED` | Auto-initializes `deliveryStatus = PENDING` (if not already set) |
-| `DELIVERED` | Auto-sets `deliveryStatus = DELIVERED` + records `deliveredAt` |
-| Others | No effect |
 
 **Success Response (200 OK):**
 ```json
@@ -301,7 +333,7 @@ RETURNED      - Order returned
 
 ---
 
-### 8. Cancel Order (Admin Only)
+### 9. Cancel Order (Admin Only)
 **PATCH** `/api/orders/{id}/cancel`
 
 Cancels an order.
@@ -365,7 +397,6 @@ Cancels an order.
   "deliveryAssignedToName": "String or null",
   "deliveryScheduledDate": "LocalDate or null",
   "deliveryNotes": "String or null",
-  "tripId": "UUID or null",
   "orderSource": "AGENT or DIRECT",
   "items": [
     {
@@ -510,7 +541,7 @@ All errors follow the standard ApiResponse format:
 3. **Agent Validation:** Only active agents can have orders created for them
 4. **Product Validation:** Only active products can be ordered
 5. **Authorization:** Agents can only see orders they created, admins see all
-6. **Auto-Commission:** If the order has an agent, a commission is auto-created in `CALCULATED` status using the best matching commission config or agent's default rate. Direct orders (`orderSource: DIRECT`) do not generate commissions.
+6. **Auto-Commission:** If the order has an agent, a commission is auto-created in `CALCULATED` status using the best matching commission config or agent's default rate. Direct orders (`orderSource: DIRECT`) do not generate commissions. The commission is auto-approved to `APPROVED` status when the order or its delivery reaches `DELIVERED`.
 7. **Customer Identification:** Provide `customerPhoneNumber` to link the order to an existing customer; fails with 404 if the phone is not found
 8. **Cancel Rollback:** Cancelling an order restores stock AND rolls back the associated commission (reverts agent totals if the commission was paid)
 9. **District Derivation:** The `district` field in the response is derived from the customer's address district and is read-only. Only the [supported districts](AGENT_API.md#supported-districts) are valid. See the Delivery API for delivery-specific operations.

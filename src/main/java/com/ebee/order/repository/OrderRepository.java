@@ -30,9 +30,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product")
     List<Order> findAllWithDetails();
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.trip.id = :tripId")
-    List<Order> findByTripIdWithDetails(@Param("tripId") UUID tripId);
-
     Optional<Order> findByOrderNumber(String orderNumber);
 
     List<Order> findByAgentId(UUID agentId);

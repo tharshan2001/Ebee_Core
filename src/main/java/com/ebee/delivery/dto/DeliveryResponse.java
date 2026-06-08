@@ -20,6 +20,5 @@ public class DeliveryResponse {
     private LocalDate scheduledDate;
     private String notes;
     private LocalDateTime deliveredAt;
-    private UUID tripId;
     private String deliveryFailureReason;
 }

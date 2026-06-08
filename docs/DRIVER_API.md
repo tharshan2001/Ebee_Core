@@ -22,8 +22,6 @@ Available values: `AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`.
 
 - **Delivery assigned** → driver availability auto-set to `ON_TRIP`
 - **Delivery DELIVERED** → driver availability auto-returned to `AVAILABLE`
-- **Trip created with driver** → driver must be `AVAILABLE` (validated)
-- **Driver assigned to trip** → driver must be `AVAILABLE` (validated)
 
 This ensures a driver cannot be double-booked — they are `ON_TRIP` from the moment a delivery is assigned until it is marked `DELIVERED`.
 

@@ -144,6 +144,7 @@ public class DeliveryService {
             order.setDeliveredAt(LocalDateTime.now());
             order.setStatus(OrderStatus.DELIVERED);
             freeDriverIfAssigned(order);
+            commissionLifecycleService.approveCommissionForOrder(order.getId());
         }
 
         if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
@@ -223,11 +224,9 @@ public class DeliveryService {
     }
 
     @Transactional(readOnly = true)
-    public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district, UUID tripId) {
+    public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district) {
         List<Order> orders;
-        if (tripId != null) {
-            orders = deliveryRepository.findByTripId(tripId);
-        } else if (status != null) {
+        if (status != null) {
             orders = deliveryRepository.findByDeliveryStatus(status);
         } else {
             orders = orderRepository.findAll().stream()
@@ -278,9 +277,6 @@ public class DeliveryService {
         response.setScheduledDate(order.getDeliveryScheduledDate());
         response.setNotes(order.getDeliveryNotes());
         response.setDeliveredAt(order.getDeliveredAt());
-        if (order.getTrip() != null) {
-            response.setTripId(order.getTrip().getId());
-        }
         response.setDeliveryFailureReason(order.getDeliveryFailureReason());
         return response;
     }

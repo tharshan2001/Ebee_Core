@@ -26,7 +26,6 @@ public interface OrderMapper {
     @Mapping(target = "deliveryAssignedToName", expression = "java(order.getDeliveryAssignedTo() != null ? order.getDeliveryAssignedTo().getFirstName() + \" \" + order.getDeliveryAssignedTo().getLastName() : null)")
     @Mapping(target = "deliveryScheduledDate", source = "deliveryScheduledDate")
     @Mapping(target = "deliveryNotes", source = "deliveryNotes")
-    @Mapping(target = "tripId", source = "trip.id")
     @Mapping(target = "orderSource", source = "orderSource")
     OrderResponse toResponse(Order order);
 

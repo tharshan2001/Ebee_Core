@@ -37,6 +37,5 @@ public class OrderResponse {
     private String deliveryAssignedToName;
     private LocalDate deliveryScheduledDate;
     private String deliveryNotes;
-    private UUID tripId;
     private OrderSource orderSource;
 }

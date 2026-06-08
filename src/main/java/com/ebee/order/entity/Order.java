@@ -3,7 +3,6 @@ package com.ebee.order.entity;
 import com.ebee.agent.entity.Agent;
 import com.ebee.common.enums.District;
 import com.ebee.customer.entity.Customer;
-import com.ebee.delivery.entity.DeliveryTrip;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
@@ -108,7 +107,4 @@ public class Order {
     @Builder.Default
     private OrderSource orderSource = OrderSource.AGENT;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_id")
-    private DeliveryTrip trip;
 }

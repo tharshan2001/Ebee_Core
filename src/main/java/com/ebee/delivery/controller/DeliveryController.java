@@ -44,9 +44,8 @@ public class DeliveryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<DeliveryResponse>>> getDeliveries(
             @RequestParam(required = false) DeliveryStatus status,
-            @RequestParam(required = false) String district,
-            @RequestParam(required = false) UUID tripId) {
-        List<DeliveryResponse> responses = deliveryService.getDeliveries(status, district, tripId);
+            @RequestParam(required = false) String district) {
+        List<DeliveryResponse> responses = deliveryService.getDeliveries(status, district);
         return ResponseEntity.ok(ApiResponse.success("Deliveries retrieved successfully", responses));
     }
 

@@ -47,7 +47,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |
 | Messages | [MESSAGE_API.md](MESSAGE_API.md) | ADMIN |
 | Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
-| Delivery Trips | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
+
 | Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
 
 ---
@@ -118,28 +118,7 @@ curl -X PATCH "http://localhost:8085/api/deliveries/<ORDER_ID>/assign" \
 
 Driver availability is auto-set to `ON_TRIP`.
 
-### 8. Create Delivery Trip
-
-```bash
-curl -X POST "http://localhost:8085/api/delivery-trips" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <TOKEN>" \
-  -d '{
-    "tripDate": "2026-06-10",
-    "district": "Batticaloa"
-  }'
-```
-
-### 9. Assign Order to Trip
-
-```bash
-curl -X POST "http://localhost:8085/api/delivery-trips/<TRIP_ID>/orders/<ORDER_ID>" \
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-Order district must match trip district.
-
-### 10. Update Delivery Status
+### 8. Update Delivery Status
 
 ```bash
 curl -X PATCH "http://localhost:8085/api/deliveries/<ORDER_ID>/status" \

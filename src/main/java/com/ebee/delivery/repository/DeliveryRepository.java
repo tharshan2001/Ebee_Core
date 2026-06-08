@@ -17,9 +17,6 @@ public interface DeliveryRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByDeliveryAssignedToId(UUID userId);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.trip.id = :tripId")
-    List<Order> findByTripId(@Param("tripId") UUID tripId);
-
     List<Order> findByDeliveryStatusAndDeliveryAssignedToId(DeliveryStatus status, UUID userId);
 
     long countByDeliveryStatus(DeliveryStatus status);

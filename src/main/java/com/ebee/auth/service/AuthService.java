@@ -3,7 +3,9 @@ package com.ebee.auth.service;
 import com.ebee.auth.dto.AuthResponse;
 import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
+import com.ebee.auth.security.UserPrincipal;
 import com.ebee.common.exception.ResourceNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import com.ebee.notification.NotificationService;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
@@ -54,11 +56,15 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
+        User user = ((UserPrincipal) authentication.getPrincipal()).getUser();
+
+        if (request.getRole() != null && user.getRole() != request.getRole()) {
+            throw new AccessDeniedException("Invalid role for login: expected " + request.getRole()
+                    + " but user has role " + user.getRole());
+        }
+
         String token = jwtService.generateToken(authentication);
         String refreshToken = jwtService.generateRefreshToken(authentication);
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", request.getEmail()));
 
         sendLoginAlert(user);
 
@@ -190,6 +196,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .role(user.getRole())
+                .mustChangePassword(user.getMustChangePassword())
                 .expiresAt(jwtService.getExpirationDate(newToken))
                 .build();
     }

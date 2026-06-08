@@ -30,6 +30,13 @@ public class OrderController {
                 .body(ApiResponse.success("Order created successfully", response));
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('AGENT')")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders() {
+        List<OrderResponse> response = orderService.getMyOrders();
+        return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(@PathVariable UUID id) {

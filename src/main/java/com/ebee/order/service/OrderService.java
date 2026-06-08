@@ -59,16 +59,21 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
         Agent agent = null;
-        
-        if (request.getAgentCode() != null) {
+
+        if (!securityService.isAdmin()) {
+            UUID userId = securityService.getCurrentUserId();
+            agent = agentRepository.findByUserId(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
+            if (!Boolean.TRUE.equals(agent.getIsActive())) {
+                throw new IllegalArgumentException("Agent is not active");
+            }
+        } else if (request.getAgentCode() != null) {
             agent = agentRepository.findByAgentCode(request.getAgentCode())
                     .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", request.getAgentCode()));
 
             if (!Boolean.TRUE.equals(agent.getIsActive())) {
                 throw new IllegalArgumentException("Agent is not active");
             }
-        } else if (!securityService.isAdmin()) {
-            throw new IllegalArgumentException("Agent is required for non-admin users");
         }
 
         User currentUser = userRepository.findById(securityService.getCurrentUserId())
@@ -166,6 +171,15 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public List<OrderResponse> getMyOrders() {
+        UUID userId = securityService.getCurrentUserId();
+        Agent agent = agentRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
+        List<Order> orders = orderRepository.findByAgentIdWithDetails(agent.getId());
+        return orderMapper.toResponseList(orders);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByCustomerId(UUID customerId) {
         customerService.getCustomerById(customerId);
         List<Order> orders = orderRepository.findByCustomerIdWithDetails(customerId);
@@ -183,17 +197,21 @@ public class OrderService {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
+        if (order.getStatus() == OrderStatus.CANCELLED
+                || order.getStatus() == OrderStatus.DELIVERED
+                || order.getStatus() == OrderStatus.RETURNED) {
             throw new IllegalArgumentException("Cannot update status of a " + order.getStatus().name().toLowerCase() + " order");
+        }
+
+        if (status == OrderStatus.DELIVERED
+                || status == OrderStatus.RETURNED
+                || status == OrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("Order status can only be updated up to SHIPPED. Use delivery or cancel endpoints for further changes.");
         }
 
         order.setStatus(status);
         if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
             order.setDeliveryStatus(DeliveryStatus.PENDING);
-        }
-        if (status == OrderStatus.DELIVERED) {
-            order.setDeliveredAt(LocalDateTime.now());
-            order.setDeliveryStatus(DeliveryStatus.DELIVERED);
         }
         Order updatedOrder = orderRepository.save(order);
 

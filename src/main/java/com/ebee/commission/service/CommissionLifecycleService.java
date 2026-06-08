@@ -100,6 +100,15 @@ public class CommissionLifecycleService {
         });
     }
 
+    @Transactional
+    public void approveCommissionForOrder(UUID orderId) {
+        commissionRepository.findCommissionByOrderId(orderId).ifPresent(commission -> {
+            if (commission.getStatus() == CommissionStatus.CALCULATED) {
+                approveCommission(commission.getId());
+            }
+        });
+    }
+
     private void sendCommissionNotification(Commission commission, String statusLabel, String message) {
         Agent agent = commission.getAgent();
         String subject = "Commission " + statusLabel + " – Order " + commission.getOrder().getOrderNumber();

@@ -72,7 +72,7 @@ public class AgentService {
                 .role(RoleType.AGENT)
                 .status(initialStatus)
                 .isActive(true)
-                .mustChangePassword(createdByAdmin ? false : true)
+                .mustChangePassword(true)
                 .build();
 
         CommissionConfig defaultConfig = commissionConfigRepository
@@ -131,8 +131,6 @@ public class AgentService {
 
         Agent savedAgent = agentRepository.save(agent);
 
-        boolean mustChangePw = createdByAdmin ? false : true;
-
         sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, generatedPassword,
                 savedAgent);
 
@@ -156,7 +154,7 @@ public class AgentService {
                 .isActive(savedAgent.getIsActive())
                 .createdAt(savedAgent.getCreatedAt())
                 .generatedPassword(generatedPassword)
-                .mustChangePassword(mustChangePw)
+                .mustChangePassword(true)
                 .build();
     }
 
@@ -359,6 +357,21 @@ public class AgentService {
         return mapToResponse(agentRepository.save(agent));
     }
 
+    @Transactional
+    public void resetPassword(UUID id) {
+        Agent agent = agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+
+        User user = agent.getUser();
+        String rawPassword = generatePassword();
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setMustChangePassword(true);
+        user.setPasswordChangedAt(null);
+        userRepository.save(user);
+
+        sendPasswordResetNotification(agent, rawPassword);
+    }
+
     private AgentResponse mapToResponse(Agent agent) {
         AgentResponse response = new AgentResponse();
         response.setId(agent.getId());
@@ -440,6 +453,34 @@ public class AgentService {
             notificationService.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
+        }
+    }
+
+    private void sendPasswordResetNotification(Agent agent, String password) {
+        try {
+            String subject = "Password Reset – Ebee";
+            String message = """
+                    Dear %s %s,
+                    
+                    Your password has been reset by an administrator.
+                    
+                    Your new login credentials:
+                    ───────────────────────────
+                    Email      : %s
+                    Password   : %s
+                    ───────────────────────────
+                    
+                    You will be required to change your password upon login.
+                    
+                    Best regards,
+                    Ebee Team
+                    """.formatted(agent.getUser().getFirstName(), agent.getUser().getLastName(),
+                    agent.getUser().getEmail(), password);
+            notificationService.notifyAgent(agent, subject, message);
+            notificationService.createInternalAlert(agent.getUser(), subject, message,
+                    AlertType.AGENT_ACTIVATED, agent.getId(), "agent");
+        } catch (Exception e) {
+            log.warn("Failed to send password reset notification to agent {}: {}", agent.getAgentCode(), e.getMessage());
         }
     }
 

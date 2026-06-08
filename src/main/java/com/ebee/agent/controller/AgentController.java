@@ -162,4 +162,11 @@ public class AgentController {
         AgentResponse response = agentService.updateCommissionRate(id, commissionRate);
         return ResponseEntity.ok(ApiResponse.success("Commission rate updated successfully", response));
     }
+
+    @PostMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@PathVariable UUID id) {
+        agentService.resetPassword(id);
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully. The new password has been sent to the agent's email."));
+    }
 }

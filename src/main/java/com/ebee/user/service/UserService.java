@@ -39,6 +39,7 @@ public class UserService {
 
         User user = userMapper.toEntity(request);
         encodePasswordIfPresent(user, request.getPassword());
+        user.setMustChangePassword(false);
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }

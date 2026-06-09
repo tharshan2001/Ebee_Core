@@ -69,10 +69,6 @@ public class DeliveryService {
         Driver driverProfile = driverRepository.findByUserId(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", driverId));
 
-        if (driverProfile.getAvailability() != DriverAvailability.AVAILABLE) {
-            throw new IllegalArgumentException("Driver is not available. Current status: " + driverProfile.getAvailability());
-        }
-
         driverProfile.setAvailability(DriverAvailability.ON_TRIP);
         driverRepository.save(driverProfile);
 
@@ -143,12 +139,7 @@ public class DeliveryService {
         if (newStatus == DeliveryStatus.DELIVERED) {
             order.setDeliveredAt(LocalDateTime.now());
             order.setStatus(OrderStatus.DELIVERED);
-            freeDriverIfAssigned(order);
             commissionLifecycleService.approveCommissionForOrder(order.getId());
-        }
-
-        if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
-            freeDriverIfAssigned(order);
         }
 
         if (newStatus == DeliveryStatus.FAILED_PERMANENT) {
@@ -212,15 +203,6 @@ public class DeliveryService {
         }
 
         return toDeliveryResponse(savedOrder);
-    }
-
-    private void freeDriverIfAssigned(Order order) {
-        if (order.getDeliveryAssignedTo() == null) return;
-        driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())
-                .ifPresent(d -> {
-                    d.setAvailability(DriverAvailability.AVAILABLE);
-                    driverRepository.save(d);
-                });
     }
 
     @Transactional(readOnly = true)

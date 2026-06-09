@@ -35,6 +35,9 @@ application-local.yml
 application-dev.yml
 application-prod.yml
 
+# Database backups
+backups/
+
 # Test
 surefire-reports/
 failsafe-reports/

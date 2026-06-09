@@ -1,5 +1,7 @@
 package com.ebee.backup.service;
 
+import com.ebee.backup.enums.BackupAction;
+import com.ebee.backup.service.BackupAuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +24,8 @@ import java.util.*;
 @Slf4j
 public class BackupService {
 
+    private final BackupAuditLogService auditLogService;
+
     @Value("${app.backup.dir}")
     private String backupDir;
 
@@ -33,6 +37,10 @@ public class BackupService {
 
     @Value("${spring.datasource.password}")
     private String dbPassword;
+
+    public BackupService(BackupAuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     public List<Map<String, Object>> listBackups() {
         File dir = new File(backupDir);
@@ -96,6 +104,7 @@ public class BackupService {
             result.put("size", Files.size(filePath));
             result.put("path", filePath.toAbsolutePath().toString());
             result.put("verified", true);
+            auditLogService.record(BackupAction.CREATE, filename, null);
             return result;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Backup failed: " + e.getMessage(), e);
@@ -170,6 +179,8 @@ public class BackupService {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("restoredFrom", filename);
             result.put("preRestoreBackup", preBackup.get("name"));
+            auditLogService.record(BackupAction.RESTORE, filename,
+                    "Pre-restore backup: " + preBackup.get("name"));
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Restore failed: " + e.getMessage(), e);
@@ -206,6 +217,8 @@ public class BackupService {
             result.put("name", target.getFileName().toString());
             result.put("size", Files.size(target));
             result.put("verified", valid);
+            auditLogService.record(BackupAction.UPLOAD, target.getFileName().toString(),
+                    valid ? null : "Verification failed");
             return result;
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload backup: " + e.getMessage(), e);

@@ -1,5 +1,8 @@
 package com.ebee.backup.controller;
 
+import com.ebee.backup.entity.BackupAuditLog;
+import com.ebee.backup.enums.BackupAction;
+import com.ebee.backup.service.BackupAuditLogService;
 import com.ebee.backup.service.BackupService;
 import com.ebee.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ import java.util.Map;
 public class BackupController {
 
     private final BackupService backupService;
+    private final BackupAuditLogService auditLogService;
 
     @GetMapping("/backups")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listBackups() {
@@ -40,6 +44,7 @@ public class BackupController {
     @GetMapping("/backups/{filename}")
     public ResponseEntity<InputStreamResource> downloadBackup(@PathVariable String filename) {
         Path file = backupService.getBackupFile(filename);
+        auditLogService.record(BackupAction.DOWNLOAD, filename, null);
         try {
             InputStreamResource resource = new InputStreamResource(new FileInputStream(file.toFile()));
             return ResponseEntity.ok()
@@ -66,5 +71,11 @@ public class BackupController {
         Map<String, Object> result = backupService.restore(filename);
         return ResponseEntity.ok(ApiResponse.success(
                 "Restore complete. Pre-restore backup: " + result.get("preRestoreBackup"), result));
+    }
+
+    @GetMapping("/audit")
+    public ResponseEntity<ApiResponse<List<BackupAuditLog>>> getAuditLogs() {
+        List<BackupAuditLog> logs = auditLogService.getRecentLogs();
+        return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved", logs));
     }
 }

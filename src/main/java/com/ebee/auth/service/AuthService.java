@@ -5,6 +5,8 @@ import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.driver.entity.Driver;
+import com.ebee.driver.repository.DriverRepository;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.notification.NotificationService;
 import com.ebee.notification.model.EmailRequest;
@@ -34,6 +36,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -47,6 +50,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
     private final OtpService otpService;
+    private final DriverRepository driverRepository;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -78,6 +82,10 @@ public class AuthService {
                 .role(user.getRole())
                 .mustChangePassword(user.getMustChangePassword())
                 .expiresAt(jwtService.getExpirationDate(token))
+                .driverId(driverId(user))
+                .licenseNumber(licenseNumber(user))
+                .contactNumber(contactNumber(user))
+                .driverAvailability(driverAvailability(user))
                 .build();
     }
 
@@ -198,7 +206,35 @@ public class AuthService {
                 .role(user.getRole())
                 .mustChangePassword(user.getMustChangePassword())
                 .expiresAt(jwtService.getExpirationDate(newToken))
+                .driverId(driverId(user))
+                .licenseNumber(licenseNumber(user))
+                .contactNumber(contactNumber(user))
+                .driverAvailability(driverAvailability(user))
                 .build();
+    }
+
+    private UUID driverId(User user) {
+        return user.getRole() == RoleType.DRIVER
+                ? driverRepository.findByUserId(user.getId()).map(Driver::getId).orElse(null)
+                : null;
+    }
+
+    private String licenseNumber(User user) {
+        return user.getRole() == RoleType.DRIVER
+                ? driverRepository.findByUserId(user.getId()).map(Driver::getLicenseNumber).orElse(null)
+                : null;
+    }
+
+    private String contactNumber(User user) {
+        return user.getRole() == RoleType.DRIVER
+                ? driverRepository.findByUserId(user.getId()).map(Driver::getContactNumber).orElse(null)
+                : null;
+    }
+
+    private String driverAvailability(User user) {
+        return user.getRole() == RoleType.DRIVER
+                ? driverRepository.findByUserId(user.getId()).map(d -> d.getAvailability().name()).orElse(null)
+                : null;
     }
 
     public void logout(String email) {

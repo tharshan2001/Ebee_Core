@@ -20,4 +20,8 @@ public class AuthResponse {
     private RoleType role;
     private Boolean mustChangePassword;
     private LocalDateTime expiresAt;
+    private UUID driverId;
+    private String licenseNumber;
+    private String contactNumber;
+    private String driverAvailability;
 }

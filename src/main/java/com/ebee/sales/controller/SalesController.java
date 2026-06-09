@@ -61,6 +61,18 @@ public class SalesController {
         return ResponseEntity.ok(ApiResponse.success("Leaderboard retrieved successfully", response));
     }
 
+    @GetMapping("/leaderboard/my-rank")
+    @PreAuthorize("hasRole('AGENT')")
+    public ResponseEntity<ApiResponse<List<AgentLeaderboardResponse>>> getMyRank(
+            @RequestParam(defaultValue = "revenue") String metric,
+            @RequestParam(required = false) District district,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        List<AgentLeaderboardResponse> response = salesService.getMyRank(
+                metric, district, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success("My rank retrieved successfully", response));
+    }
+
     @GetMapping("/by-product")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<SalesByProductResponse>>> getSalesByProduct(

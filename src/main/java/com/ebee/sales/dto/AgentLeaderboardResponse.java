@@ -19,4 +19,5 @@ public class AgentLeaderboardResponse {
     private BigDecimal totalRevenue;
     private BigDecimal totalCommission;
     private BigDecimal avgOrderValue;
+    private boolean currentUser;
 }

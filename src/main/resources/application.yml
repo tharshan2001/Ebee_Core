@@ -69,6 +69,10 @@ notification:
     default-mask: ${DIALOG_SMS_MASK:KISMET PLUS}
     default-campaign: ${DIALOG_SMS_CAMPAIGN:Notification}
 
+app:
+  backup:
+    dir: ${user.dir}/backups
+
 logging:
   level:
     com.ebee: DEBUG

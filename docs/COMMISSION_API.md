@@ -1,7 +1,7 @@
 # Commission API Reference
 
 Two categories of endpoints:
-- **Commissions** (`/api/commissions`) — the commission lifecycle (calculate → approve → process → pay)
+- **Commissions** (`/api/commissions`) — the commission lifecycle (calculate → auto-approve → auto-process after 10 days → manual pay)
 - **Commission Configs** (`/api/commission-configs`) — rate configuration (DEFAULT global, PERFORMANCE per-agent)
 
 ---
@@ -18,7 +18,7 @@ Authorization: Bearer <JWT_TOKEN>
 ```
 
 **Roles:**
-- `ADMIN` — full access (create, approve, process, pay, reject, read)
+- `ADMIN` — full access (create, process, pay, reject, read, batch pay)
 - Any authenticated user — read access (by ID, by agent)
 
 ---
@@ -31,6 +31,17 @@ When a commission is calculated (auto on order creation, or manual via `/calcula
 |---|---|
 | `DEFAULT` | Uses the global `DEFAULT` commission config rate. Falls back to agent's own `commissionRate` if no default config exists. |
 | `PERFORMANCE` | Config lookup is skipped entirely. Agent uses their own `commissionRate` directly. |
+
+---
+
+## Auto-Lifecycle (no manual approve needed)
+
+| Step | Trigger | Description |
+|------|---------|-------------|
+| `CALCULATED` | Order placed (or manual `/calculate`) | Commission created with calculated amount |
+| `APPROVED` | Order delivered (`DELIVERED` status) | Auto-approved via delivery system — no admin action needed |
+| `PROCESSING` | 10 days after approval | Daily scheduler (2am) auto-transitions commissions that have been `APPROVED` for 10+ days |
+| `PAID` | Admin calls `/pay` or `/pay-batch` | Manual step — admin pays one-by-one or in batch |
 
 ---
 
@@ -83,31 +94,140 @@ Calculates commission for an existing order. Commissions are also auto-created w
 
 | Action | Endpoint | Description |
 |--------|----------|-------------|
-| Approve | **PUT** `/api/commissions/{id}/approve` | Marks as `APPROVED`, sets `approvedAt` |
-| Process | **PUT** `/api/commissions/{id}/process` | Marks as `PROCESSING` |
-| Pay | **PUT** `/api/commissions/{id}/pay` | Marks as `PAID`, sets `paidAt`, updates agent totals |
+| Process | **PUT** `/api/commissions/{id}/process` | Manually marks as `PROCESSING` (admin override; normal flow is auto after 10 days) |
+| Pay | **PUT** `/api/commissions/{id}/pay` | Marks a single commission as `PAID`, sets `paidAt`, updates agent totals |
 | Reject | **PUT** `/api/commissions/{id}/reject?reason=...` | Rejects with reason (any state) |
 
 All transitions require ADMIN role.
+
+> The `approve` step has been removed as a manual action. Commissions are auto-approved when the order is delivered. After 10 days in `APPROVED` status, they are auto-transitioned to `PROCESSING` by a daily scheduler.
 
 **State Machine:**
 ```
 CALCULATED  (auto on order creation, or via /calculate)
     │
-    ▼
-APPROVED    (admin calls /approve)
+ auto on DELIVERED
     │
     ▼
-PROCESSING  (admin calls /process)
+APPROVED
+    │
+ after 10 days (daily scheduler at 2am)
     │
     ▼
-PAID        (admin calls /pay)  →  updates agent totalSales / totalCommission (also persisted instantly)
+PROCESSING  (admin marks as /pay or /pay-batch)
     │
     ▼
-CANCELLED   (on order cancel)   →  reverts agent totals if was PAID
+PAID        → updates agent totalSales / totalCommission
 
+Any state ──→ CANCELLED (on cancelled order or failed_permanent) → reverts agent totals if was PAID
 Any state ──→ REJECTED (admin calls /reject?reason=...)
 ```
+
+---
+
+### Batch Payment
+
+#### GET /api/commissions/pending-payment
+
+Returns a summary of `PROCESSING` commissions, sorted FIFO by `approvedAt` (oldest first). Use this to see the total amount available to pay and the individual commissions that can be paid.
+
+**Access:** ADMIN only
+
+**Query Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | `UUID` | Yes | Filter by agent. Required — payments are processed per agent. |
+
+**Example:**
+```bash
+curl -s "http://localhost:8085/api/commissions/pending-payment?agentId=05cef7aa-ac7c-4498-bd7b-dc51d9acddd5" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Pending payment summary retrieved successfully",
+  "data": {
+    "totalAvailable": 50000.00,
+    "processingCount": 8,
+    "commissions": [
+      {
+        "id": "uuid",
+        "orderNumber": "ORD-001",
+        "commissionAmount": 7500.00,
+        "status": "PROCESSING",
+        "approvedAt": "2026-06-01T10:00:00",
+        "...": "..."
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalAvailable` | `BigDecimal` | Sum of all `PROCESSING` commission amounts for the agent |
+| `processingCount` | `int` | Number of commissions currently in `PROCESSING` status |
+| `commissions` | `CommissionResponse[]` | Full list of `PROCESSING` commissions (oldest `approvedAt` first) |
+
+---
+
+#### POST /api/commissions/pay-batch
+
+Marks one or more specific commissions as `PAID`. Only commissions in `PROCESSING` status can be paid. The request specifies which commission IDs to pay — admin selects from the list returned by `GET /pending-payment`.
+
+**Access:** ADMIN only
+
+**Request:**
+```json
+{
+  "commissionIds": ["uuid-1", "uuid-2", "uuid-3"]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Batch payment of LKR 30000.00 completed. 3 commission(s) marked as paid.",
+  "data": {
+    "totalPaid": 30000.00,
+    "commissionsPaid": 3,
+    "remainingAvailable": 20000.00,
+    "paidCommissions": [
+      { "id": "uuid-1", "orderNumber": "ORD-001", "commissionAmount": 10000.00, "status": "PAID", "..." },
+      { "id": "uuid-2", "orderNumber": "ORD-002", "commissionAmount": 12000.00, "status": "PAID", "..." },
+      { "id": "uuid-3", "orderNumber": "ORD-003", "commissionAmount": 8000.00, "status": "PAID", "..." }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalPaid` | `BigDecimal` | Sum of commission amounts that were paid |
+| `commissionsPaid` | `int` | Number of commissions processed |
+| `remainingAvailable` | `BigDecimal` | Sum of remaining `PROCESSING` commissions after this batch (updated from DB) |
+| `paidCommissions` | `CommissionResponse[]` | List of commissions that were just paid |
+
+**Error (commission not in PROCESSING status):**
+```json
+{
+  "success": false,
+  "message": "An unexpected error occurred: Commission <id> for order ORD-001 is not in PROCESSING status (current: APPROVED)",
+  "data": null
+}
+```
+
+**Typical flow:**
+1. Admin calls `GET /pending-payment` → sees `totalAvailable: 50000` and the list of 8 processing commissions
+2. Admin selects which commissions to pay (e.g., 3 commissions totalling 30000)
+3. Admin calls `POST /pay-batch` with those 3 IDs
+4. Response shows `totalPaid: 30000`, `remainingAvailable: 20000`, and the 3 paid commissions
+5. Agent receives a "Paid" notification for each commission
 
 ---
 

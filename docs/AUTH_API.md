@@ -23,7 +23,7 @@ Optionally validate the user's role matches by including `role`:
 }
 ```
 
-**Response (role matches or omitted):**
+**Response (admin login):**
 ```json
 {
   "success": true,
@@ -37,10 +37,39 @@ Optionally validate the user's role matches by including `role`:
     "lastName": "User",
     "role": "ADMIN",
     "mustChangePassword": true,
-    "expiresAt": "2026-06-02T22:17:53"
+    "expiresAt": "2026-06-02T22:17:53",
+    "driverId": null,
+    "licenseNumber": null,
+    "contactNumber": null,
+    "driverAvailability": null
   }
 }
 ```
+
+**Response (driver login):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "token": "eyJhbGci...",
+    "refreshToken": "eyJhbGci...",
+    "userId": "uuid",
+    "email": "driver@ebee.com",
+    "firstName": "Driver",
+    "lastName": "User",
+    "role": "DRIVER",
+    "mustChangePassword": true,
+    "expiresAt": "2026-06-02T22:17:53",
+    "driverId": "uuid",
+    "licenseNumber": "LIC-12345",
+    "contactNumber": "0771234567",
+    "driverAvailability": "AVAILABLE"
+  }
+}
+```
+
+The `driverId`, `licenseNumber`, `contactNumber`, and `driverAvailability` fields are `null` for non-DRIVER users.
 
 **Error (role mismatch):** `403` with no token issued
 ```json
@@ -70,6 +99,49 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 **Access:** Public (uses `refresh_token` cookie)
 
 Uses the `refresh_token` HTTP-only cookie (set on login) to issue a new access token.
+
+**Response:** Same as login response — includes `mustChangePassword`, and driver fields (`driverId`, `licenseNumber`, `contactNumber`, `driverAvailability`) when the user is a DRIVER:
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "token": "eyJhbGci...",
+    "refreshToken": "eyJhbGci...",
+    "userId": "uuid",
+    "email": "admin@ebee.com",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": "ADMIN",
+    "mustChangePassword": true,
+    "expiresAt": "2026-06-02T22:17:53"
+  }
+}
+```
+
+For a DRIVER user, driver fields are populated:
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "token": "eyJhbGci...",
+    "refreshToken": "eyJhbGci...",
+    "userId": "uuid",
+    "email": "driver@ebee.com",
+    "firstName": "Driver",
+    "lastName": "User",
+    "role": "DRIVER",
+    "mustChangePassword": true,
+    "expiresAt": "2026-06-02T22:17:53",
+    "driverId": "uuid",
+    "licenseNumber": "LIC-12345",
+    "contactNumber": "0771234567",
+    "driverAvailability": "AVAILABLE"
+  }
+}
+```
 
 ---
 

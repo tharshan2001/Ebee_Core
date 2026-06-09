@@ -11,7 +11,7 @@ All endpoints require JWT:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Role:** `ADMIN` only — all sales endpoints require admin access.
+**Role:** Most endpoints require `ADMIN`. The leaderboard endpoints also allow `AGENT`.
 
 ---
 
@@ -179,6 +179,116 @@ curl -s http://localhost:8085/api/sales/dashboard \
 ```bash
 curl -s http://localhost:8085/api/sales/summary \
   -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+---
+
+## Leaderboard
+
+### GET /api/sales/leaderboard
+
+Ranked list of agents by sales performance. Includes **all active agents** (agents with zero orders appear at the bottom with `totalOrders: 0` and `totalRevenue: 0`).
+
+**Access:** ADMIN, AGENT
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `metric` | `String` | `revenue` | Sort metric: `revenue`, `orders`, `commission`, or `avgOrderValue` |
+| `limit` | `int` | `10` | Maximum agents to return (`0` = no limit, returns all) |
+| `district` | `District` | — | Filter by district enum value (optional) |
+| `startDate` | `LocalDate` | — | Include orders from this date (optional) |
+| `endDate` | `LocalDate` | — | Include orders up to this date (optional) |
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rank` | `int` | Position in sorted leaderboard (1 = best) |
+| `agentId` | `UUID` | Agent's unique ID |
+| `agentCode` | `String` | Agent's code (e.g., `JF-001`) |
+| `agentName` | `String` | Agent's full name |
+| `district` | `String` | Agent's district (e.g., `MN`, `JF`) |
+| `totalOrders` | `Long` | Number of qualifying orders |
+| `totalRevenue` | `BigDecimal` | Sum of order amounts |
+| `totalCommission` | `BigDecimal` | Sum of commission amounts in the period |
+| `avgOrderValue` | `BigDecimal` | `totalRevenue / totalOrders` (or `0` for zero-order agents) |
+| `currentUser` | `boolean` | Always `false` in the general leaderboard |
+
+**Example curl:**
+```bash
+# Top 5 by revenue
+curl -s "http://localhost:8085/api/sales/leaderboard?limit=5" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+
+# Top 10 by commission in a date range
+curl -s "http://localhost:8085/api/sales/leaderboard?metric=commission&limit=10&startDate=2026-01-01&endDate=2026-06-30" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+
+# All agents in MN district sorted by orders
+curl -s "http://localhost:8085/api/sales/leaderboard?metric=orders&limit=0&district=MN" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "Leaderboard retrieved successfully",
+  "data": [
+    {
+      "rank": 1,
+      "agentId": "05cef7aa-ac7c-4498-bd7b-dc51d9acddd5",
+      "agentCode": "MN-006",
+      "agentName": "Anton Abitharshan",
+      "district": "MN",
+      "totalOrders": 5,
+      "totalRevenue": 260209.98,
+      "totalCommission": 19515.00,
+      "avgOrderValue": 52042.00,
+      "currentUser": false
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/sales/leaderboard/my-rank
+
+Returns the **full leaderboard** (no limit) with the currently authenticated agent marked by `currentUser: true`. Useful for showing the logged-in agent where they stand among all peers.
+
+**Access:** AGENT only (ADMIN gets 403)
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `metric` | `String` | `revenue` | Sort metric: `revenue`, `orders`, `commission`, or `avgOrderValue` |
+| `district` | `District` | — | Filter by district (optional) |
+| `startDate` | `LocalDate` | — | Include orders from this date (optional) |
+| `endDate` | `LocalDate` | — | Include orders up to this date (optional) |
+
+**Note:** The `limit` parameter is **not** available here — the full leaderboard is always returned so the agent can see their exact position.
+
+**Example curl:**
+```bash
+curl -s "http://localhost:8085/api/sales/leaderboard/my-rank" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "My rank retrieved successfully",
+  "data": [
+    { "rank": 1, "agentId": "05cef7aa-...", "agentName": "Top Agent", "currentUser": false, ... },
+    { "rank": 2, "agentId": "adf3427f-...", "agentName": "Second Agent", "currentUser": false, ... },
+    { "rank": 5, "agentId": "05cef7aa-...", "agentName": "Anton Abitharshan", "currentUser": true, ... }
+  ]
+}
 ```
 
 ---

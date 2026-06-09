@@ -361,7 +361,7 @@ Cancels an order.
 ### OrderRequest
 ```json
 {
-  "agentCode": "String (required for non-admin, e.g. AG-001)",
+  "agentCode": "String (optional; ignored for non-admin — resolved from JWT; for admin, sets the order's agent)",
   "customerPhoneNumber": "String (optional, must match existing customer)",
   "notes": "String (optional)",
   "items": [
@@ -491,13 +491,12 @@ curl -X POST http://localhost:8085/api/auth/login \
   -d '{"email":"agent@ebee.com","password":"password123"}'
 ```
 
-2. Agent creates order (using their own agentCode):
+2. Agent creates order (agentCode is optional; resolved from JWT automatically):
 ```bash
 curl -X POST http://localhost:8085/api/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <AGENT_TOKEN>" \
   -d '{
-    "agentCode": "AG-001",
     "customerPhoneNumber": "+94771234567",
     "notes": "Customer order",
     "items": [

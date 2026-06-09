@@ -58,7 +58,7 @@ Drivers can have multiple active deliveries. Admin manages availability via `PAT
 
 | Action | Guards |
 |--------|--------|
-| Assign Driver to Delivery | delivery status must be `PENDING`, user must have `DRIVER` role |
+| Assign Driver to Delivery | delivery status must be `PENDING`, user must have `DRIVER` role, driver must not be `SUSPENDED` |
 | Update Delivery Status | current status must not be `DELIVERED` or `FAILED_PERMANENT`; `FAILED` can transition to `PENDING` (retry) or `FAILED_PERMANENT` (terminal) |
 
 ---

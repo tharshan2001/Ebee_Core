@@ -6,6 +6,7 @@ import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.driver.entity.Driver;
+import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.notification.NotificationService;
@@ -65,6 +66,12 @@ public class AuthService {
         if (request.getRole() != null && user.getRole() != request.getRole()) {
             throw new AccessDeniedException("Invalid role for login: expected " + request.getRole()
                     + " but user has role " + user.getRole());
+        }
+
+        if (user.getRole() == RoleType.DRIVER) {
+            driverRepository.findByUserId(user.getId())
+                    .filter(d -> d.getAvailability() == DriverAvailability.SUSPENDED)
+                    .ifPresent(d -> { throw new IllegalStateException("Your account has been suspended"); });
         }
 
         String token = jwtService.generateToken(authentication);

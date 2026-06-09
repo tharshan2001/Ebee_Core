@@ -69,6 +69,10 @@ public class DeliveryService {
         Driver driverProfile = driverRepository.findByUserId(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", driverId));
 
+        if (driverProfile.getAvailability() == DriverAvailability.SUSPENDED) {
+            throw new IllegalArgumentException("Cannot assign delivery — driver is suspended");
+        }
+
         driverProfile.setAvailability(DriverAvailability.ON_TRIP);
         driverRepository.save(driverProfile);
 

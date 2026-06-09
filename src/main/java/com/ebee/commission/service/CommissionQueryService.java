@@ -1,6 +1,7 @@
 package com.ebee.commission.service;
 
 import com.ebee.commission.dto.CommissionResponse;
+import com.ebee.commission.dto.PendingPaymentSummary;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.mapper.CommissionMapper;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,6 +24,21 @@ public class CommissionQueryService {
 
     private final CommissionRepository commissionRepository;
     private final CommissionMapper mapper;
+
+    public PendingPaymentSummary getPendingPaymentSummary(UUID agentId) {
+        List<Commission> processing = commissionRepository.findByAgentIdAndStatus(agentId, CommissionStatus.PROCESSING);
+        BigDecimal total = commissionRepository.sumCommissionAmountByAgentIdAndStatus(agentId, CommissionStatus.PROCESSING);
+        processing.sort(Comparator.comparing(Commission::getApprovedAt,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        List<CommissionResponse> responses = processing.stream()
+                .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
+                .collect(Collectors.toList());
+        return PendingPaymentSummary.builder()
+                .totalAvailable(total)
+                .processingCount(processing.size())
+                .commissions(responses)
+                .build();
+    }
 
     public List<CommissionResponse> getCommissionsByAgent(UUID agentId) {
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);

@@ -40,4 +40,13 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
 
     @Query("SELECT c.agent.id, COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.agent.id IN :agentIds AND c.status NOT IN ('CANCELLED', 'REJECTED') AND c.createdAt >= :start AND c.createdAt < :end GROUP BY c.agent.id")
     List<Object[]> sumCommissionByAgentIds(@Param("agentIds") List<UUID> agentIds, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT c FROM Commission c WHERE c.status = 'APPROVED' AND c.approvedAt IS NOT NULL AND c.approvedAt <= :threshold")
+    List<Commission> findApprovedCommissionsOlderThan(@Param("threshold") LocalDateTime threshold);
+
+    @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.status = :status")
+    BigDecimal sumCommissionAmountByStatus(@Param("status") CommissionStatus status);
+
+    @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.agent.id = :agentId AND c.status = :status")
+    BigDecimal sumCommissionAmountByAgentIdAndStatus(@Param("agentId") UUID agentId, @Param("status") CommissionStatus status);
 }

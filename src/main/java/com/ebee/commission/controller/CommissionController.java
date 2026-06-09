@@ -1,14 +1,18 @@
 package com.ebee.commission.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.commission.dto.BatchPaymentRequest;
+import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
+import com.ebee.commission.dto.PendingPaymentSummary;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.commission.service.CommissionQueryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,13 +41,6 @@ public class CommissionController {
         CommissionResponse response = calculationService.calculateCommission(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Commission calculated successfully", response));
-    }
-
-    @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<CommissionResponse>> approveCommission(@PathVariable UUID id) {
-        CommissionResponse response = lifecycleService.approveCommission(id);
-        return ResponseEntity.ok(ApiResponse.success("Commission approved successfully", response));
     }
 
     @PutMapping("/{id}/process")
@@ -81,6 +78,25 @@ public class CommissionController {
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getAllCommissions() {
         List<CommissionResponse> response = queryService.getAllCommissions();
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
+    }
+
+    @GetMapping("/pending-payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PendingPaymentSummary>> getPendingPaymentSummary(
+            @RequestParam UUID agentId) {
+        PendingPaymentSummary response = queryService.getPendingPaymentSummary(agentId);
+        return ResponseEntity.ok(ApiResponse.success("Pending payment summary retrieved successfully", response));
+    }
+
+    @PostMapping("/pay-batch")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<BatchPaymentResponse>> payBatch(
+            @Valid @RequestBody BatchPaymentRequest request) {
+        BatchPaymentResponse response = lifecycleService.payBatch(request.getCommissionIds());
+        return ResponseEntity.ok(ApiResponse.success(
+                "Batch payment of LKR " + response.getTotalPaid() + " completed. "
+                + response.getCommissionsPaid() + " commission(s) marked as paid.",
+                response));
     }
 
     @GetMapping("/status/{status}")

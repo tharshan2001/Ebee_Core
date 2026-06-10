@@ -4,14 +4,17 @@ import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderStatus;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-final class DeliveryStateMachine {
+@Component
+@RequiredArgsConstructor
+class DeliveryStateMachine implements DeliveryStateTransition {
 
-    private DeliveryStateMachine() {}
-
-    static TransitionResult transition(Order order, DeliveryStatus newStatus, String reason, boolean isAdmin) {
+    @Override
+    public TransitionResult transition(Order order, DeliveryStatus newStatus, String reason, boolean isAdmin) {
         DeliveryStatus currentStatus = order.getDeliveryStatus();
 
         if (currentStatus == null) {
@@ -67,6 +70,4 @@ final class DeliveryStateMachine {
 
         return new TransitionResult(wasDelivered, wasFailedPermanent, currentStatus);
     }
-
-    record TransitionResult(boolean wasDelivered, boolean wasFailedPermanent, DeliveryStatus previousStatus) {}
 }

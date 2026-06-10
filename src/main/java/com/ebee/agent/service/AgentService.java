@@ -41,7 +41,7 @@ public class AgentService {
     private final AgentDocumentService agentDocumentService;
     private final AgentMapper agentMapper;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final CommissionConfigRepository commissionConfigRepository;
     private final AuditLogService auditLogService;
 
@@ -323,7 +323,7 @@ public class AgentService {
     private void sendAgentStatusNotification(Agent agent, String statusLabel, String message, boolean includeSms) {
         String subject = "Agent Account " + statusLabel + " – Ebee";
         try {
-            notificationService.notifyAgent(agent, subject, message);
+            notificationPort.notifyAgent(agent, subject, message);
         } catch (Exception e) {
             log.warn("Failed to send {} notification to agent {}: {}", statusLabel.toLowerCase(),
                     agent.getAgentCode(), e.getMessage());
@@ -337,7 +337,7 @@ public class AgentService {
             default -> null;
         };
         if (alertType != null && agent.getUser() != null) {
-            notificationService.createInternalAlert(agent.getUser(), subject, message, alertType, agent.getId(), "agent");
+            notificationPort.createInternalAlert(agent.getUser(), subject, message, alertType, agent.getId(), "agent");
         }
     }
 
@@ -362,8 +362,8 @@ public class AgentService {
                     Best regards,
                     Ebee Team
                     """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), password);
-            notificationService.notifyAgent(agent, subject, message);
-            notificationService.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
+            notificationPort.notifyAgent(agent, subject, message);
+            notificationPort.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
         }
@@ -389,8 +389,8 @@ public class AgentService {
                     Ebee Team
                     """.formatted(agent.getUser().getFirstName(), agent.getUser().getLastName(),
                     agent.getUser().getEmail(), password);
-            notificationService.notifyAgent(agent, subject, message);
-            notificationService.createInternalAlert(agent.getUser(), subject, message,
+            notificationPort.notifyAgent(agent, subject, message);
+            notificationPort.createInternalAlert(agent.getUser(), subject, message,
                     AlertType.AGENT_ACTIVATED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send password reset notification to agent {}: {}", agent.getAgentCode(), e.getMessage());

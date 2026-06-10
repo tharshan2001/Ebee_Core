@@ -12,8 +12,12 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public abstract class AgentMapper {
 
-    @Autowired
     protected CommissionRepository commissionRepository;
+
+    @Autowired
+    public void setCommissionRepository(CommissionRepository commissionRepository) {
+        this.commissionRepository = commissionRepository;
+    }
 
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "email", source = "user.email")

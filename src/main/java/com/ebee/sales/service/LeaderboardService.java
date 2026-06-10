@@ -20,7 +20,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +45,7 @@ public class LeaderboardService {
 
         List<Agent> allAgents = agentRepository.findAllWithUser().stream()
                 .filter(Agent::getIsActive)
-                .collect(Collectors.toList());
+                .toList();
 
         List<AgentLeaderboardResponse> entries = new ArrayList<>();
         List<UUID> allAgentIds = new ArrayList<>();
@@ -80,9 +79,9 @@ public class LeaderboardService {
         }
 
         if (district != null) {
-            entries = entries.stream()
+            entries = new ArrayList<>(entries.stream()
                     .filter(e -> district.name().equals(e.getDistrict()))
-                    .collect(Collectors.toList());
+                    .toList());
         }
 
         Comparator<AgentLeaderboardResponse> comparator = switch (metric != null ? metric : "revenue") {

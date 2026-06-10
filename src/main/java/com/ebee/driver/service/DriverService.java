@@ -31,7 +31,7 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final AuditLogService auditLogService;
 
 
@@ -80,7 +80,7 @@ public class DriverService {
                 "Driver " + savedUser.getFirstName() + " " + savedUser.getLastName()
                 + " (" + savedUser.getEmail() + ") created");
 
-        notificationService.notifyUser(savedUser, subject, message);
+        notificationPort.notifyUser(savedUser, subject, message);
 
         return DriverWithCredentialsResponse.builder()
                 .id(savedDriver.getId())

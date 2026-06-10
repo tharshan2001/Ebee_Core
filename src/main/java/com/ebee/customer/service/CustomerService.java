@@ -24,7 +24,7 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -176,7 +176,7 @@ public class CustomerService {
                     customer.getLastName(),
                     customer.getAddress() != null ? "Address: " + customer.getAddress().getStreet() + ", " + customer.getAddress().getCity() : "No address provided"
             );
-            notificationService.notifyCustomer(customer, subject, message);
+            notificationPort.notifyCustomer(customer, subject, message);
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to customer {}: {}", customer.getPhoneNumber(), e.getMessage());
         }

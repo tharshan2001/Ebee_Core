@@ -24,7 +24,7 @@ import java.util.Map;
 public class ReminderSchedulerService {
 
     private final ReminderRepository reminderRepository;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     @Scheduled(fixedRate = 60_000)
     @Transactional
@@ -53,7 +53,7 @@ public class ReminderSchedulerService {
                     sendSms(reminder, message);
                 }
 
-                notificationService.createInternalAlert(reminder.getUser(), subject, message,
+                notificationPort.createInternalAlert(reminder.getUser(), subject, message,
                         AlertType.REMINDER_DUE, reminder.getId(), "reminder");
 
                 reminder.setAlertSent(true);
@@ -87,7 +87,7 @@ public class ReminderSchedulerService {
                             + (reminder.getReminderTime() != null ? " at " + reminder.getReminderTime() : ""));
                 }
 
-                notificationService.createInternalAlert(reminder.getUser(), subject, message,
+                notificationPort.createInternalAlert(reminder.getUser(), subject, message,
                         AlertType.REMINDER_DUE, reminder.getId(), "reminder");
 
                 reminder.setEarlyAlertSent(true);
@@ -101,7 +101,7 @@ public class ReminderSchedulerService {
     }
 
     private void sendEmail(Reminder reminder, String subject, String message) {
-        notificationService.sendEmail(EmailRequest.builder()
+        notificationPort.sendEmail(EmailRequest.builder()
                 .to(reminder.getUser().getEmail())
                 .subject(subject)
                 .body(message)
@@ -111,7 +111,7 @@ public class ReminderSchedulerService {
 
     private void sendSms(Reminder reminder, String message) {
         if (reminder.getUser().getPhoneNumber() != null) {
-            notificationService.sendSms(SmsRequest.builder()
+            notificationPort.sendSms(SmsRequest.builder()
                     .phoneNumbers(List.of(reminder.getUser().getPhoneNumber()))
                     .message(message)
                     .build());

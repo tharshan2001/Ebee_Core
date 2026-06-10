@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -57,25 +56,25 @@ public class CommissionConfigService {
     public List<CommissionConfigResponse> getAllConfigs() {
         return configRepository.findAll().stream()
                 .map(mapper::toConfigResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<CommissionConfigResponse> getActiveConfigs() {
         return configRepository.findByIsActiveTrue().stream()
                 .map(mapper::toConfigResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<CommissionConfigResponse> getConfigsByType(CommissionType type) {
         return configRepository.findByType(type).stream()
                 .map(mapper::toConfigResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<CommissionConfigResponse> getActiveConfigsByType(CommissionType type) {
         return configRepository.findByIsActiveTrueAndType(type).stream()
                 .map(mapper::toConfigResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public CommissionConfigResponse getDefaultConfig() {

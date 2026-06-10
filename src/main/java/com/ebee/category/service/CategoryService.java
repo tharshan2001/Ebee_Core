@@ -4,9 +4,6 @@ import com.ebee.category.dto.CategoryRequest;
 import com.ebee.category.dto.CategoryResponse;
 import com.ebee.category.entity.Category;
 import com.ebee.category.repository.CategoryRepository;
-import com.ebee.category.dto.CategoryResponse;
-import com.ebee.category.entity.Category;
-import com.ebee.category.repository.CategoryRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +40,7 @@ public class CategoryService {
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findByIsActiveTrueOrderByName().stream()
                 .map(this::toResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public CategoryResponse getCategoryById(UUID id) {

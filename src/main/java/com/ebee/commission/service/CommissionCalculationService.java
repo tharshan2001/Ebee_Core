@@ -30,7 +30,7 @@ public class CommissionCalculationService {
     private final CommissionConfigRepository configRepository;
     private final OrderRepository orderRepository;
     private final CommissionMapper mapper;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     @Transactional
     public CommissionResponse calculateCommission(CommissionCalculateRequest request) {
@@ -63,8 +63,8 @@ public class CommissionCalculationService {
                 commission.getCommissionRate(),
                 commission.getCommissionAmount()
         );
-        notificationService.notifyAgent(agent, subject, message);
-        notificationService.createInternalAlert(agent.getUser(), subject, message,
+        notificationPort.notifyAgent(agent, subject, message);
+        notificationPort.createInternalAlert(agent.getUser(), subject, message,
                 AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
 
         return mapper.toResponse(commission);

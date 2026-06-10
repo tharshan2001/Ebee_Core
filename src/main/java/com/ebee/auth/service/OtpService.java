@@ -23,7 +23,7 @@ public class OtpService {
     private static final int OTP_LENGTH = 6;
 
     private final ConcurrentHashMap<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final UserRepository userRepository;
 
     public void generateAndSendOtp(String email) {
@@ -42,7 +42,7 @@ public class OtpService {
                 + "This code expires in 5 minutes.\n\n"
                 + "If you did not request this, please ignore this email.";
 
-        notificationService.sendEmail(EmailRequest.builder()
+        notificationPort.sendEmail(EmailRequest.builder()
                 .to(email)
                 .subject(subject)
                 .body(body)
@@ -51,7 +51,7 @@ public class OtpService {
 
         if (phoneNumber != null) {
             String smsMessage = "Ebee: Your OTP for " + purpose + " is " + otp + ". Expires in 5 minutes.";
-            notificationService.sendSms(SmsRequest.builder()
+            notificationPort.sendSms(SmsRequest.builder()
                     .phoneNumbers(List.of(phoneNumber))
                     .message(smsMessage)
                     .build());

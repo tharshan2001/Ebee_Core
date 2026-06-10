@@ -15,7 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InventoryAlertService {
 
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final UserRepository userRepository;
 
     public void checkAndNotify(Inventory inventory) {
@@ -31,8 +31,8 @@ public class InventoryAlertService {
                 productName, inventory.getQuantity(), inventory.getReorderLevel());
         List<User> admins = userRepository.findByRole(RoleType.ADMIN);
         for (User admin : admins) {
-            notificationService.notifyUser(admin, subject, message);
-            notificationService.createInternalAlert(admin, subject, message,
+            notificationPort.notifyUser(admin, subject, message);
+            notificationPort.createInternalAlert(admin, subject, message,
                     AlertType.LOW_STOCK, inventory.getId(), "inventory");
         }
     }

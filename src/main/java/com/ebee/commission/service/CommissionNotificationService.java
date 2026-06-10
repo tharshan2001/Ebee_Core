@@ -10,13 +10,13 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CommissionNotificationService {
 
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     public void sendCommissionNotification(Commission commission, String statusLabel, String message) {
         var agent = commission.getAgent();
         String subject = "Commission " + statusLabel + " – Order " + commission.getOrder().getOrderNumber();
         String fullMessage = "Dear %s,\n\n%s".formatted(agent.getUser().getFirstName(), message);
-        notificationService.notifyAgent(agent, subject, fullMessage);
+        notificationPort.notifyAgent(agent, subject, fullMessage);
 
         AlertType alertType = switch (statusLabel) {
             case "Approved" -> AlertType.COMMISSION_APPROVED;
@@ -27,7 +27,7 @@ public class CommissionNotificationService {
             default -> null;
         };
         if (alertType != null) {
-            notificationService.createInternalAlert(agent.getUser(), subject, fullMessage,
+            notificationPort.createInternalAlert(agent.getUser(), subject, fullMessage,
                     alertType, commission.getId(), "commission");
         }
     }

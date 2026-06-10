@@ -15,7 +15,6 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +31,7 @@ public class CommissionQueryService {
                 Comparator.nullsLast(Comparator.naturalOrder())));
         List<CommissionResponse> responses = processing.stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
-                .collect(Collectors.toList());
+                .toList();
         return PendingPaymentSummary.builder()
                 .totalAvailable(total)
                 .processingCount(processing.size())
@@ -44,13 +43,13 @@ public class CommissionQueryService {
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);
         return commissionRepository.findByAgentId(agentId).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), totalSales))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<CommissionResponse> getCommissionsByStatus(CommissionStatus status) {
         return commissionRepository.findByStatus(status).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public CommissionResponse getCommissionById(UUID id) {
@@ -66,7 +65,7 @@ public class CommissionQueryService {
                     BigDecimal totalSales = commissionRepository.sumSalesByAgentId(c.getAgent().getId());
                     return enrichWithAgentTotals(mapper.toResponse(c), totalSales);
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private CommissionResponse enrichWithAgentTotals(CommissionResponse response, BigDecimal totalSales) {

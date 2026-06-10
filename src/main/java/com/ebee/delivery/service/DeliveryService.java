@@ -38,10 +38,11 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final InventoryService inventoryService;
     private final CommissionLifecycleService commissionLifecycleService;
     private final AuditLogService auditLogService;
+    private final DeliveryStateTransition deliveryStateTransition;
 
     @Transactional
     public void initializeDelivery(Order order) {
@@ -83,14 +84,14 @@ public class DeliveryService {
         String subject = "Delivery Assigned – " + savedOrder.getOrderNumber();
         String driverMsg = "Dear %s,\n\nYou have been assigned to deliver order %s in %s.".formatted(
                 driver.getFirstName(), savedOrder.getOrderNumber(), savedOrder.getDistrict());
-        notificationService.notifyUser(driver, subject, driverMsg);
-        notificationService.createInternalAlert(driver, subject, driverMsg,
+        notificationPort.notifyUser(driver, subject, driverMsg);
+        notificationPort.createInternalAlert(driver, subject, driverMsg,
                 AlertType.DELIVERY_ASSIGNED, savedOrder.getId(), "order");
 
         if (savedOrder.getCustomer() != null) {
             String customerMsg = "Dear %s,\n\nYour order %s has been assigned to a driver for delivery.".formatted(
                     savedOrder.getCustomer().getFirstName(), savedOrder.getOrderNumber());
-            notificationService.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
+            notificationPort.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
         }
 
         auditLogService.record(AuditAction.DELIVERY_ASSIGN, "Order", savedOrder.getId(),
@@ -107,7 +108,7 @@ public class DeliveryService {
 
         DeliveryStatus newStatus = request.getStatus();
 
-        DeliveryStateMachine.TransitionResult result = DeliveryStateMachine.transition(
+        DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
                 order, newStatus, request.getReason(), securityService.isAdmin());
 
         if (result.wasDelivered()) {
@@ -217,7 +218,7 @@ public class DeliveryService {
             };
             if (customerMsg != null) {
                 String subject = "Delivery " + newStatus.name() + " – " + order.getOrderNumber();
-                notificationService.notifyCustomer(order.getCustomer(), subject, customerMsg);
+                notificationPort.notifyCustomer(order.getCustomer(), subject, customerMsg);
             }
         }
 
@@ -232,7 +233,7 @@ public class DeliveryService {
                     : "Delivery of order %s has %sfailed."
                     .formatted(order.getOrderNumber(),
                             newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
-            notificationService.createInternalAlert(order.getCreatedBy(), subject, msg,
+            notificationPort.createInternalAlert(order.getCreatedBy(), subject, msg,
                     AlertType.DELIVERY_FAILED, order.getId(), "order");
         }
     }

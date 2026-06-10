@@ -47,7 +47,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
     private final OtpService otpService;
     private final DriverRepository driverRepository;
     private final AuditLogService auditLogService;
@@ -106,11 +106,11 @@ public class AuthService {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - New Login Detected";
 
-            notificationService.sendHtmlEmail(user.getEmail(), subject, "login-alert.html",
+            notificationPort.sendHtmlEmail(user.getEmail(), subject, "login-alert.html",
                     Map.of("firstName", user.getFirstName(), "loginTime", time, "email", user.getEmail()));
 
             if (user.getPhoneNumber() != null) {
-                notificationService.sendSms(SmsRequest.builder()
+                notificationPort.sendSms(SmsRequest.builder()
                         .phoneNumbers(List.of(user.getPhoneNumber()))
                         .message("Ebee: New login detected on your account at " + time)
                         .build());
@@ -129,7 +129,7 @@ public class AuthService {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - Logout Detected";
 
-            notificationService.sendEmail(EmailRequest.builder()
+            notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
                     .body("You have been logged out of your Ebee account.\n\nTime: " + time
@@ -138,7 +138,7 @@ public class AuthService {
                     .build());
 
             if (user.getPhoneNumber() != null) {
-                notificationService.sendSms(SmsRequest.builder()
+                notificationPort.sendSms(SmsRequest.builder()
                         .phoneNumbers(List.of(user.getPhoneNumber()))
                         .message("Ebee: You have been logged out of your account at " + time)
                         .build());
@@ -153,7 +153,7 @@ public class AuthService {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - Password Changed";
 
-            notificationService.sendEmail(EmailRequest.builder()
+            notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
                     .body("Your Ebee account password was changed.\n\nTime: " + time
@@ -162,7 +162,7 @@ public class AuthService {
                     .build());
 
             if (user.getPhoneNumber() != null) {
-                notificationService.sendSms(SmsRequest.builder()
+                notificationPort.sendSms(SmsRequest.builder()
                         .phoneNumbers(List.of(user.getPhoneNumber()))
                         .message("Ebee: Your account password was changed at " + time
                                 + ". If this was not you, contact support.")

@@ -29,7 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     @Transactional
     public UserResponse createUser(UserRequest request) {
@@ -64,7 +64,7 @@ public class UserService {
                     Best regards,
                     Ebee Team
                     """.formatted(user.getFirstName());
-            notificationService.sendEmail(EmailRequest.builder()
+            notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
                     .body(message)

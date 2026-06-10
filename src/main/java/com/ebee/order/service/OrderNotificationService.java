@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OrderNotificationService {
 
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     public void sendOrderCreated(Order order, Commission commission) {
         String itemSummary = OrderItemSummaryBuilder.buildItemSummary(order);
@@ -35,7 +35,7 @@ public class OrderNotificationService {
                     itemSummary,
                     order.getTotalAmount()
             );
-            notificationService.notifyCustomer(order.getCustomer(), customerSubject, customerMessage);
+            notificationPort.notifyCustomer(order.getCustomer(), customerSubject, customerMessage);
         }
 
         if (order.getAgent() != null) {
@@ -66,8 +66,8 @@ public class OrderNotificationService {
                     order.getTotalAmount(),
                     commissionInfo
             );
-            notificationService.notifyAgent(order.getAgent(), agentSubject, agentMessage);
-            notificationService.createInternalAlert(order.getAgent().getUser(), agentSubject, agentMessage,
+            notificationPort.notifyAgent(order.getAgent(), agentSubject, agentMessage);
+            notificationPort.createInternalAlert(order.getAgent().getUser(), agentSubject, agentMessage,
                     AlertType.ORDER_CREATED, order.getId(), "order");
 
             if (commission != null) {
@@ -90,8 +90,8 @@ public class OrderNotificationService {
                         commission.getCommissionRate(),
                         commission.getCommissionAmount()
                 );
-                notificationService.notifyAgent(order.getAgent(), commissionSubject, commissionMsg);
-                notificationService.createInternalAlert(order.getAgent().getUser(), commissionSubject, commissionMsg,
+                notificationPort.notifyAgent(order.getAgent(), commissionSubject, commissionMsg);
+                notificationPort.createInternalAlert(order.getAgent().getUser(), commissionSubject, commissionMsg,
                         AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
             }
         }
@@ -115,7 +115,7 @@ public class OrderNotificationService {
                         order.getOrderNumber(),
                         statusMessage
                 );
-                notificationService.notifyCustomer(order.getCustomer(), subject, message);
+                notificationPort.notifyCustomer(order.getCustomer(), subject, message);
             }
         }
 
@@ -140,8 +140,8 @@ public class OrderNotificationService {
                         customerInfo,
                         statusMessage
                 );
-                notificationService.notifyAgent(order.getAgent(), subject, message);
-                notificationService.createInternalAlert(order.getAgent().getUser(), subject, message,
+                notificationPort.notifyAgent(order.getAgent(), subject, message);
+                notificationPort.createInternalAlert(order.getAgent().getUser(), subject, message,
                         AlertType.ORDER_STATUS_CHANGED, order.getId(), "order");
             }
         }
@@ -160,7 +160,7 @@ public class OrderNotificationService {
                     OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()),
                     order.getOrderNumber()
             );
-            notificationService.notifyCustomer(order.getCustomer(), subject, message);
+            notificationPort.notifyCustomer(order.getCustomer(), subject, message);
         }
 
         if (order.getAgent() != null) {
@@ -173,8 +173,8 @@ public class OrderNotificationService {
                     order.getOrderNumber(),
                     customerInfo
             );
-            notificationService.notifyAgent(order.getAgent(), subject, message);
-            notificationService.createInternalAlert(order.getAgent().getUser(), subject, message,
+            notificationPort.notifyAgent(order.getAgent(), subject, message);
+            notificationPort.createInternalAlert(order.getAgent().getUser(), subject, message,
                     AlertType.ORDER_CANCELLED, order.getId(), "order");
         }
     }

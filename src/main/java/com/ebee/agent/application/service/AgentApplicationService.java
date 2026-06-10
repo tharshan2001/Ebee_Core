@@ -30,7 +30,7 @@ public class AgentApplicationService {
     private final EmailSender emailSender;
     private final NotificationTemplateService templateService;
     private final UserRepository userRepository;
-    private final NotificationPort notificationService;
+    private final NotificationPort notificationPort;
 
     @Transactional
     public AgentApplicationResponse create(AgentApplicationRequest request) {
@@ -49,7 +49,7 @@ public class AgentApplicationService {
         String alertMessage = request.getFirstName() + " " + request.getLastName()
                 + " (" + request.getEmail() + ") has submitted an agent application.";
         userRepository.findByRole(RoleType.ADMIN).forEach(admin ->
-                notificationService.createInternalAlert(admin, alertTitle, alertMessage,
+                notificationPort.createInternalAlert(admin, alertTitle, alertMessage,
                         AlertType.AGENT_APPROVED, saved.getId(), "agent_application"));
 
         return mapToResponse(saved);

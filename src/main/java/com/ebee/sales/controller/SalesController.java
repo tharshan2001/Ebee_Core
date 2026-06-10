@@ -3,6 +3,8 @@ package com.ebee.sales.controller;
 import com.ebee.common.enums.District;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.sales.dto.*;
+import com.ebee.sales.service.DashboardService;
+import com.ebee.sales.service.LeaderboardService;
 import com.ebee.sales.service.SalesService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -20,6 +22,8 @@ import java.util.UUID;
 public class SalesController {
 
     private final SalesService salesService;
+    private final DashboardService dashboardService;
+    private final LeaderboardService leaderboardService;
 
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
@@ -35,7 +39,7 @@ public class SalesController {
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        DashboardResponse response = salesService.getDashboard(startDate, endDate);
+        DashboardResponse response = dashboardService.getDashboard(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Dashboard data retrieved successfully", response));
     }
 
@@ -56,7 +60,7 @@ public class SalesController {
             @RequestParam(required = false) District district,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        List<AgentLeaderboardResponse> response = salesService.getLeaderboard(
+        List<AgentLeaderboardResponse> response = leaderboardService.getLeaderboard(
                 metric, limit, district, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Leaderboard retrieved successfully", response));
     }
@@ -68,7 +72,7 @@ public class SalesController {
             @RequestParam(required = false) District district,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        List<AgentLeaderboardResponse> response = salesService.getMyRank(
+        List<AgentLeaderboardResponse> response = leaderboardService.getMyRank(
                 metric, district, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("My rank retrieved successfully", response));
     }

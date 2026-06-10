@@ -7,7 +7,7 @@ import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.delivery.dto.DeliveryResponse;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.repository.DeliveryRepository;
@@ -16,8 +16,6 @@ import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.entity.Order;
-import com.ebee.order.entity.OrderItem;
-import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
@@ -28,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,7 +38,7 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
     private final InventoryService inventoryService;
     private final CommissionLifecycleService commissionLifecycleService;
     private final AuditLogService auditLogService;
@@ -108,114 +105,32 @@ public class DeliveryService {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
-        DeliveryStatus currentStatus = order.getDeliveryStatus();
         DeliveryStatus newStatus = request.getStatus();
 
-        if (currentStatus == null) {
-            throw new IllegalArgumentException("Delivery has not been initialized for this order");
-        }
+        DeliveryStateMachine.TransitionResult result = DeliveryStateMachine.transition(
+                order, newStatus, request.getReason(), securityService.isAdmin());
 
-        if (currentStatus == DeliveryStatus.DELIVERED || currentStatus == DeliveryStatus.FAILED_PERMANENT) {
-            throw new IllegalArgumentException("Cannot update status of a " +
-                    (currentStatus == DeliveryStatus.DELIVERED ? "delivered" : "permanently failed") + " delivery");
-        }
-
-        if (currentStatus == DeliveryStatus.FAILED
-                && newStatus != DeliveryStatus.PENDING
-                && newStatus != DeliveryStatus.FAILED_PERMANENT) {
-            throw new IllegalArgumentException("Failed delivery can only be retried (PENDING) or marked permanent (FAILED_PERMANENT)");
-        }
-
-        if (newStatus == DeliveryStatus.FAILED) {
-            order.setDeliveryFailureReason(request.getReason());
-        }
-
-        if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.PENDING) {
-            order.setDeliveryFailureReason(null);
-            order.setDeliveryAssignedTo(null);
-        }
-
-        if (newStatus == DeliveryStatus.FAILED_PERMANENT && !securityService.isAdmin()) {
-            throw new SecurityException("Only admins can mark a delivery as permanently failed");
-        }
-
-        if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.FAILED_PERMANENT) {
-            if (request.getReason() != null) {
-                order.setDeliveryFailureReason(request.getReason());
-            }
-        }
-
-        order.setDeliveryStatus(newStatus);
-
-        if (newStatus == DeliveryStatus.DELIVERED) {
-            order.setDeliveredAt(LocalDateTime.now());
-            order.setStatus(OrderStatus.DELIVERED);
+        if (result.wasDelivered()) {
             commissionLifecycleService.approveCommissionForOrder(order.getId());
         }
 
-        if (newStatus == DeliveryStatus.FAILED_PERMANENT) {
-            for (OrderItem item : order.getItems()) {
-                inventoryService.recordOrderStock(
-                        item.getProduct().getId(),
-                        item.getQuantity(),
-                        StockMovementType.RETURN,
-                        "Delivery permanently failed - Order " + order.getOrderNumber()
-                );
-            }
+        if (result.wasFailedPermanent()) {
+            order.getItems().forEach(item -> inventoryService.recordOrderStock(
+                    item.getProduct().getId(),
+                    item.getQuantity(),
+                    StockMovementType.RETURN,
+                    "Delivery permanently failed - Order " + order.getOrderNumber()
+            ));
             commissionLifecycleService.cancelCommissionForOrder(order.getId());
-            order.setStatus(OrderStatus.PENDING);
-            order.setDeliveryAssignedTo(null);
-            order.setDeliveryScheduledDate(null);
-            order.setDeliveryNotes(null);
         }
 
         Order savedOrder = orderRepository.save(order);
 
         auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
                 "Delivery for order " + savedOrder.getOrderNumber() + " changed from "
-                + currentStatus + " to " + newStatus);
+                        + result.previousStatus() + " to " + newStatus);
 
-        if (savedOrder.getCustomer() != null) {
-            String customerName = savedOrder.getCustomer().getFirstName();
-            String customerMsg = switch (newStatus) {
-                case PICKED_UP -> "Dear %s,\n\nYour order %s has been picked up by the driver.".formatted(
-                        customerName, savedOrder.getOrderNumber());
-                case IN_TRANSIT -> "Dear %s,\n\nYour order %s is on its way for delivery!".formatted(
-                        customerName, savedOrder.getOrderNumber());
-                case FAILED -> {
-                    String reason = savedOrder.getDeliveryFailureReason();
-                    String base = "Dear %s,\n\nUnfortunately, delivery of your order %s has failed.".formatted(
-                            customerName, savedOrder.getOrderNumber());
-                    yield reason != null ? base + "\nReason: " + reason : base;
-                }
-                case FAILED_PERMANENT -> {
-                    String reason = savedOrder.getDeliveryFailureReason();
-                    String base = "Dear %s,\n\nDelivery of your order %s has been permanently failed.".formatted(
-                            customerName, savedOrder.getOrderNumber());
-                    yield reason != null ? base + "\nReason: " + reason : base;
-                }
-                default -> null;
-            };
-            if (customerMsg != null) {
-                String subject = "Delivery " + newStatus.name() + " – " + savedOrder.getOrderNumber();
-                notificationService.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
-            }
-        }
-
-        if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
-            String prefix = newStatus == DeliveryStatus.FAILED_PERMANENT ? "Delivery Permanently Failed" : "Delivery Failed";
-            String subject = prefix + " – " + savedOrder.getOrderNumber();
-            String reason = savedOrder.getDeliveryFailureReason();
-            String msg = reason != null
-                    ? "Delivery of order %s has %sfailed.\nReason: %s"
-                    .formatted(savedOrder.getOrderNumber(),
-                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "", reason)
-                    : "Delivery of order %s has %sfailed."
-                    .formatted(savedOrder.getOrderNumber(),
-                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
-            notificationService.createInternalAlert(savedOrder.getCreatedBy(), subject, msg,
-                    AlertType.DELIVERY_FAILED, savedOrder.getId(), "order");
-        }
+        sendDeliveryNotifications(savedOrder, newStatus);
 
         return toDeliveryResponse(savedOrder);
     }
@@ -276,5 +191,49 @@ public class DeliveryService {
         response.setDeliveredAt(order.getDeliveredAt());
         response.setDeliveryFailureReason(order.getDeliveryFailureReason());
         return response;
+    }
+
+    private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
+        if (order.getCustomer() != null) {
+            String customerName = order.getCustomer().getFirstName();
+            String customerMsg = switch (newStatus) {
+                case PICKED_UP -> "Dear %s,\n\nYour order %s has been picked up by the driver.".formatted(
+                        customerName, order.getOrderNumber());
+                case IN_TRANSIT -> "Dear %s,\n\nYour order %s is on its way for delivery!".formatted(
+                        customerName, order.getOrderNumber());
+                case FAILED -> {
+                    String reason = order.getDeliveryFailureReason();
+                    String base = "Dear %s,\n\nUnfortunately, delivery of your order %s has failed.".formatted(
+                            customerName, order.getOrderNumber());
+                    yield reason != null ? base + "\nReason: " + reason : base;
+                }
+                case FAILED_PERMANENT -> {
+                    String reason = order.getDeliveryFailureReason();
+                    String base = "Dear %s,\n\nDelivery of your order %s has been permanently failed.".formatted(
+                            customerName, order.getOrderNumber());
+                    yield reason != null ? base + "\nReason: " + reason : base;
+                }
+                default -> null;
+            };
+            if (customerMsg != null) {
+                String subject = "Delivery " + newStatus.name() + " – " + order.getOrderNumber();
+                notificationService.notifyCustomer(order.getCustomer(), subject, customerMsg);
+            }
+        }
+
+        if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
+            String prefix = newStatus == DeliveryStatus.FAILED_PERMANENT ? "Delivery Permanently Failed" : "Delivery Failed";
+            String subject = prefix + " – " + order.getOrderNumber();
+            String reason = order.getDeliveryFailureReason();
+            String msg = reason != null
+                    ? "Delivery of order %s has %sfailed.\nReason: %s"
+                    .formatted(order.getOrderNumber(),
+                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "", reason)
+                    : "Delivery of order %s has %sfailed."
+                    .formatted(order.getOrderNumber(),
+                            newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
+            notificationService.createInternalAlert(order.getCreatedBy(), subject, msg,
+                    AlertType.DELIVERY_FAILED, order.getId(), "order");
+        }
     }
 }

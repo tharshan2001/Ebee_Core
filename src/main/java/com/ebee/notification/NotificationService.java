@@ -23,7 +23,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NotificationService {
+public class NotificationService implements NotificationPort {
 
     private final EmailSender emailSender;
     private final SmsSender smsSender;

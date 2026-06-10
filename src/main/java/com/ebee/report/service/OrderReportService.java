@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -23,14 +25,14 @@ public class OrderReportService {
     private final OrderRepository orderRepository;
 
     public OrderSummaryReport getSummary(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> distribution = orderRepository.findOrderStatusDistribution(start, end);
         Long pending = 0L, shipped = 0L, delivered = 0L, cancelled = 0L, returned = 0L;
         for (Object[] row : distribution) {
             String status = row[0] != null ? row[0].toString() : "";
-            Long count = toLong(row[1]);
+            Long count = NumberUtils.toLong(row[1]);
             switch (status) {
                 case "PENDING" -> pending = count;
                 case "SHIPPED" -> shipped = count;
@@ -58,8 +60,8 @@ public class OrderReportService {
     }
 
     public List<TopCustomerReport> getTopCustomers(PeriodRange range, int limit) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = orderRepository.findTopCustomersByRevenue(start, end);
         List<TopCustomerReport> list = new ArrayList<>();
@@ -70,8 +72,8 @@ public class OrderReportService {
             UUID customerId = (UUID) row[0];
             String name = (String) row[1];
             String phone = (String) row[2];
-            Long count = toLong(row[3]);
-            BigDecimal spent = toBigDecimal(row[4]);
+            Long count = NumberUtils.toLong(row[3]);
+            BigDecimal spent = NumberUtils.toBigDecimal(row[4]);
             BigDecimal avg = count > 0
                     ? spent.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
@@ -90,8 +92,8 @@ public class OrderReportService {
     }
 
     public AvgDeliveryTimeReport getAvgDeliveryTime(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = orderRepository.findAvgDeliveryTime(start, end);
         if (results.isEmpty()) {
@@ -108,26 +110,8 @@ public class OrderReportService {
                 .avgHours(row[0] != null ? ((Number) row[0]).doubleValue() : 0.0)
                 .minHours(row[1] != null ? ((Number) row[1]).doubleValue() : 0.0)
                 .maxHours(row[2] != null ? ((Number) row[2]).doubleValue() : 0.0)
-                .deliveredCount(toLong(row[3]))
+                .deliveredCount(NumberUtils.toLong(row[3]))
                 .build();
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
-
-    private BigDecimal toBigDecimal(Object obj) {
-        if (obj instanceof BigDecimal bd) return bd;
-        if (obj instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
-        return BigDecimal.ZERO;
-    }
 }

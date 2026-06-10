@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -42,8 +44,8 @@ public class DriverReportService {
     }
 
     public List<DriverPerformanceReport> getPerformance(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = deliveryRepository.findDeliveryStatsByDriver(start, end);
         List<DriverPerformanceReport> list = new ArrayList<>();
@@ -51,9 +53,9 @@ public class DriverReportService {
         for (Object[] row : results) {
             UUID driverId = (UUID) row[0];
             String name = (String) row[1];
-            long total = toLong(row[2]);
-            long success = toLong(row[3]);
-            long fail = toLong(row[4]);
+            long total = NumberUtils.toLong(row[2]);
+            long success = NumberUtils.toLong(row[3]);
+            long fail = NumberUtils.toLong(row[4]);
             double rate = total > 0 ? (double) success / total * 100 : 0.0;
 
             list.add(DriverPerformanceReport.builder()
@@ -68,16 +70,4 @@ public class DriverReportService {
         return list;
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
 }

@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,8 +22,8 @@ public class ActivityReportService {
     private final AuditLogRepository auditLogRepository;
 
     public ActivitySummaryReport getAuditSummary(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = auditLogRepository.findActionSummaryByDateRange(start, end);
         long total = 0;
@@ -29,8 +31,8 @@ public class ActivityReportService {
 
         for (Object[] row : results) {
             String action = row[0] instanceof Enum<?> e ? e.name() : (row[0] != null ? row[0].toString() : "Unknown");
-            long count = toLong(row[1]);
-            long uniqueUsers = toLong(row[2]);
+            long count = NumberUtils.toLong(row[1]);
+            long uniqueUsers = NumberUtils.toLong(row[2]);
             total += count;
             breakdowns.add(ActivitySummaryReport.ActionBreakdown.builder()
                     .action(action)
@@ -46,16 +48,4 @@ public class ActivityReportService {
                 .build();
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
 }

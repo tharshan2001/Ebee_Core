@@ -17,6 +17,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
+import com.ebee.sales.projection.ProductSalesProjection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +36,8 @@ public class FinancialReportService {
     private final ProductRepository productRepository;
 
     public FinancialReport getProfitLoss(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(start, end);
 
@@ -45,12 +48,11 @@ public class FinancialReportService {
             costMap.put(p.getId(), p.getCostPrice() != null ? p.getCostPrice() : BigDecimal.ZERO);
         }
 
-        List<Object[]> itemResults = orderItemRepository.findSalesByProduct(start, end);
+        List<ProductSalesProjection> itemResults = orderItemRepository.findSalesByProduct(start, end);
         BigDecimal costPrice = BigDecimal.ZERO;
-        for (Object[] row : itemResults) {
-            UUID productId = (UUID) row[0];
-            BigDecimal qty = BigDecimal.valueOf(toLong(row[4]));
-            BigDecimal unitCost = costMap.getOrDefault(productId, BigDecimal.ZERO);
+        for (ProductSalesProjection p : itemResults) {
+            BigDecimal qty = BigDecimal.valueOf(p.getTotalQuantity());
+            BigDecimal unitCost = costMap.getOrDefault(p.getProductId(), BigDecimal.ZERO);
             costPrice = costPrice.add(unitCost.multiply(qty));
         }
 
@@ -88,16 +90,4 @@ public class FinancialReportService {
                 .build();
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
 }

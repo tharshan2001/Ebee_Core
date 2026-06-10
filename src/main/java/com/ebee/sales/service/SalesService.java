@@ -3,30 +3,24 @@ package com.ebee.sales.service;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.repository.CommissionRepository;
-import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.common.security.SecurityService;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import com.ebee.order.repository.OrderItemRepository;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.sales.dto.*;
+import com.ebee.sales.projection.CategorySalesProjection;
+import com.ebee.sales.projection.ProductSalesProjection;
+import com.ebee.sales.projection.SalesSummaryProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,11 +31,10 @@ public class SalesService {
     private final OrderItemRepository orderItemRepository;
     private final CommissionRepository commissionRepository;
     private final AgentRepository agentRepository;
-    private final SecurityService securityService;
 
     public SalesSummaryResponse getSalesSummary(LocalDate startDate, LocalDate endDate) {
-        LocalDateTime start = toStartDateTime(startDate);
-        LocalDateTime end = toEndDateTime(endDate);
+        LocalDateTime start = DateUtils.toStartDateTime(startDate);
+        LocalDateTime end = DateUtils.toEndDateTime(endDate);
 
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(start, end);
         Long count = orderRepository.countOrdersByDateRange(start, end);
@@ -60,205 +53,39 @@ public class SalesService {
                 .build();
     }
 
-    public DashboardResponse getDashboard(LocalDate startDate, LocalDate endDate) {
-        if (startDate == null && endDate == null) {
-            endDate = LocalDate.now();
-            startDate = endDate.minusDays(30);
-        } else if (startDate != null && endDate == null) {
-            endDate = startDate.plusDays(30);
-        } else if (startDate == null) {
-            startDate = endDate.minusDays(30);
-        }
-
-        long periodDays = ChronoUnit.DAYS.between(startDate, endDate);
-        LocalDate prevStart = startDate.minusDays(periodDays);
-        LocalDate prevEnd = startDate;
-
-        LocalDateTime curStart = toStartDateTime(startDate);
-        LocalDateTime curEnd = toEndDateTime(endDate);
-        LocalDateTime prevStartDt = toStartDateTime(prevStart);
-        LocalDateTime prevEndDt = toEndDateTime(prevEnd);
-
-        BigDecimal curRevenue = orderRepository.sumRevenueByDateRange(curStart, curEnd);
-        Long curCount = orderRepository.countOrdersByDateRange(curStart, curEnd);
-        BigDecimal curAvg = curCount > 0
-                ? curRevenue.divide(BigDecimal.valueOf(curCount), 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal curCommission = commissionRepository.sumCommissionLockedByDateRange(curStart, curEnd);
-
-        BigDecimal prevRevenue = orderRepository.sumRevenueByDateRange(prevStartDt, prevEndDt);
-        Long prevCount = orderRepository.countOrdersByDateRange(prevStartDt, prevEndDt);
-        BigDecimal prevCommission = commissionRepository.sumCommissionLockedByDateRange(prevStartDt, prevEndDt);
-
-        LocalDate today = LocalDate.now();
-        LocalDateTime todayStart = today.atStartOfDay();
-        LocalDateTime todayEnd = today.atTime(LocalTime.MAX);
-        LocalDateTime yesterdayStart = today.minusDays(1).atStartOfDay();
-        LocalDateTime yesterdayEnd = todayStart;
-
-        Long ordersToday = orderRepository.countOrdersByDateRangeAllStatuses(todayStart, todayEnd);
-        Long ordersYesterday = orderRepository.countOrdersByDateRangeAllStatuses(yesterdayStart, yesterdayEnd);
-        Long deliveriesToday = orderRepository.countDeliveredByDateRange(todayStart, todayEnd);
-        Long deliveriesYesterday = orderRepository.countDeliveredByDateRange(yesterdayStart, yesterdayEnd);
-
-        return DashboardResponse.builder()
-                .period(DashboardPeriod.builder().start(startDate).end(endDate).build())
-                .summary(DashboardSummary.builder()
-                        .totalRevenue(curRevenue)
-                        .totalOrders(curCount)
-                        .averageOrderValue(curAvg)
-                        .totalCommission(curCommission)
-                        .build())
-                .today(DashboardToday.builder()
-                        .ordersToday(ordersToday)
-                        .ordersYesterday(ordersYesterday)
-                        .deliveriesToday(deliveriesToday)
-                        .deliveriesYesterday(deliveriesYesterday)
-                        .build())
-                .previousPeriod(DashboardPreviousPeriod.builder()
-                        .totalRevenue(prevRevenue)
-                        .totalOrders(prevCount)
-                        .totalCommission(prevCommission)
-                        .build())
-                .build();
-    }
-
     public List<SalesByAgentResponse> getSalesByAgent(LocalDate startDate, LocalDate endDate) {
-        List<Object[]> results = orderRepository.findSalesByAgent(toStartDateTime(startDate), toEndDateTime(endDate));
-        List<SalesByAgentResponse> list = new ArrayList<>();
-
-        for (Object[] row : results) {
-            UUID agentId = (UUID) row[0];
-            if (agentId == null) continue;
-
-            String firstName = (String) row[2];
-            String lastName = (String) row[3];
-
-            list.add(SalesByAgentResponse.builder()
-                    .agentId(agentId)
-                    .agentCode((String) row[1])
-                    .agentName((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""))
-                    .totalOrders(toLong(row[4]))
-                    .totalRevenue(toBigDecimal(row[5]))
-                    .build());
-        }
-
-        return list;
-    }
-
-    public List<AgentLeaderboardResponse> getLeaderboard(
-            String metric, int limit, District district,
-            LocalDate startDate, LocalDate endDate) {
-        LocalDateTime start = toStartDateTime(startDate);
-        LocalDateTime end = toEndDateTime(endDate);
-
-        List<Object[]> orderResults = orderRepository.findSalesByAgent(start, end);
-        Map<UUID, Object[]> orderMap = new HashMap<>();
-        for (Object[] row : orderResults) {
-            orderMap.put((UUID) row[0], row);
-        }
-
-        List<Agent> allAgents = agentRepository.findAllWithUser().stream()
-                .filter(Agent::getIsActive)
-                .collect(Collectors.toList());
-
-        List<AgentLeaderboardResponse> entries = new ArrayList<>();
-        List<UUID> allAgentIds = new ArrayList<>();
-        for (Agent agent : allAgents) {
-            allAgentIds.add(agent.getId());
-            Object[] orderRow = orderMap.get(agent.getId());
-            Long orders = 0L;
-            BigDecimal revenue = BigDecimal.ZERO;
-            if (orderRow != null) {
-                orders = toLong(orderRow[4]);
-                revenue = toBigDecimal(orderRow[5]);
-            }
-            entries.add(AgentLeaderboardResponse.builder()
-                    .agentId(agent.getId())
-                    .agentCode(agent.getAgentCode())
-                    .agentName((agent.getUser().getFirstName() != null ? agent.getUser().getFirstName() : "")
-                            + " " + (agent.getUser().getLastName() != null ? agent.getUser().getLastName() : ""))
-                    .district(agent.getDistrict() != null ? agent.getDistrict().name() : "")
-                    .totalOrders(orders)
-                    .totalRevenue(revenue)
-                    .avgOrderValue(orders > 0
-                            ? revenue.divide(BigDecimal.valueOf(orders), 2, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO)
-                    .build());
-        }
-
-        List<Object[]> commissionResults = commissionRepository.sumCommissionByAgentIds(
-                allAgentIds, start, end);
-        Map<UUID, BigDecimal> commissionMap = new HashMap<>();
-        for (Object[] cr : commissionResults) {
-            commissionMap.put((UUID) cr[0], toBigDecimal(cr[1]));
-        }
-        for (AgentLeaderboardResponse entry : entries) {
-            entry.setTotalCommission(commissionMap.getOrDefault(entry.getAgentId(), BigDecimal.ZERO));
-        }
-
-        if (district != null) {
-            entries = entries.stream()
-                    .filter(e -> district.name().equals(e.getDistrict()))
-                    .collect(Collectors.toList());
-        }
-
-        Comparator<AgentLeaderboardResponse> comparator = switch (metric != null ? metric : "revenue") {
-            case "orders" -> Comparator.comparingLong(AgentLeaderboardResponse::getTotalOrders);
-            case "commission" -> Comparator.comparing(AgentLeaderboardResponse::getTotalCommission);
-            case "avgOrderValue" -> Comparator.comparing(AgentLeaderboardResponse::getAvgOrderValue);
-            default -> Comparator.comparing(AgentLeaderboardResponse::getTotalRevenue);
-        };
-
-        entries.sort(comparator.reversed());
-
-        if (limit > 0 && limit < entries.size()) {
-            entries = entries.subList(0, limit);
-        }
-
-        for (int i = 0; i < entries.size(); i++) {
-            entries.get(i).setRank(i + 1);
-        }
-
-        return entries;
-    }
-
-    public List<AgentLeaderboardResponse> getMyRank(
-            String metric, District district,
-            LocalDate startDate, LocalDate endDate) {
-        UUID currentUserId = securityService.getCurrentUserId();
-        Agent agent = agentRepository.findByUserId(currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", currentUserId));
-        UUID currentAgentId = agent.getId();
-
-        List<AgentLeaderboardResponse> all = getLeaderboard(metric, 0, district, startDate, endDate);
-
-        for (AgentLeaderboardResponse entry : all) {
-            if (entry.getAgentId().equals(currentAgentId)) {
-                entry.setCurrentUser(true);
-            }
-        }
-
-        return all;
+        return orderRepository.findSalesByAgent(
+                        DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate))
+                .stream()
+                .filter(p -> p.getAgentId() != null)
+                .map(p -> SalesByAgentResponse.builder()
+                        .agentId(p.getAgentId())
+                        .agentCode(p.getAgentCode())
+                        .agentName((p.getFirstName() != null ? p.getFirstName() : "")
+                                + " " + (p.getLastName() != null ? p.getLastName() : ""))
+                        .totalOrders(p.getTotalOrders())
+                        .totalRevenue(p.getTotalRevenue())
+                        .build())
+                .toList();
     }
 
     public SalesByAgentDetailResponse getSalesByAgentDetail(UUID agentId, LocalDate startDate, LocalDate endDate) {
         Agent agent = agentRepository.findById(agentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", agentId));
 
-        List<Object[]> result = orderRepository.findSalesSummaryByAgent(agentId,
-                toStartDateTime(startDate), toEndDateTime(endDate));
+        List<SalesSummaryProjection> result = orderRepository.findSalesSummaryByAgent(agentId,
+                DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate));
         BigDecimal revenue = BigDecimal.ZERO;
         Long count = 0L;
 
         if (!result.isEmpty()) {
-            Object[] row = result.get(0);
-            revenue = toBigDecimal(row[0]);
-            count = toLong(row[1]);
+            SalesSummaryProjection p = result.get(0);
+            revenue = p.getTotalRevenue();
+            count = p.getTotalOrders();
         }
 
         BigDecimal commission = commissionRepository.sumCommissionAmountByAgentIdAndDateRange(agentId,
-                toStartDateTime(startDate), toEndDateTime(endDate));
+                DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate));
 
         return SalesByAgentDetailResponse.builder()
                 .agentId(agent.getId())
@@ -271,102 +98,66 @@ public class SalesService {
     }
 
     public List<SalesByProductResponse> getSalesByProduct(LocalDate startDate, LocalDate endDate) {
-        List<Object[]> results = orderItemRepository.findSalesByProduct(
-                toStartDateTime(startDate), toEndDateTime(endDate));
-        List<SalesByProductResponse> list = new ArrayList<>();
-
-        for (Object[] row : results) {
-            list.add(SalesByProductResponse.builder()
-                    .productId((UUID) row[0])
-                    .productName((String) row[1])
-                    .itemCode((String) row[2])
-                    .category((String) row[3])
-                    .totalQuantity(toLong(row[4]))
-                    .totalRevenue(toBigDecimal(row[5]))
-                    .build());
-        }
-
-        return list;
+        return orderItemRepository.findSalesByProduct(
+                        DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate))
+                .stream()
+                .map(p -> SalesByProductResponse.builder()
+                        .productId(p.getProductId())
+                        .productName(p.getProductName())
+                        .itemCode(p.getItemCode())
+                        .category(p.getCategory())
+                        .totalQuantity(p.getTotalQuantity())
+                        .totalRevenue(p.getTotalRevenue())
+                        .build())
+                .toList();
     }
 
     public List<SalesByCategoryResponse> getSalesByCategory(LocalDate startDate, LocalDate endDate) {
-        List<Object[]> results = orderItemRepository.findSalesByCategory(
-                toStartDateTime(startDate), toEndDateTime(endDate));
-        List<SalesByCategoryResponse> list = new ArrayList<>();
-        BigDecimal totalRevenue = BigDecimal.ZERO;
+        List<CategorySalesProjection> results = orderItemRepository.findSalesByCategory(
+                DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate));
 
-        for (Object[] row : results) {
-            totalRevenue = totalRevenue.add(toBigDecimal(row[2]));
-        }
+        BigDecimal totalRevenue = results.stream()
+                .map(CategorySalesProjection::getTotalRevenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        for (Object[] row : results) {
-            BigDecimal rev = toBigDecimal(row[2]);
-            BigDecimal percentage = totalRevenue.compareTo(BigDecimal.ZERO) > 0
-                    ? rev.divide(totalRevenue, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
-                    : BigDecimal.ZERO;
-
-            list.add(SalesByCategoryResponse.builder()
-                    .category((String) row[0])
-                    .totalQuantity(toLong(row[1]))
-                    .totalRevenue(rev)
-                    .percentageOfTotal(percentage)
-                    .build());
-        }
-
-        return list;
+        return results.stream()
+                .map(p -> {
+                    BigDecimal rev = p.getTotalRevenue();
+                    BigDecimal percentage = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                            ? rev.divide(totalRevenue, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
+                            : BigDecimal.ZERO;
+                    return SalesByCategoryResponse.builder()
+                            .category(p.getCategory())
+                            .totalQuantity(p.getTotalQuantity())
+                            .totalRevenue(rev)
+                            .percentageOfTotal(percentage)
+                            .build();
+                })
+                .toList();
     }
 
     public List<SalesTrendResponse> getDailyTrend(LocalDate startDate, LocalDate endDate) {
         return mapTrendResults(
-                orderRepository.findDailyTrend(toStartDateTime(startDate), toEndDateTime(endDate)));
+                orderRepository.findDailyTrend(DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate)));
     }
 
     public List<SalesTrendResponse> getMonthlyTrend(LocalDate startDate, LocalDate endDate) {
         return mapTrendResults(
-                orderRepository.findMonthlyTrend(toStartDateTime(startDate), toEndDateTime(endDate)));
+                orderRepository.findMonthlyTrend(DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate)));
     }
 
     public List<SalesTrendResponse> getYearlyTrend(LocalDate startDate, LocalDate endDate) {
         return mapTrendResults(
-                orderRepository.findYearlyTrend(toStartDateTime(startDate), toEndDateTime(endDate)));
+                orderRepository.findYearlyTrend(DateUtils.toStartDateTime(startDate), DateUtils.toEndDateTime(endDate)));
     }
 
     private List<SalesTrendResponse> mapTrendResults(List<Object[]> results) {
-        List<SalesTrendResponse> list = new ArrayList<>();
-
-        for (Object[] row : results) {
-            list.add(SalesTrendResponse.builder()
-                    .period(toLocalDateTime(row[0]))
-                    .totalOrders(toLong(row[1]))
-                    .totalRevenue(toBigDecimal(row[2]))
-                    .build());
-        }
-
-        return list;
-    }
-
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private LocalDateTime toLocalDateTime(Object obj) {
-        if (obj instanceof Timestamp ts) return ts.toLocalDateTime();
-        if (obj instanceof LocalDateTime ldt) return ldt;
-        return null;
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
-
-    private BigDecimal toBigDecimal(Object obj) {
-        if (obj instanceof BigDecimal bd) return bd;
-        if (obj instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
-        return BigDecimal.ZERO;
+        return results.stream()
+                .map(row -> SalesTrendResponse.builder()
+                        .period(NumberUtils.toLocalDateTime(row[0]))
+                        .totalOrders(NumberUtils.toLong(row[1]))
+                        .totalRevenue(NumberUtils.toBigDecimal(row[2]))
+                        .build())
+                .toList();
     }
 }

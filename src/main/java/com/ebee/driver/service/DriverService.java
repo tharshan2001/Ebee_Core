@@ -3,7 +3,8 @@ package com.ebee.driver.service;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.notification.NotificationService;
+import com.ebee.common.util.PasswordGenerator;
+import com.ebee.notification.NotificationPort;
 import com.ebee.driver.dto.AvailabilityRequest;
 import com.ebee.driver.dto.DriverRequest;
 import com.ebee.driver.dto.DriverResponse;
@@ -20,7 +21,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,12 +31,9 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
     private final AuditLogService auditLogService;
 
-    private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-    private static final int PASSWORD_LENGTH = 12;
-    private final SecureRandom random = new SecureRandom();
 
     @Transactional
     public DriverWithCredentialsResponse createDriver(DriverRequest request) {
@@ -44,7 +41,7 @@ public class DriverService {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
-        String generatedPassword = generatePassword();
+        String generatedPassword = PasswordGenerator.generate();
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -179,11 +176,4 @@ public class DriverService {
         return response;
     }
 
-    private String generatePassword() {
-        StringBuilder password = new StringBuilder(PASSWORD_LENGTH);
-        for (int i = 0; i < PASSWORD_LENGTH; i++) {
-            password.append(PASSWORD_CHARS.charAt(random.nextInt(PASSWORD_CHARS.length())));
-        }
-        return password.toString();
-    }
 }

@@ -12,7 +12,7 @@ import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class CommissionCalculationService {
     private final CommissionConfigRepository configRepository;
     private final OrderRepository orderRepository;
     private final CommissionMapper mapper;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
 
     @Transactional
     public CommissionResponse calculateCommission(CommissionCalculateRequest request) {

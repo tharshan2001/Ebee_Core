@@ -16,6 +16,8 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,8 +31,8 @@ public class SalesReportService {
     private final CommissionRepository commissionRepository;
 
     public SalesSummaryReport getSummary(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(start, end);
         Long count = orderRepository.countOrdersByDateRange(start, end);
@@ -40,8 +42,8 @@ public class SalesReportService {
         BigDecimal commission = commissionRepository.sumCommissionLockedByDateRange(start, end);
 
         PeriodRange prevRange = PeriodUtils.previousPeriod(range);
-        LocalDateTime prevStart = toStartDateTime(prevRange.startDate());
-        LocalDateTime prevEnd = toEndDateTime(prevRange.endDate());
+        LocalDateTime prevStart = DateUtils.toStartDateTime(prevRange.startDate());
+        LocalDateTime prevEnd = DateUtils.toEndDateTime(prevRange.endDate());
         BigDecimal prevRevenue = orderRepository.sumRevenueByDateRange(prevStart, prevEnd);
         Long prevCount = orderRepository.countOrdersByDateRange(prevStart, prevEnd);
         BigDecimal prevCommission = commissionRepository.sumCommissionLockedByDateRange(prevStart, prevEnd);
@@ -65,8 +67,8 @@ public class SalesReportService {
     }
 
     public List<SalesTrendReport> getTrend(PeriodRange range, String granularity) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = switch (granularity != null ? granularity : "monthly") {
             case "daily" -> orderRepository.findDailyTrend(start, end);
@@ -79,16 +81,16 @@ public class SalesReportService {
         for (Object[] row : results) {
             list.add(SalesTrendReport.builder()
                     .period(toLocalDate(row[0]))
-                    .totalOrders(toLong(row[1]))
-                    .totalRevenue(toBigDecimal(row[2]))
+                    .totalOrders(NumberUtils.toLong(row[1]))
+                    .totalRevenue(NumberUtils.toBigDecimal(row[2]))
                     .build());
         }
         return list;
     }
 
     public SalesBySourceReport getBySource(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = orderRepository.findSalesBySource(start, end);
         BigDecimal agentRevenue = BigDecimal.ZERO;
@@ -98,8 +100,8 @@ public class SalesReportService {
 
         for (Object[] row : results) {
             String source = row[0] != null ? row[0].toString() : "";
-            Long orders = toLong(row[1]);
-            BigDecimal rev = toBigDecimal(row[2]);
+            Long orders = NumberUtils.toLong(row[1]);
+            BigDecimal rev = NumberUtils.toBigDecimal(row[2]);
             if ("AGENT".equals(source) || OrderSource.AGENT.name().equals(source)) {
                 agentRevenue = rev;
                 agentOrders = orders;
@@ -134,8 +136,8 @@ public class SalesReportService {
     }
 
     public List<SalesByStatusReport> getByStatus(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = orderRepository.findOrderStatusDistribution(start, end);
         Long totalCount = orderRepository.countTotalOrdersByDateRange(start, end);
@@ -143,8 +145,8 @@ public class SalesReportService {
 
         for (Object[] row : results) {
             String status = row[0] != null ? row[0].toString() : "UNKNOWN";
-            Long count = toLong(row[1]);
-            BigDecimal rev = toBigDecimal(row[2]);
+            Long count = NumberUtils.toLong(row[1]);
+            BigDecimal rev = NumberUtils.toBigDecimal(row[2]);
             BigDecimal pct = totalCount > 0
                     ? BigDecimal.valueOf(count).divide(BigDecimal.valueOf(totalCount), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
                     : BigDecimal.ZERO;
@@ -168,30 +170,11 @@ public class SalesReportService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
     private LocalDate toLocalDate(Object obj) {
         if (obj instanceof Timestamp ts) return ts.toLocalDateTime().toLocalDate();
         if (obj instanceof java.sql.Date d) return d.toLocalDate();
         if (obj instanceof LocalDateTime ldt) return ldt.toLocalDate();
         if (obj instanceof LocalDate d) return d;
         return null;
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
-
-    private BigDecimal toBigDecimal(Object obj) {
-        if (obj instanceof BigDecimal bd) return bd;
-        if (obj instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
-        return BigDecimal.ZERO;
     }
 }

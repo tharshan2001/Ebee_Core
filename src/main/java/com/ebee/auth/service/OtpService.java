@@ -1,6 +1,6 @@
 package com.ebee.auth.service;
 
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.entity.User;
@@ -23,7 +23,7 @@ public class OtpService {
     private static final int OTP_LENGTH = 6;
 
     private final ConcurrentHashMap<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
     private final UserRepository userRepository;
 
     public void generateAndSendOtp(String email) {

@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -21,14 +23,14 @@ public class DeliveryReportService {
     private final DeliveryRepository deliveryRepository;
 
     public DeliverySummaryReport getSummary(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> statusCounts = deliveryRepository.countByDeliveryStatusAndDateRange(start, end);
         long total = 0, success = 0, fail = 0;
         for (Object[] row : statusCounts) {
             String status = row[0] != null ? row[0].toString() : "";
-            long count = toLong(row[1]);
+            long count = NumberUtils.toLong(row[1]);
             total += count;
             if ("DELIVERED".equals(status)) success += count;
             else if ("FAILED".equals(status) || "FAILED_PERMANENT".equals(status)) fail += count;
@@ -46,8 +48,8 @@ public class DeliveryReportService {
     }
 
     public List<DeliveryByDriverReport> getByDriver(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = deliveryRepository.findDeliveryStatsByDriver(start, end);
         List<DeliveryByDriverReport> list = new ArrayList<>();
@@ -55,9 +57,9 @@ public class DeliveryReportService {
         for (Object[] row : results) {
             UUID driverId = (UUID) row[0];
             String name = (String) row[1];
-            long total = toLong(row[2]);
-            long success = toLong(row[3]);
-            long fail = toLong(row[4]);
+            long total = NumberUtils.toLong(row[2]);
+            long success = NumberUtils.toLong(row[3]);
+            long fail = NumberUtils.toLong(row[4]);
             double rate = total > 0 ? (double) success / total * 100 : 0.0;
 
             list.add(DeliveryByDriverReport.builder()
@@ -73,16 +75,16 @@ public class DeliveryReportService {
     }
 
     public List<DeliveryFailureReasonReport> getFailureReasons(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> results = deliveryRepository.findFailureReasonBreakdown(start, end);
-        long total = results.stream().mapToLong(r -> toLong(r[1])).sum();
+        long total = results.stream().mapToLong(r -> NumberUtils.toLong(r[1])).sum();
         List<DeliveryFailureReasonReport> list = new ArrayList<>();
 
         for (Object[] row : results) {
             String reason = row[0] != null ? row[0].toString() : "No reason provided";
-            long count = toLong(row[1]);
+            long count = NumberUtils.toLong(row[1]);
             double pct = total > 0 ? (double) count / total * 100 : 0.0;
 
             list.add(DeliveryFailureReasonReport.builder()
@@ -94,16 +96,4 @@ public class DeliveryReportService {
         return list;
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
-
-    private Long toLong(Object obj) {
-        if (obj instanceof Number n) return n.longValue();
-        return 0L;
-    }
 }

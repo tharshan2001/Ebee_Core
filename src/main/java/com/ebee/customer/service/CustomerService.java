@@ -9,7 +9,7 @@ import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.repository.CustomerRepository;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,7 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {

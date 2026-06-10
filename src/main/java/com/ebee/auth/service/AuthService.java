@@ -11,7 +11,7 @@ import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import org.springframework.security.access.AccessDeniedException;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.dto.UserRequest;
@@ -20,12 +20,8 @@ import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import com.ebee.user.service.UserService;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -37,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,13 +47,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
     private final OtpService otpService;
     private final DriverRepository driverRepository;
     private final AuditLogService auditLogService;
-
-    @Value("${jwt.secret}")
-    private String jwtSecret;
 
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
@@ -318,24 +310,10 @@ public class AuthService {
     }
 
     private String generateResetToken(User user) {
-        return Jwts.builder()
-                .setSubject(user.getEmail())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 300_000))
-                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()), SignatureAlgorithm.HS256)
-                .compact();
+        return jwtService.generateResetToken(user.getEmail());
     }
 
     private String extractEmailFromResetToken(String token) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes()))
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject();
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid or expired reset token");
-        }
+        return jwtService.extractEmailFromResetToken(token);
     }
 }

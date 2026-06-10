@@ -1,7 +1,7 @@
 package com.ebee.reminder.service;
 
 import com.ebee.alert.enums.AlertType;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.reminder.entity.Reminder;
@@ -24,7 +24,7 @@ import java.util.Map;
 public class ReminderSchedulerService {
 
     private final ReminderRepository reminderRepository;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
 
     @Scheduled(fixedRate = 60_000)
     @Transactional

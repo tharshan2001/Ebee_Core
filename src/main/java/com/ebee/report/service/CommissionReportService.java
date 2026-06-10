@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import com.ebee.common.util.DateUtils;
+import com.ebee.common.util.NumberUtils;
 import java.util.*;
 
 @Service
@@ -25,8 +27,8 @@ public class CommissionReportService {
     private final AgentRepository agentRepository;
 
     public CommissionSummaryReport getSummary(PeriodRange range) {
-        LocalDateTime start = toStartDateTime(range.startDate());
-        LocalDateTime end = toEndDateTime(range.endDate());
+        LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
+        LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         BigDecimal approved = commissionRepository.sumCommissionAmountByStatus(CommissionStatus.APPROVED);
         BigDecimal paid = commissionRepository.sumCommissionAmountByStatus(CommissionStatus.PAID);
@@ -90,11 +92,4 @@ public class CommissionReportService {
         return list;
     }
 
-    private LocalDateTime toStartDateTime(LocalDate date) {
-        return date != null ? date.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-    }
-
-    private LocalDateTime toEndDateTime(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(9999, 12, 31, 23, 59);
-    }
 }

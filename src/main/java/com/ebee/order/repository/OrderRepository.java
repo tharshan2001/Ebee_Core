@@ -6,6 +6,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.ebee.sales.projection.AgentSalesProjection;
+import com.ebee.sales.projection.CategorySalesProjection;
+import com.ebee.sales.projection.ProductSalesProjection;
+import com.ebee.sales.projection.SalesSummaryProjection;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,11 +50,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
     Long countOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT a.id, a.agentCode, a.user.firstName, a.user.lastName, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o LEFT JOIN o.agent a LEFT JOIN a.user WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY a.id, a.agentCode, a.user.firstName, a.user.lastName")
-    List<Object[]> findSalesByAgent(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    @Query("SELECT a.id AS agentId, a.agentCode AS agentCode, a.user.firstName AS firstName, a.user.lastName AS lastName, COUNT(o) AS totalOrders, COALESCE(SUM(o.totalAmount), 0) AS totalRevenue FROM Order o LEFT JOIN o.agent a LEFT JOIN a.user WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY a.id, a.agentCode, a.user.firstName, a.user.lastName")
+    List<AgentSalesProjection> findSalesByAgent(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0), COUNT(o) FROM Order o WHERE o.agent.id = :agentId AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
-    List<Object[]> findSalesSummaryByAgent(@Param("agentId") UUID agentId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) AS totalRevenue, COUNT(o) AS totalOrders FROM Order o WHERE o.agent.id = :agentId AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    List<SalesSummaryProjection> findSalesSummaryByAgent(@Param("agentId") UUID agentId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query(value = "SELECT DATE_TRUNC('day', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('day', o.created_at) ORDER BY period", nativeQuery = true)
     List<Object[]> findDailyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);

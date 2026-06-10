@@ -1,7 +1,7 @@
 package com.ebee.user.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.notification.NotificationService;
+import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.user.dto.UserProfileResponse;
 import com.ebee.user.dto.UserRequest;
@@ -29,7 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final NotificationService notificationService;
+    private final NotificationPort notificationService;
 
     @Transactional
     public UserResponse createUser(UserRequest request) {

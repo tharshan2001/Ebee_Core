@@ -111,4 +111,21 @@ public class JwtService {
         final String email = extractEmailFromToken(refreshToken);
         return (email.equals(userDetails.getUsername())) && !isTokenExpired(refreshToken);
     }
+
+    public String generateResetToken(String email) {
+        return Jwts.builder()
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 300_000))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractEmailFromResetToken(String token) {
+        try {
+            return extractEmail(token);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+    }
 }

@@ -67,4 +67,18 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status = 'DELIVERED' AND o.deliveredAt >= :start AND o.deliveredAt < :end")
     Long countDeliveredByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    @Query("SELECT o.status, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end GROUP BY o.status")
+    List<Object[]> findOrderStatusDistribution(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT o.orderSource, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY o.orderSource")
+    List<Object[]> findSalesBySource(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT c.id, CONCAT(c.firstName, ' ', c.lastName), c.phoneNumber, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o JOIN o.customer c WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY c.id, c.firstName, c.lastName, c.phoneNumber ORDER BY COALESCE(SUM(o.totalAmount), 0) DESC")
+    List<Object[]> findTopCustomersByRevenue(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), MIN(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), MAX(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), COUNT(o) FROM orders o WHERE o.status = 'DELIVERED' AND o.delivered_at >= :start AND o.delivered_at < :end", nativeQuery = true)
+    List<Object[]> findAvgDeliveryTime(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end")
+    Long countTotalOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

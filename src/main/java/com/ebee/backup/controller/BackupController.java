@@ -1,5 +1,6 @@
 package com.ebee.backup.controller;
 
+import com.ebee.auth.service.OtpService;
 import com.ebee.backup.entity.BackupAuditLog;
 import com.ebee.backup.enums.BackupAction;
 import com.ebee.backup.service.BackupAuditLogService;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,6 +30,7 @@ public class BackupController {
 
     private final BackupService backupService;
     private final BackupAuditLogService auditLogService;
+    private final OtpService otpService;
 
     @GetMapping("/backups")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listBackups() {
@@ -35,8 +38,17 @@ public class BackupController {
         return ResponseEntity.ok(ApiResponse.success("Backups retrieved successfully", backups));
     }
 
+    @PostMapping("/send-otp")
+    public ResponseEntity<ApiResponse<Void>> sendOtp(Authentication authentication) {
+        otpService.generateAndSendOtp(authentication.getName(), "backup operation");
+        return ResponseEntity.ok(ApiResponse.success("OTP sent to your email", null));
+    }
+
     @PostMapping("/backup")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createBackup() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createBackup(
+            Authentication authentication,
+            @RequestParam String otp) {
+        verifyOtp(authentication, otp);
         Map<String, Object> backup = backupService.createBackup();
         return ResponseEntity.ok(ApiResponse.success("Backup created successfully", backup));
     }
@@ -60,14 +72,20 @@ public class BackupController {
 
     @PostMapping("/backups/upload")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadBackup(
-            @RequestParam("file") MultipartFile file) {
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam String otp) {
+        verifyOtp(authentication, otp);
         Map<String, Object> result = backupService.uploadBackup(file);
         return ResponseEntity.ok(ApiResponse.success("Backup uploaded successfully", result));
     }
 
     @PostMapping("/restore")
     public ResponseEntity<ApiResponse<Map<String, Object>>> restoreBackup(
-            @RequestParam String filename) {
+            Authentication authentication,
+            @RequestParam String filename,
+            @RequestParam String otp) {
+        verifyOtp(authentication, otp);
         Map<String, Object> result = backupService.restore(filename);
         return ResponseEntity.ok(ApiResponse.success(
                 "Restore complete. Pre-restore backup: " + result.get("preRestoreBackup"), result));
@@ -77,5 +95,11 @@ public class BackupController {
     public ResponseEntity<ApiResponse<List<BackupAuditLog>>> getAuditLogs() {
         List<BackupAuditLog> logs = auditLogService.getRecentLogs();
         return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved", logs));
+    }
+
+    private void verifyOtp(Authentication authentication, String otp) {
+        if (!otpService.verifyOtp(authentication.getName(), otp)) {
+            throw new IllegalArgumentException("Invalid or expired OTP");
+        }
     }
 }

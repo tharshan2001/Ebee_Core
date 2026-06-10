@@ -1,5 +1,6 @@
 package com.ebee.common.security;
 
+import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,5 +49,25 @@ public class SecurityService {
         return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+    }
+
+    public String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            return "system";
+        }
+        return authentication.getName();
+    }
+
+    public String getCurrentUserRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return "SYSTEM";
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .findFirst()
+                .map(a -> a.replace("ROLE_", ""))
+                .orElse("UNKNOWN");
     }
 }

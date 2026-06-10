@@ -34,4 +34,10 @@ public interface AgentRepository extends JpaRepository<Agent, UUID> {
 
     @Query("SELECT MAX(a.agentCode) FROM Agent a WHERE a.agentCode LIKE :pattern")
     String findMaxAgentCodeByPattern(@Param("pattern") String pattern);
+
+    @Query("SELECT COUNT(a) FROM Agent a WHERE a.createdAt >= :start AND a.createdAt < :end")
+    Long countNewAgentsSince(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+    @Query("SELECT COALESCE(a.district, 'Unknown'), COUNT(a), SUM(CASE WHEN a.isActive = true THEN 1 ELSE 0 END) FROM Agent a GROUP BY a.district ORDER BY COUNT(a) DESC")
+    List<Object[]> findAgentDistrictDistribution();
 }

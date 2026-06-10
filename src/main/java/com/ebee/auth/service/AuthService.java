@@ -1,5 +1,7 @@
 package com.ebee.auth.service;
 
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.auth.dto.AuthResponse;
 import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
@@ -28,6 +30,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +55,7 @@ public class AuthService {
     private final NotificationService notificationService;
     private final OtpService otpService;
     private final DriverRepository driverRepository;
+    private final AuditLogService auditLogService;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -74,10 +78,15 @@ public class AuthService {
                     .ifPresent(d -> { throw new IllegalStateException("Your account has been suspended"); });
         }
 
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
         String token = jwtService.generateToken(authentication);
         String refreshToken = jwtService.generateRefreshToken(authentication);
 
         sendLoginAlert(user);
+
+        auditLogService.record(AuditAction.LOGIN, "User", user.getId(),
+                "User " + user.getEmail() + " logged in as " + user.getRole());
 
         return AuthResponse.builder()
                 .token(token)
@@ -248,6 +257,8 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         sendLogoutAlert(user);
+        auditLogService.record(AuditAction.LOGOUT, "User", user.getId(),
+                "User " + user.getEmail() + " logged out");
     }
 
     @Transactional
@@ -265,6 +276,8 @@ public class AuthService {
         userRepository.save(user);
 
         sendPasswordChangedAlert(user);
+        auditLogService.record(AuditAction.PASSWORD_CHANGE, "User", user.getId(),
+                "User " + user.getEmail() + " changed their password");
     }
 
     public void forgotPassword(String email) {
@@ -272,6 +285,8 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
         otpService.generateAndSendOtp(user.getEmail());
+        auditLogService.record(AuditAction.FORGOT_PASSWORD, "User", user.getId(),
+                "User " + user.getEmail() + " requested password reset");
     }
 
     public String verifyOtp(String email, String otp) {
@@ -298,6 +313,8 @@ public class AuthService {
         userRepository.save(user);
 
         sendPasswordChangedAlert(user);
+        auditLogService.record(AuditAction.PASSWORD_RESET, "User", user.getId(),
+                "Password reset completed for " + user.getEmail());
     }
 
     private String generateResetToken(User user) {

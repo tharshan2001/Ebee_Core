@@ -1,5 +1,7 @@
 package com.ebee.driver.service;
 
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.notification.NotificationService;
 import com.ebee.driver.dto.AvailabilityRequest;
@@ -30,6 +32,7 @@ public class DriverService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -76,6 +79,10 @@ public class DriverService {
                 
                 Please log in and change your password.
                 """.formatted(savedUser.getFirstName(), savedUser.getEmail(), generatedPassword);
+        auditLogService.record(AuditAction.DRIVER_CREATE, "Driver", savedDriver.getId(),
+                "Driver " + savedUser.getFirstName() + " " + savedUser.getLastName()
+                + " (" + savedUser.getEmail() + ") created");
+
         notificationService.notifyUser(savedUser, subject, message);
 
         return DriverWithCredentialsResponse.builder()
@@ -129,6 +136,8 @@ public class DriverService {
         driver.setContactNumber(request.getContactNumber());
 
         Driver savedDriver = driverRepository.save(driver);
+        auditLogService.record(AuditAction.DRIVER_UPDATE, "Driver", id,
+                "Driver " + driver.getUser().getEmail() + " updated");
         return toResponse(savedDriver);
     }
 
@@ -139,6 +148,9 @@ public class DriverService {
 
         driver.setAvailability(request.getAvailability());
         Driver savedDriver = driverRepository.save(driver);
+        auditLogService.record(AuditAction.DRIVER_AVAILABILITY_CHANGE, "Driver", id,
+                "Driver " + driver.getUser().getEmail() + " availability changed to "
+                + request.getAvailability());
         return toResponse(savedDriver);
     }
 

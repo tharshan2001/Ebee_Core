@@ -2,6 +2,8 @@ package com.ebee.commission.service;
 
 import com.ebee.agent.entity.Agent;
 import com.ebee.alert.enums.AlertType;
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -30,6 +32,7 @@ public class CommissionLifecycleService {
     private final CommissionRepository commissionRepository;
     private final CommissionMapper mapper;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public CommissionResponse approveCommission(UUID commissionId) {
@@ -37,6 +40,9 @@ public class CommissionLifecycleService {
         commission.setStatus(CommissionStatus.APPROVED);
         commission.setApprovedAt(LocalDateTime.now());
         commission = commissionRepository.save(commission);
+        auditLogService.record(AuditAction.COMMISSION_APPROVE, "Commission", commissionId,
+                "Commission LKR " + commission.getCommissionAmount() + " for order "
+                + commission.getOrder().getOrderNumber() + " approved");
         sendCommissionNotification(commission, "Approved",
                 "Your commission of LKR %.2f for order %s has been approved and is pending processing.".formatted(
                         commission.getCommissionAmount(), commission.getOrder().getOrderNumber()));
@@ -48,6 +54,9 @@ public class CommissionLifecycleService {
         Commission commission = getCommissionEntity(commissionId);
         commission.setStatus(CommissionStatus.PROCESSING);
         commission = commissionRepository.save(commission);
+        auditLogService.record(AuditAction.COMMISSION_PROCESS, "Commission", commissionId,
+                "Commission LKR " + commission.getCommissionAmount() + " for order "
+                + commission.getOrder().getOrderNumber() + " moved to processing");
         sendCommissionNotification(commission, "Processing",
                 "Your commission of LKR %.2f for order %s is now being processed for payment.".formatted(
                         commission.getCommissionAmount(), commission.getOrder().getOrderNumber()));
@@ -60,6 +69,10 @@ public class CommissionLifecycleService {
         commission.setStatus(CommissionStatus.PAID);
         commission.setPaidAt(LocalDateTime.now());
         commission = commissionRepository.save(commission);
+
+        auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", commissionId,
+                "Commission LKR " + commission.getCommissionAmount() + " for order "
+                + commission.getOrder().getOrderNumber() + " paid");
 
         Agent agent = commission.getAgent();
         agent.setTotalCommission(agent.getTotalCommission() + commission.getCommissionAmount().doubleValue());
@@ -83,6 +96,9 @@ public class CommissionLifecycleService {
         commission.setStatus(CommissionStatus.REJECTED);
         commission.setErrorMessage(reason);
         commission = commissionRepository.save(commission);
+        auditLogService.record(AuditAction.COMMISSION_REJECT, "Commission", commissionId,
+                "Commission LKR " + commission.getCommissionAmount() + " for order "
+                + commission.getOrder().getOrderNumber() + " rejected: " + reason);
         sendCommissionNotification(commission, "Rejected",
                 "Your commission for order %s has been rejected.\n\nReason: %s\n\nPlease contact support for more information."
                         .formatted(commission.getOrder().getOrderNumber(), reason));
@@ -100,6 +116,10 @@ public class CommissionLifecycleService {
             }
 
             commission.setStatus(CommissionStatus.CANCELLED);
+
+            auditLogService.record(AuditAction.COMMISSION_CANCEL, "Commission", commission.getId(),
+                    "Commission LKR " + commission.getCommissionAmount() + " for order "
+                    + commission.getOrder().getOrderNumber() + " cancelled");
 
             sendCommissionNotification(commission, "Cancelled",
                     "Your commission for order %s has been cancelled as the order was cancelled.".formatted(
@@ -160,6 +180,9 @@ public class CommissionLifecycleService {
             agent.setTotalSales(agent.getTotalSales() + c.getOrderAmount().doubleValue());
 
             commissionRepository.save(c);
+            auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", c.getId(),
+                    "Commission LKR " + c.getCommissionAmount() + " for order "
+                    + c.getOrder().getOrderNumber() + " paid via batch payment");
             sendCommissionNotification(c, "Paid",
                     """
                             Your commission of LKR %.2f for order %s has been paid.

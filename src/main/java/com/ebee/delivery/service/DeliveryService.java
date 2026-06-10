@@ -1,5 +1,7 @@
 package com.ebee.delivery.service;
 
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
@@ -42,6 +44,7 @@ public class DeliveryService {
     private final NotificationService notificationService;
     private final InventoryService inventoryService;
     private final CommissionLifecycleService commissionLifecycleService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public void initializeDelivery(Order order) {
@@ -92,6 +95,10 @@ public class DeliveryService {
                     savedOrder.getCustomer().getFirstName(), savedOrder.getOrderNumber());
             notificationService.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
         }
+
+        auditLogService.record(AuditAction.DELIVERY_ASSIGN, "Order", savedOrder.getId(),
+                "Driver " + driver.getFirstName() + " assigned to deliver order "
+                + savedOrder.getOrderNumber());
 
         return toDeliveryResponse(savedOrder);
     }
@@ -163,6 +170,10 @@ public class DeliveryService {
         }
 
         Order savedOrder = orderRepository.save(order);
+
+        auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
+                "Delivery for order " + savedOrder.getOrderNumber() + " changed from "
+                + currentStatus + " to " + newStatus);
 
         if (savedOrder.getCustomer() != null) {
             String customerName = savedOrder.getCustomer().getFirstName();

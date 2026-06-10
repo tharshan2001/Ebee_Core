@@ -6,6 +6,8 @@ import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.enums.AgentCommissionType;
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
@@ -46,6 +48,7 @@ public class AgentService {
     private final NotificationService notificationService;
     private final CommissionConfigRepository commissionConfigRepository;
     private final CommissionRepository commissionRepository;
+    private final AuditLogService auditLogService;
 
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     private static final int PASSWORD_LENGTH = 12;
@@ -131,6 +134,9 @@ public class AgentService {
 
         Agent savedAgent = agentRepository.save(agent);
 
+        auditLogService.record(AuditAction.CREATE, "Agent", savedAgent.getId(),
+                "Agent " + savedAgent.getAgentCode() + " (" + savedAgent.getUser().getEmail() + ") created");
+
         sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, generatedPassword,
                 savedAgent);
 
@@ -170,6 +176,9 @@ public class AgentService {
         agent.setIsActive(true);
         Agent savedAgent = agentRepository.save(agent);
 
+        auditLogService.record(AuditAction.AGENT_APPROVE, "Agent", id,
+                "Agent " + agent.getAgentCode() + " approved");
+
         sendAgentStatusNotification(agent, "Approved",
                 "Congratulations! Your agent application has been approved. You can now log in and start selling.",
                 true);
@@ -188,6 +197,9 @@ public class AgentService {
 
         agent.setIsActive(false);
         Agent savedAgent = agentRepository.save(agent);
+
+        auditLogService.record(AuditAction.AGENT_REJECT, "Agent", id,
+                "Agent " + agent.getAgentCode() + " rejected");
 
         sendAgentStatusNotification(agent, "Rejected",
                 "Your agent application has been rejected. Please contact support for more information.",
@@ -209,6 +221,9 @@ public class AgentService {
         agent.setIsActive(true);
         Agent savedAgent = agentRepository.save(agent);
 
+        auditLogService.record(AuditAction.AGENT_ACTIVATE, "Agent", id,
+                "Agent " + agent.getAgentCode() + " activated");
+
         sendAgentStatusNotification(agent, "Activated",
                 "Your account has been activated. You can now log in and access the system.",
                 true);
@@ -228,6 +243,9 @@ public class AgentService {
 
         agent.setIsActive(false);
         Agent savedAgent = agentRepository.save(agent);
+
+        auditLogService.record(AuditAction.AGENT_DEACTIVATE, "Agent", id,
+                "Agent " + agent.getAgentCode() + " deactivated");
 
         sendAgentStatusNotification(agent, "Deactivated",
                 "Your account has been deactivated. If you believe this is an error, please contact support.",
@@ -347,6 +365,8 @@ public class AgentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
         agent.setIsActive(false);
         agentRepository.save(agent);
+        auditLogService.record(AuditAction.AGENT_DEACTIVATE, "Agent", id,
+                "Agent " + agent.getAgentCode() + " deleted (deactivated)");
     }
 
     @Transactional
@@ -368,6 +388,9 @@ public class AgentService {
         user.setMustChangePassword(true);
         user.setPasswordChangedAt(null);
         userRepository.save(user);
+
+        auditLogService.record(AuditAction.PASSWORD_RESET, "Agent", id,
+                "Password reset for agent " + agent.getAgentCode());
 
         sendPasswordResetNotification(agent, rawPassword);
     }

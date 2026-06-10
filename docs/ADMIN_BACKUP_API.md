@@ -14,11 +14,53 @@ Non-admin users receive `403 Forbidden`.
 
 ---
 
+## OTP Flow
+
+All mutation endpoints (backup, restore, upload) require a one-time password (OTP) sent to the admin's registered email. The OTP expires after 5 minutes and is consumed on first use.
+
+**Flow:**
+1. Call `POST /api/admin/db/send-otp` to receive a 6-digit OTP via email
+2. Use that OTP as a query parameter (`?otp=...`) or form field on the target endpoint
+3. Each OTP is single-use — a new one must be requested for each operation
+
+---
+
+## Send OTP
+
+**POST** `/api/admin/db/send-otp`
+
+Sends a 6-digit OTP to the authenticated admin's email address. No request body required.
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8085/api/admin/db/send-otp" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "OTP sent to your email",
+  "data": null
+}
+```
+
+**Error (email send failure):** `500` with standard error response.
+
+---
+
 ## Create Backup
 
-**POST** `/api/admin/db/backup`
+**POST** `/api/admin/db/backup?otp=`
 
 Triggers a `pg_dump` of the database. The dump file is verified with `pg_restore -l` after creation. Corrupt backups are deleted immediately and the request fails.
+
+**Query Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `otp` | `String` | Yes | OTP received via email from `/send-otp` |
 
 **Response (200):**
 ```json
@@ -40,6 +82,21 @@ Triggers a `pg_dump` of the database. The dump file is verified with `pg_restore
 | `size` | `long` | File size in bytes |
 | `path` | `String` | Absolute path on server |
 | `verified` | `boolean` | Whether `pg_restore -l` passed |
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8085/api/admin/db/backup?otp=483291" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Error (invalid/expired OTP):**
+```json
+{
+  "success": false,
+  "message": "Invalid or expired OTP",
+  "data": null
+}
+```
 
 **Error (backup corrupt):**
 ```json
@@ -121,12 +178,14 @@ Upload a `.dump` file to the server's backups directory. The file is verified wi
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `file` | `MultipartFile` | Yes | The `.dump` file to upload |
+| `otp` | `String` | Yes | OTP received via email from `/send-otp` |
 
 **Example:**
 ```bash
 curl -X POST "http://localhost:8085/api/admin/db/backups/upload" \
   -H "Authorization: Bearer <JWT_TOKEN>" \
-  -F "file=@my_backup.dump"
+  -F "file=@my_backup.dump" \
+  -F "otp=483291"
 ```
 
 **Response:**
@@ -156,7 +215,7 @@ curl -X POST "http://localhost:8085/api/admin/db/backups/upload" \
 
 ## Restore Backup
 
-**POST** `/api/admin/db/restore?filename=`
+**POST** `/api/admin/db/restore?filename=&otp=`
 
 Restores the database from a backup file. **Destructive operation** — the current database is dropped and recreated.
 
@@ -167,10 +226,11 @@ Restores the database from a backup file. **Destructive operation** — the curr
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `filename` | `String` | Yes | Name of the `.dump` file in the backups directory |
+| `otp` | `String` | Yes | OTP received via email from `/send-otp` |
 
 **Example:**
 ```bash
-curl -X POST "http://localhost:8085/api/admin/db/restore?filename=ebee_db_20260609_133154.dump" \
+curl -X POST "http://localhost:8085/api/admin/db/restore?filename=ebee_db_20260609_133154.dump&otp=483291" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -200,13 +260,14 @@ curl -X POST "http://localhost:8085/api/admin/db/restore?filename=ebee_db_202606
 
 ## CLI Equivalent
 
-These operations use the same underlying commands as the `scripts/db.sh` script:
+These operations use the same underlying commands as the `scripts/db.sh` script (CLI bypasses OTP):
 
 | API Endpoint | CLI Command |
 |---|---|
+| `POST /send-otp` | (email-based, CLI not applicable) |
 | `POST /backup` | `./scripts/db.sh backup` |
 | `GET /backups` | `./scripts/db.sh list` |
-| `POST /restore?filename=...` | `./scripts/db.sh restore backups/...` |
+| `POST /restore?filename=...&otp=...` | `./scripts/db.sh restore backups/...` |
 | `POST /backups/upload` | Manual file copy to `backups/` directory |
 
 ---
@@ -214,8 +275,8 @@ These operations use the same underlying commands as the `scripts/db.sh` script:
 ## Typical UI Flow
 
 1. **Dashboard loads** → `GET /api/admin/db/backups` → displays backup list
-2. **Admin clicks "Backup Now"** → `POST /api/admin/db/backup` → new backup appears in list
+2. **Admin clicks "Backup Now"** → prompt appears: "An OTP has been sent to your email" (automatically calls `POST /send-otp` first) → admin enters OTP → `POST /api/admin/db/backup?otp=...` → new backup appears in list
 3. **Admin selects a backup** → option to download or restore
-4. **Admin clicks "Download"** → `GET /api/admin/db/backups/{filename}` → file downloads
-5. **Admin clicks "Restore"** → confirmation dialog → `POST /api/admin/db/restore?filename=...` → pre-restore backup created, then restored
-6. **Admin drag-and-drops a file** → `POST /api/admin/db/backups/upload` → file uploaded and verified
+4. **Admin clicks "Download"** → `GET /api/admin/db/backups/{filename}` → file downloads (no OTP needed for download)
+5. **Admin clicks "Restore"** → confirmation dialog → sends OTP → admin enters OTP → `POST /api/admin/db/restore?filename=...&otp=...` → pre-restore backup created, then restored
+6. **Admin drag-and-drops a file** → sends OTP → admin enters OTP → `POST /api/admin/db/backups/upload?otp=...` → file uploaded and verified

@@ -27,14 +27,18 @@ public class OtpService {
     private final UserRepository userRepository;
 
     public void generateAndSendOtp(String email) {
+        generateAndSendOtp(email, "password reset");
+    }
+
+    public void generateAndSendOtp(String email, String purpose) {
         String otp = generateOtp();
         otpStore.put(email, new OtpEntry(otp, LocalDateTime.now().plusSeconds(OTP_TTL_SECONDS)));
 
         User user = userRepository.findByEmail(email).orElse(null);
         String phoneNumber = user != null ? user.getPhoneNumber() : null;
 
-        String subject = "Ebee - Password Reset OTP";
-        String body = "Your OTP for password reset is: " + otp + "\n\n"
+        String subject = "Ebee - OTP for " + purpose;
+        String body = "Your OTP for " + purpose + " is: " + otp + "\n\n"
                 + "This code expires in 5 minutes.\n\n"
                 + "If you did not request this, please ignore this email.";
 
@@ -46,14 +50,14 @@ public class OtpService {
                 .build());
 
         if (phoneNumber != null) {
-            String smsMessage = "Ebee: Your password reset OTP is " + otp + ". Expires in 5 minutes.";
+            String smsMessage = "Ebee: Your OTP for " + purpose + " is " + otp + ". Expires in 5 minutes.";
             notificationService.sendSms(SmsRequest.builder()
                     .phoneNumbers(List.of(phoneNumber))
                     .message(smsMessage)
                     .build());
         }
 
-        log.info("OTP sent to {} via email{}", email, phoneNumber != null ? " and SMS" : "");
+        log.info("OTP sent to {} for '{}' via email{}", email, purpose, phoneNumber != null ? " and SMS" : "");
     }
 
     public boolean verifyOtp(String email, String otp) {

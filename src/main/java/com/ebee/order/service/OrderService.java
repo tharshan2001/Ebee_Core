@@ -3,6 +3,8 @@ package com.ebee.order.service;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.alert.enums.AlertType;
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -55,6 +57,7 @@ public class OrderService {
     private final CommissionLifecycleService commissionLifecycleService;
     private final CustomerService customerService;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
@@ -139,6 +142,11 @@ public class OrderService {
             commission = commissionCalculationService.calculateCommissionForOrder(savedOrder);
         }
 
+        auditLogService.record(AuditAction.CREATE, "Order", savedOrder.getId(),
+                "Order " + savedOrder.getOrderNumber() + " created for "
+                + (customer != null ? customerDisplayName(customer) : "walk-in")
+                + " via " + savedOrder.getOrderSource());
+
         if (customer != null) {
             customerService.incrementTotalOrders(customer.getId());
         }
@@ -215,6 +223,10 @@ public class OrderService {
         }
         Order updatedOrder = orderRepository.save(order);
 
+        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
+                "Order " + updatedOrder.getOrderNumber() + " status changed from "
+                + order.getStatus() + " to " + status);
+
         sendOrderStatusNotifications(updatedOrder);
 
         return orderMapper.toResponse(updatedOrder);
@@ -248,6 +260,9 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
+
+        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
+                "Order " + updatedOrder.getOrderNumber() + " cancelled");
 
         sendOrderCancelledNotifications(updatedOrder);
 

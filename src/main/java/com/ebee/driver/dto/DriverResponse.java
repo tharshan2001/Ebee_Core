@@ -17,7 +17,6 @@ public class DriverResponse {
     private String userEmail;
     private String userPhone;
     private String licenseNumber;
-    private String contactNumber;
     private DriverAvailability availability;
     private Boolean isActive;
     private LocalDateTime createdAt;

@@ -16,7 +16,6 @@ public class DriverWithCredentialsResponse {
     private String firstName;
     private String lastName;
     private String licenseNumber;
-    private String contactNumber;
     private DriverAvailability availability;
     private Boolean isActive;
     private LocalDateTime createdAt;

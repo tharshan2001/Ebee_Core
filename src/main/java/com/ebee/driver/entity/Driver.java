@@ -32,9 +32,6 @@ public class Driver {
     @Column(name = "license_number", length = 50)
     private String licenseNumber;
 
-    @Column(name = "contact_number", length = 20)
-    private String contactNumber;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

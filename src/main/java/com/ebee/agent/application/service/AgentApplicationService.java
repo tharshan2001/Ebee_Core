@@ -6,6 +6,7 @@ import com.ebee.agent.application.entity.AgentApplication;
 import com.ebee.agent.application.repository.AgentApplicationRepository;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.sender.EmailSender;
@@ -38,7 +39,7 @@ public class AgentApplicationService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
-                .phoneNumber(request.getPhoneNumber())
+                .phoneNumber(PhoneUtils.normalize(request.getPhoneNumber()))
                 .build();
 
         AgentApplication saved = repository.save(application);

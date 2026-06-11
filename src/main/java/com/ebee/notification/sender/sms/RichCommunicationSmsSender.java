@@ -1,5 +1,6 @@
 package com.ebee.notification.sender.sms;
 
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.config.NotificationProperties;
 import com.ebee.notification.model.NotificationResult;
 import com.ebee.notification.model.SmsRequest;
@@ -104,14 +105,7 @@ public class RichCommunicationSmsSender implements SmsSender {
     }
 
     private String normalizePhone(String phone) {
-        String cleaned = phone.replaceAll("[^0-9]", "");
-        if (cleaned.startsWith("0")) {
-            cleaned = cleaned.substring(1);
-        }
-        if (!cleaned.startsWith("94")) {
-            cleaned = "94" + cleaned;
-        }
-        return cleaned;
+        return PhoneUtils.forSms(phone);
     }
 
     private String md5(String value) {

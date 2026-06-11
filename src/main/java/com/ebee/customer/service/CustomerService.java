@@ -2,6 +2,7 @@ package com.ebee.customer.service;
 
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
 import com.ebee.customer.dto.CustomerRequest;
@@ -28,6 +29,7 @@ public class CustomerService {
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (customerRepository.existsByPhoneNumber(request.getPhoneNumber())) {
             throw new IllegalArgumentException("Customer already exists with phone: " + request.getPhoneNumber());
         }
@@ -55,6 +57,7 @@ public class CustomerService {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
 
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (request.getFirstName() != null) {
             customer.setFirstName(request.getFirstName());
         }
@@ -87,12 +90,13 @@ public class CustomerService {
 
     @Transactional
     public Customer findOrCreateByPhone(String phoneNumber, String firstName, String lastName) {
-        return customerRepository.findByPhoneNumber(phoneNumber)
+        String normalized = PhoneUtils.normalize(phoneNumber);
+        return customerRepository.findByPhoneNumber(normalized)
                 .orElseGet(() -> {
                     Customer customer = Customer.builder()
                             .firstName(firstName)
                             .lastName(lastName)
-                            .phoneNumber(phoneNumber)
+                            .phoneNumber(normalized)
                             .build();
                     customer = customerRepository.save(customer);
                     sendWelcomeNotification(customer);
@@ -102,7 +106,8 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public Customer findByPhone(String phoneNumber) {
-        return customerRepository.findByPhoneNumber(phoneNumber)
+        String normalized = PhoneUtils.normalize(phoneNumber);
+        return customerRepository.findByPhoneNumber(normalized)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "phoneNumber", phoneNumber));
     }
 
@@ -115,7 +120,8 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerResponse getCustomerByPhone(String phoneNumber) {
-        Customer customer = customerRepository.findByPhoneNumber(phoneNumber)
+        String normalized = PhoneUtils.normalize(phoneNumber);
+        Customer customer = customerRepository.findByPhoneNumber(normalized)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "phoneNumber", phoneNumber));
         return toResponse(customer);
     }

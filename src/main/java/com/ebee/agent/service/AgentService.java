@@ -11,6 +11,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.common.util.PasswordGenerator;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
@@ -48,6 +49,7 @@ public class AgentService {
 
     @Transactional
     public AgentWithCredentialsResponse createAgent(AgentRequest request, boolean createdByAdmin) {
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
@@ -240,6 +242,7 @@ public class AgentService {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
 
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (!agent.getAgentCode().equals(request.getAgentCode()) &&
             agentRepository.existsByAgentCode(request.getAgentCode())) {
             throw new IllegalArgumentException("Agent code already exists");

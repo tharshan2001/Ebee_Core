@@ -87,7 +87,10 @@ public class InventoryService {
         int quantityAfter = quantityBefore + request.getQuantityChange();
 
         if (quantityAfter < 0) {
-            throw new IllegalArgumentException("Insufficient stock. Current stock: " + quantityBefore);
+            String msg = quantityBefore == 0
+                    ? "Out of stock."
+                    : "Insufficient stock. Current stock: " + quantityBefore;
+            throw new IllegalArgumentException(msg);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -110,7 +113,10 @@ public class InventoryService {
         int quantityAfter = quantityBefore + quantityChange;
 
         if (quantityAfter < 0) {
-            throw new IllegalArgumentException("Insufficient stock for product: " + inventory.getProduct().getName());
+            String msg = quantityBefore == 0
+                    ? "Out of stock: " + inventory.getProduct().getName()
+                    : "Insufficient stock for product: " + inventory.getProduct().getName();
+            throw new IllegalArgumentException(msg);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -128,7 +134,10 @@ public class InventoryService {
 
         int available = inventory.getQuantity() - inventory.getReservedQuantity();
         if (available < quantity) {
-            throw new IllegalArgumentException("Insufficient available stock. Available: " + available);
+            String msg = available == 0
+                    ? "Out of stock"
+                    : "Insufficient available stock. Available: " + available;
+            throw new IllegalArgumentException(msg);
         }
 
         inventory.setReservedQuantity(inventory.getReservedQuantity() + quantity);

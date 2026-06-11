@@ -4,6 +4,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PasswordGenerator;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.driver.dto.AvailabilityRequest;
 import com.ebee.driver.dto.DriverRequest;
@@ -37,6 +38,7 @@ public class DriverService {
 
     @Transactional
     public DriverWithCredentialsResponse createDriver(DriverRequest request) {
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
@@ -60,7 +62,6 @@ public class DriverService {
         Driver driver = Driver.builder()
                 .user(savedUser)
                 .licenseNumber(request.getLicenseNumber())
-                .contactNumber(request.getContactNumber())
                 .build();
 
         Driver savedDriver = driverRepository.save(driver);
@@ -89,7 +90,6 @@ public class DriverService {
                 .firstName(savedUser.getFirstName())
                 .lastName(savedUser.getLastName())
                 .licenseNumber(savedDriver.getLicenseNumber())
-                .contactNumber(savedDriver.getContactNumber())
                 .availability(savedDriver.getAvailability())
                 .isActive(savedDriver.getIsActive())
                 .createdAt(savedDriver.getCreatedAt())
@@ -125,12 +125,11 @@ public class DriverService {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         if (request.getPhoneNumber() != null) {
-            user.setPhoneNumber(request.getPhoneNumber());
+            user.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         }
         userRepository.save(user);
 
         driver.setLicenseNumber(request.getLicenseNumber());
-        driver.setContactNumber(request.getContactNumber());
 
         Driver savedDriver = driverRepository.save(driver);
         auditLogService.record(AuditAction.DRIVER_UPDATE, "Driver", id,
@@ -168,7 +167,6 @@ public class DriverService {
         response.setUserEmail(driver.getUser().getEmail());
         response.setUserPhone(driver.getUser().getPhoneNumber());
         response.setLicenseNumber(driver.getLicenseNumber());
-        response.setContactNumber(driver.getContactNumber());
         response.setAvailability(driver.getAvailability());
         response.setIsActive(driver.getIsActive());
         response.setCreatedAt(driver.getCreatedAt());

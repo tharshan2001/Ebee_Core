@@ -1,6 +1,8 @@
 package com.ebee.user.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.util.PasswordGenerator;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.EmailRequest;
 import com.ebee.user.dto.UserProfileResponse;
@@ -33,25 +35,31 @@ public class UserService {
 
     @Transactional
     public UserResponse createUser(UserRequest request) {
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
+        String rawPassword = request.getPassword();
+        if (rawPassword == null || rawPassword.isEmpty()) {
+            rawPassword = PasswordGenerator.generate();
+        }
+
         User user = userMapper.toEntity(request);
-        encodePasswordIfPresent(user, request.getPassword());
-        user.setMustChangePassword(false);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setMustChangePassword(rawPassword != request.getPassword());
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
 
         User savedUser = userRepository.save(user);
 
-        sendWelcomeNotification(savedUser);
+        sendWelcomeNotification(savedUser, rawPassword);
 
         return userMapper.toResponse(savedUser);
     }
 
-    private void sendWelcomeNotification(User user) {
+    private void sendWelcomeNotification(User user, String rawPassword) {
         try {
             String subject = "Welcome to Ebee — Account Created";
             String message = """
@@ -59,11 +67,15 @@ public class UserService {
                     
                     Welcome to Ebee! Your account has been created successfully.
                     
-                    You can now log in using your registered email.
+                    Your login credentials:
+                    Email: %s
+                    Password: %s
+                    
+                    Please log in and change your password immediately.
                     
                     Best regards,
                     Ebee Team
-                    """.formatted(user.getFirstName());
+                    """.formatted(user.getFirstName(), user.getEmail(), rawPassword);
             notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
@@ -102,6 +114,7 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
+        request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (!user.getEmail().equals(request.getEmail()) &&
             userRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());

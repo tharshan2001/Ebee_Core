@@ -109,7 +109,10 @@ public class OrderService {
 
             if (!inventoryService.hasSufficientStock(product.getId(), itemRequest.getQuantity())) {
                 Integer available = inventoryService.getAvailableStock(product.getId());
-                throw new IllegalArgumentException("Insufficient stock for " + product.getName() + ". Available: " + available);
+                String msg = available == 0
+                        ? "Out of stock: " + product.getName()
+                        : "Insufficient stock for " + product.getName() + ". Available: " + available;
+                throw new IllegalArgumentException(msg);
             }
 
             BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));

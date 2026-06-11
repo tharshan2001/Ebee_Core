@@ -7,6 +7,7 @@ import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
@@ -92,7 +93,6 @@ public class AuthService {
                 .expiresAt(jwtService.getExpirationDate(token))
                 .driverId(driverId(user))
                 .licenseNumber(licenseNumber(user))
-                .contactNumber(contactNumber(user))
                 .driverAvailability(driverAvailability(user))
                 .build();
     }
@@ -180,7 +180,7 @@ public class AuthService {
         userRequest.setPassword(request.getPassword());
         userRequest.setFirstName(request.getFirstName());
         userRequest.setLastName(request.getLastName());
-        userRequest.setPhoneNumber(request.getPhoneNumber());
+        userRequest.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         userRequest.setRole(request.getRole());
 
         return userService.createUser(userRequest);
@@ -216,7 +216,6 @@ public class AuthService {
                 .expiresAt(jwtService.getExpirationDate(newToken))
                 .driverId(driverId(user))
                 .licenseNumber(licenseNumber(user))
-                .contactNumber(contactNumber(user))
                 .driverAvailability(driverAvailability(user))
                 .build();
     }
@@ -230,12 +229,6 @@ public class AuthService {
     private String licenseNumber(User user) {
         return user.getRole() == RoleType.DRIVER
                 ? driverRepository.findByUserId(user.getId()).map(Driver::getLicenseNumber).orElse(null)
-                : null;
-    }
-
-    private String contactNumber(User user) {
-        return user.getRole() == RoleType.DRIVER
-                ? driverRepository.findByUserId(user.getId()).map(Driver::getContactNumber).orElse(null)
                 : null;
     }
 

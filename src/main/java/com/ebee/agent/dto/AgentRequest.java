@@ -2,6 +2,7 @@ package com.ebee.agent.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,6 +24,7 @@ public class AgentRequest {
     @NotBlank(message = "District is required")
     private String district;
 
+    @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
     private String phoneNumber;
 
     private String nicNumber;

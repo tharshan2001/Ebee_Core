@@ -12,15 +12,12 @@ import java.util.List;
 @Data
 public class ProductRequest {
 
-    @NotBlank(message = "Product name is required")
     private String name;
 
-    @NotBlank(message = "Item code is required")
     private String itemCode;
 
     private String description;
 
-    @NotBlank(message = "Category is required")
     @Size(max = 100, message = "Category must not exceed 100 characters")
     private String category;
 
@@ -31,4 +28,6 @@ public class ProductRequest {
     private BigDecimal costPrice;
 
     private List<MultipartFile> images;
+
+    private List<String> removeImageUrls;
 }

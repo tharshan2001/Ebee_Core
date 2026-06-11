@@ -36,19 +36,26 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Module | File | Auth |
 |--------|------|------|
 | Authentication | [AUTH_API.md](AUTH_API.md) | Public (login/refresh) |
+| Users | [USER_API.md](USER_API.md) | ADMIN (mutate), any (read own) |
+| Profile | [PROFILE_API.md](PROFILE_API.md) | Authenticated users |
 | Products | [PRODUCT_API.md](PRODUCT_API.md) | ADMIN |
+| Inventory | [INVENTORY_API.md](INVENTORY_API.md) | ADMIN (mutate), any (read) |
+| Categories | [CATEGORY_API.md](CATEGORY_API.md) | ADMIN (mutate), any (read) |
 | Agents | [AGENT_API.md](AGENT_API.md) | ADMIN (create/update/delete), any (read) |
 | Agent Applications | [AGENT_APPLICATION_API.md](AGENT_APPLICATION_API.md) | Public (submit), ADMIN (manage) |
 | Customers | [CUSTOMER_API.md](CUSTOMER_API.md) | ADMIN, AGENT |
 | Orders | [ORDER_API.md](ORDER_API.md) | ADMIN, AGENT |
-| Categories | [CATEGORY_API.md](CATEGORY_API.md) | ADMIN (mutate), any (read) |
 | Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN (mutate), any (read) |
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
+| Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
+| Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
 | Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |
 | Messages | [MESSAGE_API.md](MESSAGE_API.md) | ADMIN |
-| Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
-
-| Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
+| Reminders | [REMINDER_API.md](REMINDER_API.md) | ADMIN |
+| Sales & Dashboard | [SALES_API.md](SALES_API.md) | ADMIN (most), AGENT (leaderboard) |
+| Reports | [REPORTS_API.md](REPORTS_API.md) | ADMIN |
+| Audit Logs | [ADMIN_AUDIT_API.md](ADMIN_AUDIT_API.md) | ADMIN |
+| Database Backup | [ADMIN_BACKUP_API.md](ADMIN_BACKUP_API.md) | ADMIN |
 
 ---
 

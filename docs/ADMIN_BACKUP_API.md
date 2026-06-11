@@ -102,7 +102,7 @@ curl -X POST "http://localhost:8085/api/admin/db/backup?otp=483291" \
 ```json
 {
   "success": false,
-  "message": "An unexpected error occurred: Backup verification failed — file is corrupt",
+  "message": "An unexpected error occurred",
   "data": null
 }
 ```

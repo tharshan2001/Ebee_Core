@@ -173,7 +173,15 @@ public class ProductService {
             product.setCostPrice(request.getCostPrice());
         }
 
-        boolean imagesInserted = false;
+        boolean imagesChanged = false;
+        if (request.getRemoveImageUrls() != null && !request.getRemoveImageUrls().isEmpty()) {
+            for (String imageUrl : request.getRemoveImageUrls()) {
+                s3Service.deleteFile(imageUrl);
+                productImageRepository.deleteByProductIdAndImageUrl(id, imageUrl);
+            }
+            imagesChanged = true;
+        }
+
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             int baseSortOrder = product.getImages().size();
 
@@ -199,13 +207,13 @@ public class ProductService {
                             UUID.randomUUID(), id, imageUrl, image.getOriginalFilename(), image.getContentType(), sortOrder++
                     );
                     log.info("Image inserted for product_id={}", id);
-                    imagesInserted = true;
+                    imagesChanged = true;
                 }
             }
         }
 
         productRepository.save(product);
-        if (imagesInserted) {
+        if (imagesChanged) {
             entityManager.refresh(product);
         }
         return toResponseWithRelations(product);
@@ -268,11 +276,6 @@ public class ProductService {
     public void deleteProduct(UUID id) {
         Product product = productRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
-
-        for (ProductImage image : product.getImages()) {
-            s3Service.deleteFile(image.getImageUrl());
-        }
-        productImageRepository.deleteByProductId(id);
 
         product.setIsActive(false);
         productRepository.save(product);

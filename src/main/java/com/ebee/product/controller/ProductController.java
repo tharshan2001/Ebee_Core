@@ -89,7 +89,8 @@ public class ProductController {
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "price", required = false) BigDecimal price,
             @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
-            @RequestParam(value = "images", required = false) MultipartFile[] images) {
+            @RequestParam(value = "images", required = false) MultipartFile[] images,
+            @RequestParam(value = "removeImages", required = false) List<String> removeImages) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -101,6 +102,7 @@ public class ProductController {
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
+        request.setRemoveImageUrls(removeImages);
         validate(request);
 
         ProductResponse response = productService.updateProduct(id, request);

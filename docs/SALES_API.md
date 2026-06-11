@@ -449,7 +449,7 @@ All endpoints return standard error format on failure:
 ```json
 {
   "success": false,
-  "message": "An unexpected error occurred: <details>",
+  "message": "An unexpected error occurred",
   "data": null
 }
 ```

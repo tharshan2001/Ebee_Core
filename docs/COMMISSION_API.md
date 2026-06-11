@@ -217,7 +217,7 @@ Marks one or more specific commissions as `PAID`. Only commissions in `PROCESSIN
 ```json
 {
   "success": false,
-  "message": "An unexpected error occurred: Commission <id> for order ORD-001 is not in PROCESSING status (current: APPROVED)",
+  "message": "Commission <id> for order ORD-001 is not in PROCESSING status (current: APPROVED)",
   "data": null
 }
 ```

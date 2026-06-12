@@ -59,10 +59,7 @@ public class AuthService {
         String email = request.getEmail();
         String loginKey = "login:" + email;
 
-        if (!rateLimitingService.isLoginAllowed(loginKey)) {
-            log.warn("Login rate limit exceeded for: {}", email);
-            throw new IllegalStateException("Too many login attempts. Please try again later.");
-        }
+        boolean rateLimited = !rateLimitingService.isLoginAllowed(loginKey);
 
         Authentication authentication;
         try {
@@ -70,6 +67,10 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (Exception e) {
+            if (rateLimited) {
+                log.warn("Login rate limit exceeded for: {}", email);
+                throw new IllegalStateException("Too many login attempts. Please try again later.");
+            }
             throw e;
         }
 

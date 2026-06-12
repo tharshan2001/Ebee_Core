@@ -2,6 +2,7 @@ package com.ebee.report.service;
 
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.repository.CommissionRepository;
+import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.order.repository.OrderItemRepository;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -34,6 +35,7 @@ public class FinancialReportService {
     private final OrderItemRepository orderItemRepository;
     private final CommissionRepository commissionRepository;
     private final ProductRepository productRepository;
+    private final ExpenseRepository expenseRepository;
 
     public FinancialReport getProfitLoss(PeriodRange range) {
         LocalDateTime start = DateUtils.toStartDateTime(range.startDate());
@@ -62,7 +64,8 @@ public class FinancialReportService {
                 : BigDecimal.ZERO;
 
         BigDecimal commissions = commissionRepository.sumCommissionLockedByDateRange(start, end);
-        BigDecimal netProfit = grossProfit.subtract(commissions);
+        BigDecimal expenses = expenseRepository.sumApprovedByDateRange(range.startDate(), range.endDate());
+        BigDecimal netProfit = grossProfit.subtract(commissions).subtract(expenses);
 
         return FinancialReport.builder()
                 .totalRevenue(revenue)
@@ -70,6 +73,7 @@ public class FinancialReportService {
                 .grossProfit(grossProfit)
                 .grossMargin(grossMargin.setScale(2, RoundingMode.HALF_UP))
                 .totalCommissions(commissions)
+                .totalExpenses(expenses)
                 .netProfit(netProfit)
                 .period(range)
                 .build();

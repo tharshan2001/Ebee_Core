@@ -13,6 +13,7 @@ public class FinancialReport {
     private BigDecimal grossProfit;
     private BigDecimal grossMargin;
     private BigDecimal totalCommissions;
+    private BigDecimal totalExpenses;
     private BigDecimal netProfit;
     private PeriodRange period;
 }

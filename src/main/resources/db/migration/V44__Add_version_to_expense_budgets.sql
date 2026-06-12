@@ -1,0 +1,1 @@
+ALTER TABLE expense_budgets ADD COLUMN version INTEGER NOT NULL DEFAULT 0;

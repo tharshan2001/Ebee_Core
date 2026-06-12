@@ -78,13 +78,13 @@ app:
 
 rate-limiting:
   login:
-    max-attempts: 5
+    max-attempts: 10
     window-minutes: 15
   generic:
-    max-requests: 10
+    max-requests: 30
     window-minutes: 15
   ip:
-    max-requests: 100
+    max-requests: 200
     window-minutes: 1
 
 logging:

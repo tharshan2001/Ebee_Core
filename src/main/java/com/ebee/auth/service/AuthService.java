@@ -6,6 +6,7 @@ import com.ebee.auth.dto.AuthResponse;
 import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.security.UserPrincipal;
+import com.ebee.auth.security.RateLimitingService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.driver.entity.Driver;
@@ -52,11 +53,27 @@ public class AuthService {
     private final OtpService otpService;
     private final DriverRepository driverRepository;
     private final AuditLogService auditLogService;
+    private final RateLimitingService rateLimitingService;
 
     public AuthResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        String email = request.getEmail();
+        String loginKey = "login:" + email;
+
+        if (!rateLimitingService.isLoginAllowed(loginKey)) {
+            log.warn("Login rate limit exceeded for: {}", email);
+            throw new IllegalStateException("Too many login attempts. Please try again later.");
+        }
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
+            );
+        } catch (Exception e) {
+            throw e;
+        }
+
+        rateLimitingService.resetLoginAttempts(loginKey);
 
         User user = ((UserPrincipal) authentication.getPrincipal()).getUser();
 

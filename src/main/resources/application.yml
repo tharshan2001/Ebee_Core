@@ -76,6 +76,17 @@ app:
   backup:
     dir: ${user.dir}/backups
 
+rate-limiting:
+  login:
+    max-attempts: 5
+    window-minutes: 15
+  generic:
+    max-requests: 10
+    window-minutes: 15
+  ip:
+    max-requests: 100
+    window-minutes: 1
+
 logging:
   level:
     com.ebee: INFO

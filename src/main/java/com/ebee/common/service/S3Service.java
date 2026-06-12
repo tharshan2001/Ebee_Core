@@ -26,10 +26,22 @@ public class S3Service {
     @Value("${aws.region}")
     private String region;
 
+    private static final java.util.Set<String> ALLOWED_CONTENT_TYPES = java.util.Set.of(
+            "image/jpeg", "image/png", "image/webp", "image/gif",
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
     @Async
     public CompletableFuture<String> uploadFile(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
             return CompletableFuture.completedFuture(null);
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new IllegalArgumentException("File type '" + contentType + "' is not allowed");
         }
 
         String originalName = file.getOriginalFilename();

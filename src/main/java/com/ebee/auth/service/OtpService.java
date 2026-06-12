@@ -7,12 +7,12 @@ import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -21,8 +21,9 @@ public class OtpService {
 
     private static final long OTP_TTL_SECONDS = 300;
     private static final int OTP_LENGTH = 6;
+    private static final String OTP_KEY_PREFIX = "otp:";
 
-    private final ConcurrentHashMap<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
+    private final StringRedisTemplate redisTemplate;
     private final NotificationPort notificationPort;
     private final UserRepository userRepository;
 
@@ -32,7 +33,7 @@ public class OtpService {
 
     public void generateAndSendOtp(String email, String purpose) {
         String otp = generateOtp();
-        otpStore.put(email, new OtpEntry(otp, LocalDateTime.now().plusSeconds(OTP_TTL_SECONDS)));
+        redisTemplate.opsForValue().set(OTP_KEY_PREFIX + email, otp, OTP_TTL_SECONDS, TimeUnit.SECONDS);
 
         User user = userRepository.findByEmail(email).orElse(null);
         String phoneNumber = user != null ? user.getPhoneNumber() : null;
@@ -61,22 +62,18 @@ public class OtpService {
     }
 
     public boolean verifyOtp(String email, String otp) {
-        OtpEntry entry = otpStore.get(email);
+        String key = OTP_KEY_PREFIX + email;
+        String storedOtp = redisTemplate.opsForValue().get(key);
 
-        if (entry == null) {
+        if (storedOtp == null) {
             return false;
         }
 
-        if (entry.expiry().isBefore(LocalDateTime.now())) {
-            otpStore.remove(email);
+        if (!storedOtp.equals(otp.trim())) {
             return false;
         }
 
-        if (!entry.otp().equals(otp.trim())) {
-            return false;
-        }
-
-        otpStore.remove(email);
+        redisTemplate.delete(key);
         return true;
     }
 
@@ -88,6 +85,4 @@ public class OtpService {
         }
         return otp.toString();
     }
-
-    private record OtpEntry(String otp, LocalDateTime expiry) {}
 }

@@ -44,6 +44,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     boolean existsByOrderNumber(String orderNumber);
 
+    @Query("SELECT MAX(o.orderNumber) FROM Order o WHERE o.orderNumber LIKE :pattern")
+    String findMaxOrderNumberByPattern(@Param("pattern") String pattern);
+
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
     BigDecimal sumRevenueByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 

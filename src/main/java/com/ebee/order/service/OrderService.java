@@ -6,6 +6,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
+import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.order.util.OrderItemSummaryBuilder;
@@ -83,7 +84,9 @@ public class OrderService {
 
         Customer customer = customerService.findByPhone(request.getCustomerPhoneNumber());
 
-        String orderNumber = orderNumberService.generateOrderNumber();
+        OrderSource orderSource = agent != null ? OrderSource.AGENT : OrderSource.DIRECT;
+        District district = customer.getAddress().getDistrict();
+        String orderNumber = orderNumberService.generateOrderNumber(district, orderSource);
 
         Order order = Order.builder()
                 .agent(agent)
@@ -92,7 +95,7 @@ public class OrderService {
                 .orderNumber(orderNumber)
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
-                .orderSource(agent != null ? OrderSource.AGENT : OrderSource.DIRECT)
+                .orderSource(orderSource)
                 .items(new ArrayList<>())
                 .build();
 

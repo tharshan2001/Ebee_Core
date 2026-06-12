@@ -22,10 +22,15 @@ All endpoints (except public ones) require a JWT Bearer token:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Public endpoints** (no auth required):
+**Public endpoints** (no auth required, rate-limited):
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/verify-otp`
+- `POST /api/auth/reset-password`
 - `POST /api/agent-applications`
+- `GET /api/products/**`
+- `GET /api/categories/**`
 
 See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 
@@ -169,6 +174,7 @@ All endpoints return a consistent JSON envelope:
 | 401 | Unauthorized — missing or invalid token |
 | 403 | Forbidden — insufficient role |
 | 404 | Resource not found |
+| 429 | Too many requests — rate limit exceeded |
 | 500 | Internal server error |
 
 ---
@@ -190,6 +196,6 @@ All endpoints return a consistent JSON envelope:
 
 ## Env Configuration
 
-All secrets are loaded from environment variables. See `.env` (gitignored) for local development values.
+All secrets are loaded from environment variables. See `.env.example` for the required variables.
 
-Required vars: `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD`, `DIALOG_SMS_USERNAME`, `DIALOG_SMS_PASSWORD`, `JWT_SECRET`, `DB_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+Required vars: `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD`, `DIALOG_SMS_USERNAME`, `DIALOG_SMS_PASSWORD`, `JWT_SECRET`, `JWT_RESET_SECRET`, `DB_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.

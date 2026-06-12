@@ -1,5 +1,40 @@
 # Authentication API
 
+> **Rate Limiting:** Auth endpoints are rate-limited. Login is capped at 5 attempts per 15 minutes per email. Generic endpoints (forgot-password, verify-otp, reset-password, refresh) are capped at 10 requests per 15 minutes. All endpoints are capped at 100 requests per minute per IP. Excess requests return `429 Too Many Requests`.
+
+---
+
+## Register
+
+**POST** `/api/auth/register`
+
+**Access:** ADMIN only (`@PreAuthorize("hasRole('ADMIN')")`)
+
+**Request:**
+```json
+{
+  "email": "newagent@ebee.com",
+  "password": "SecureP@ss1",
+  "firstName": "New",
+  "lastName": "Agent",
+  "phoneNumber": "+94771234567",
+  "role": "AGENT"
+}
+```
+
+> **Password requirements:** Minimum 8 characters, must contain at least one uppercase letter, one lowercase letter, one digit, and one special character (`@#$%^&+=!`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": { ... }
+}
+```
+
+---
+
 ## Login
 
 **POST** `/api/auth/login`
@@ -155,9 +190,11 @@ For a DRIVER user, driver fields are populated:
 ```json
 {
   "currentPassword": "admin123",
-  "newPassword": "newSecurePass456"
+  "newPassword": "NewSecurePass@456"
 }
 ```
+
+> **Password requirements:** Minimum 8 characters, must contain at least one uppercase letter, one lowercase letter, one digit, and one special character (`@#$%^&+=!`).
 
 **Response:**
 ```json
@@ -194,14 +231,7 @@ Sends a 6-digit OTP to the user's email and phone number (if available). OTP exp
 }
 ```
 
-**Error (unknown email):**
-```json
-{
-  "success": false,
-  "message": "User not found with email: 'unknown@test.com'",
-  "data": null
-}
-```
+> **Note:** The response is identical for existing and non-existing emails. This endpoint does not reveal whether an email is registered (prevents email enumeration).
 
 ---
 
@@ -255,9 +285,11 @@ Uses the reset token from verify-otp to set a new password. The reset token is a
 ```json
 {
   "resetToken": "eyJhbGciOiJIUzI1NiJ9...",
-  "newPassword": "myNewSecurePassword"
+  "newPassword": "MyNewSecureP@ss1"
 }
 ```
+
+> **Password requirements:** Minimum 8 characters, must contain at least one uppercase letter, one lowercase letter, one digit, and one special character (`@#$%^&+=!`).
 
 **Response:**
 ```json

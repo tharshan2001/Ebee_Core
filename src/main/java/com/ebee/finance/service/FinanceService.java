@@ -42,7 +42,9 @@ public class FinanceService {
 
         List<Object[]> categoryRows = expenseRepository.sumApprovedGroupByCategory(start, end);
         List<CategoryBreakdown> expenseByCategory = categoryRows.stream()
-                .map(row -> new CategoryBreakdown((String) row[0], (BigDecimal) row[1]))
+                .map(row -> new CategoryBreakdown(
+                        row[0] instanceof Enum ? ((Enum<?>) row[0]).name() : String.valueOf(row[0]),
+                        (BigDecimal) row[1]))
                 .toList();
 
         List<ExpenseBudget> budgets = budgetRepository.findAllByOrderByPeriodStartDescCategoryAsc();

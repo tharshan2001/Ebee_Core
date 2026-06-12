@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -61,6 +62,15 @@ public class ExpenseBudgetService {
     public BudgetResponse updateBudget(UUID id, BudgetRequest request) {
         ExpenseBudget budget = findBudget(id);
 
+        budgetRepository.findByCategoryAndPeriodStart(request.getCategory(), request.getPeriodStart())
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(id)) {
+                        throw new IllegalArgumentException(
+                                "Budget already exists for category " + request.getCategory()
+                                + " starting " + request.getPeriodStart());
+                    }
+                });
+
         budget.setCategory(request.getCategory());
         budget.setPeriodStart(request.getPeriodStart());
         budget.setPeriodEnd(request.getPeriodEnd());
@@ -73,13 +83,7 @@ public class ExpenseBudgetService {
 
     @Transactional
     public void addSpending(ExpenseCategory category, LocalDate dateIncurred, BigDecimal amount) {
-        List<ExpenseBudget> budgets = budgetRepository.findByPeriodStartGreaterThanEqualOrderByCategory(LocalDate.of(1900, 1, 1));
-
-        ExpenseBudget matchingBudget = budgets.stream()
-                .filter(b -> b.getCategory() == category)
-                .filter(b -> !dateIncurred.isBefore(b.getPeriodStart()) && !dateIncurred.isAfter(b.getPeriodEnd()))
-                .findFirst()
-                .orElse(null);
+        ExpenseBudget matchingBudget = budgetRepository.findByCategoryAndDate(category, dateIncurred).orElse(null);
 
         if (matchingBudget == null) {
             log.debug("No budget found for category {} on date {}", category, dateIncurred);
@@ -91,7 +95,7 @@ public class ExpenseBudgetService {
 
         BigDecimal utilization = matchingBudget.getSpentAmount()
                 .multiply(BigDecimal.valueOf(100))
-                .divide(matchingBudget.getAllocatedAmount(), 1, java.math.RoundingMode.HALF_UP);
+                .divide(matchingBudget.getAllocatedAmount(), 1, RoundingMode.HALF_UP);
 
         if (utilization.compareTo(BigDecimal.valueOf(100)) >= 0) {
             log.warn("Budget exceeded for category {}: spent LKR {} of allocated LKR {} ({}%)",

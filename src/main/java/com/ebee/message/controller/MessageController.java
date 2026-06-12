@@ -49,6 +49,7 @@ public class MessageController {
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        size = Math.min(size, 200);
         User admin = getUser(authentication);
         Page<MessageResponse> messages = messageService.getSentMessages(admin,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "sentAt")));
@@ -61,6 +62,7 @@ public class MessageController {
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        size = Math.min(size, 200);
         User admin = getUser(authentication);
         MessageResponse response = messageService.getMessageWithRecipients(id, admin,
                 PageRequest.of(page, size));

@@ -19,5 +19,4 @@ public class DriverWithCredentialsResponse {
     private DriverAvailability availability;
     private Boolean isActive;
     private LocalDateTime createdAt;
-    private String generatedPassword;
 }

@@ -12,10 +12,12 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -25,6 +27,9 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
+    @Value("${jwt.reset-secret:}")
+    private String resetSecret;
+
     @Value("${jwt.expiration:86400000}")
     private long expiration;
 
@@ -32,7 +37,7 @@ public class JwtService {
     private long refreshExpiration;
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(Authentication authentication) {
@@ -45,7 +50,9 @@ public class JwtService {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
+                .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
+                .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -56,7 +63,9 @@ public class JwtService {
 
         return Jwts.builder()
                 .setSubject(email)
+                .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
+                .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
                 .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -70,11 +79,6 @@ public class JwtService {
         Claims claims = extractAllClaims(token);
         String role = claims.get("role", String.class);
         return RoleType.valueOf(role.replace("ROLE_", ""));
-    }
-
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String email = extractEmail(token);
-        return (email.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
     private boolean isTokenExpired(String token) {
@@ -115,17 +119,33 @@ public class JwtService {
     public String generateResetToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
+                .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
+                .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
                 .setExpiration(new Date(System.currentTimeMillis() + 300_000))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(getResetSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String extractEmailFromResetToken(String token) {
         try {
-            return extractEmail(token);
+            return extractClaim(token, getResetSigningKey(), Claims::getSubject);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid or expired reset token");
         }
+    }
+
+    private Key getResetSigningKey() {
+        String key = resetSecret != null && !resetSecret.isEmpty() ? resetSecret : secret;
+        return Keys.hmacShaKeyFor(key.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private <T> T extractClaim(String token, Key signingKey, Function<Claims, T> claimsResolver) {
+        final Claims claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claimsResolver.apply(claims);
     }
 }

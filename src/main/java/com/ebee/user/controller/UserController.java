@@ -41,6 +41,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or @securityService.isCurrentUser(#id, authentication)")
     public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable UUID id) {
         UserResponse response = userService.getUserById(id);
         return ResponseEntity.ok(ApiResponse.success("User retrieved successfully", response));

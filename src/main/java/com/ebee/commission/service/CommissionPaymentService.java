@@ -35,6 +35,16 @@ public class CommissionPaymentService {
     @Transactional
     public CommissionResponse markAsPaid(UUID commissionId) {
         Commission commission = getCommissionEntity(commissionId);
+
+        if (commission.getStatus() == CommissionStatus.PAID) {
+            throw new IllegalStateException("Commission " + commissionId + " is already paid");
+        }
+        if (commission.getStatus() != CommissionStatus.PROCESSING) {
+            throw new IllegalStateException(
+                    "Commission " + commissionId + " must be in PROCESSING status to mark as paid (current: "
+                    + commission.getStatus() + ")");
+        }
+
         commission.setStatus(CommissionStatus.PAID);
         commission.setPaidAt(LocalDateTime.now());
         commission = commissionRepository.save(commission);

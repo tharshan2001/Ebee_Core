@@ -67,15 +67,11 @@ public class UserService {
                     
                     Welcome to Ebee! Your account has been created successfully.
                     
-                    Your login credentials:
-                    Email: %s
-                    Password: %s
-                    
-                    Please log in and change your password immediately.
+                    You can log in using your registered email address. If you need to set or reset your password, please use the "Forgot Password" option on the login page.
                     
                     Best regards,
                     Ebee Team
-                    """.formatted(user.getFirstName(), user.getEmail(), rawPassword);
+                    """.formatted(user.getFirstName());
             notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
@@ -125,9 +121,6 @@ public class UserService {
         user.setLastName(request.getLastName());
         user.setPhoneNumber(request.getPhoneNumber());
         encodePasswordIfPresent(user, request.getPassword());
-        if (request.getStatus() != null) {
-            user.setStatus(request.getStatus());
-        }
 
         User updatedUser = userRepository.save(user);
         return userMapper.toResponse(updatedUser);

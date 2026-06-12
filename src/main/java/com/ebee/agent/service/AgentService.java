@@ -101,8 +101,7 @@ public class AgentService {
         auditLogService.record(AuditAction.CREATE, "Agent", savedAgent.getId(),
                 "Agent " + savedAgent.getAgentCode() + " (" + savedAgent.getUser().getEmail() + ") created");
 
-        sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, generatedPassword,
-                savedAgent);
+        sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, savedAgent);
 
         return AgentWithCredentialsResponse.builder()
                 .agentId(savedAgent.getId())
@@ -123,7 +122,6 @@ public class AgentService {
                 .userStatus(savedUser.getStatus())
                 .isActive(savedAgent.getIsActive())
                 .createdAt(savedAgent.getCreatedAt())
-                .generatedPassword(generatedPassword)
                 .mustChangePassword(true)
                 .build();
     }
@@ -293,6 +291,12 @@ public class AgentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
         agent.setIsActive(false);
         agentRepository.save(agent);
+
+        User user = agent.getUser();
+        user.setIsActive(false);
+        user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
+
         auditLogService.record(AuditAction.AGENT_DEACTIVATE, "Agent", id,
                 "Agent " + agent.getAgentCode() + " deleted (deactivated)");
     }
@@ -320,7 +324,7 @@ public class AgentService {
         auditLogService.record(AuditAction.PASSWORD_RESET, "Agent", id,
                 "Password reset for agent " + agent.getAgentCode());
 
-        sendPasswordResetNotification(agent, rawPassword);
+        sendPasswordResetNotification(agent);
     }
 
     private void sendAgentStatusNotification(Agent agent, String statusLabel, String message, boolean includeSms) {
@@ -345,7 +349,7 @@ public class AgentService {
     }
 
     private void sendWelcomeNotification(String firstName, String lastName, String agentCode,
-                                          String password, Agent agent) {
+                                          Agent agent) {
         try {
             String subject = "Welcome to Ebee — Agent Registration Successful";
             String message = """
@@ -353,18 +357,14 @@ public class AgentService {
                     
                     Congratulations! Your agent account has been successfully created.
                     
-                    Your Login Credentials:
-                    ───────────────────────────
                     Agent Code : %s
                     Email      : %s
-                    Password   : %s
-                    ───────────────────────────
                     
-                    Please log in and change your password at your earliest convenience.
+                    Please log in and use the "Forgot Password" option to set your password.
                     
                     Best regards,
                     Ebee Team
-                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), password);
+                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail());
             notificationPort.notifyAgent(agent, subject, message);
             notificationPort.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {
@@ -372,7 +372,7 @@ public class AgentService {
         }
     }
 
-    private void sendPasswordResetNotification(Agent agent, String password) {
+    private void sendPasswordResetNotification(Agent agent) {
         try {
             String subject = "Password Reset – Ebee";
             String message = """
@@ -380,18 +380,14 @@ public class AgentService {
                     
                     Your password has been reset by an administrator.
                     
-                    Your new login credentials:
-                    ───────────────────────────
-                    Email      : %s
-                    Password   : %s
-                    ───────────────────────────
+                    Email: %s
                     
-                    You will be required to change your password upon login.
+                    Please log in and use the "Forgot Password" option to set a new password.
                     
                     Best regards,
                     Ebee Team
                     """.formatted(agent.getUser().getFirstName(), agent.getUser().getLastName(),
-                    agent.getUser().getEmail(), password);
+                    agent.getUser().getEmail());
             notificationPort.notifyAgent(agent, subject, message);
             notificationPort.createInternalAlert(agent.getUser(), subject, message,
                     AlertType.AGENT_ACTIVATED, agent.getId(), "agent");

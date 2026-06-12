@@ -31,5 +31,4 @@ public class AgentWithCredentialsResponse {
     private Boolean isActive;
     private Boolean mustChangePassword;
     private LocalDateTime createdAt;
-    private String generatedPassword;
 }

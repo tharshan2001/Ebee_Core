@@ -25,7 +25,7 @@ public class CommissionConfigController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> createConfig(
-            @RequestBody CommissionConfigRequest request) {
+            @Valid @RequestBody CommissionConfigRequest request) {
         CommissionConfigResponse response = configService.createConfig(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Commission config created successfully", response));
@@ -35,7 +35,7 @@ public class CommissionConfigController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> updateConfig(
             @PathVariable UUID id,
-            @RequestBody CommissionConfigRequest request) {
+            @Valid @RequestBody CommissionConfigRequest request) {
         CommissionConfigResponse response = configService.updateConfig(id, request);
         return ResponseEntity.ok(ApiResponse.success("Commission config updated successfully", response));
     }

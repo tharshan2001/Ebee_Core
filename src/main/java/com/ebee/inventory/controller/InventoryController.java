@@ -24,24 +24,28 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<InventoryResponse>> getInventoryById(@PathVariable UUID id) {
         InventoryResponse response = inventoryService.getInventoryById(id);
         return ResponseEntity.ok(ApiResponse.success("Inventory retrieved successfully", response));
     }
 
     @GetMapping("/product/{productId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<InventoryResponse>> getInventoryByProductId(@PathVariable UUID productId) {
         InventoryResponse response = inventoryService.getInventoryByProductId(productId);
         return ResponseEntity.ok(ApiResponse.success("Inventory retrieved successfully", response));
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> getAllInventories() {
         List<InventoryResponse> response = inventoryService.getAllInventories();
         return ResponseEntity.ok(ApiResponse.success("Inventories retrieved successfully", response));
     }
 
     @GetMapping("/low-stock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> getLowStockInventories() {
         List<InventoryResponse> response = inventoryService.getLowStockInventories();
         return ResponseEntity.ok(ApiResponse.success("Low stock inventories retrieved successfully", response));
@@ -75,6 +79,7 @@ public class InventoryController {
     }
 
     @GetMapping("/product/{productId}/history")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<List<StockResponse>>> getStockHistoryByProductId(@PathVariable UUID productId) {
         List<StockResponse> response = inventoryService.getStockHistoryByProductId(productId);
         return ResponseEntity.ok(ApiResponse.success("Stock history retrieved successfully", response));

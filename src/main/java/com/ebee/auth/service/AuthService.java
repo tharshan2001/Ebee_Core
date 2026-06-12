@@ -266,12 +266,11 @@ public class AuthService {
     }
 
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-
-        otpService.generateAndSendOtp(user.getEmail());
-        auditLogService.record(AuditAction.FORGOT_PASSWORD, "User", user.getId(),
-                "User " + user.getEmail() + " requested password reset");
+        userRepository.findByEmail(email).ifPresent(user -> {
+            otpService.generateAndSendOtp(user.getEmail());
+            auditLogService.record(AuditAction.FORGOT_PASSWORD, "User", user.getId(),
+                    "User " + user.getEmail() + " requested password reset");
+        });
     }
 
     public String verifyOtp(String email, String otp) {

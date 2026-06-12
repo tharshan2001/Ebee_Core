@@ -80,7 +80,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
         log.warn("Type mismatch for parameter '{}': {}", ex.getName(), ex.getValue());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Invalid value for " + ex.getName() + ": " + ex.getValue()));
+                .body(ApiResponse.error("Invalid value for parameter: " + ex.getName()));
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)

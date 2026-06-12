@@ -4,7 +4,6 @@ import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -44,14 +43,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String email;
 
-        // Try to extract token from Authorization header first
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
         } else {
-            // Try to extract token from cookies
-            jakarta.servlet.http.Cookie[] cookies = request.getCookies();
-            jwt = extractTokenFromCookies(cookies);
+            filterChain.doFilter(request, response);
+            return;
         }
 
         if (jwt == null) {
@@ -76,13 +73,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String extractTokenFromCookies(jakarta.servlet.http.Cookie[] cookies) {
-        if (cookies == null) return null;
-        for (jakarta.servlet.http.Cookie cookie : cookies) {
-            if ("jwt_token".equals(cookie.getName())) {
-                return cookie.getValue();
-            }
-        }
-        return null;
-    }
 }

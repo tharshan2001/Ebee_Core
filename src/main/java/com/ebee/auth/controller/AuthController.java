@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.function.Consumer;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -31,17 +32,7 @@ public class AuthController {
             HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request);
 
-        Cookie jwtCookie = new Cookie("jwt_token", authResponse.getToken());
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(24 * 60 * 60);
-        response.addCookie(jwtCookie);
-
-        Cookie refreshCookie = new Cookie("refresh_token", authResponse.getRefreshToken());
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setPath("/api/auth/refresh");
-        refreshCookie.setMaxAge(7 * 24 * 60 * 60);
-        response.addCookie(refreshCookie);
+        addAuthCookies(response, authResponse.getToken(), authResponse.getRefreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
     }
@@ -71,17 +62,7 @@ public class AuthController {
             authService.logout(email);
         }
 
-        Cookie jwtCookie = new Cookie("jwt_token", null);
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(0);
-        response.addCookie(jwtCookie);
-
-        Cookie refreshCookie = new Cookie("refresh_token", null);
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setPath("/api/auth/refresh");
-        refreshCookie.setMaxAge(0);
-        response.addCookie(refreshCookie);
+        clearAuthCookies(response);
 
         return ResponseEntity.ok(ApiResponse.success("Logout successful"));
     }
@@ -109,17 +90,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.refreshToken(refreshToken);
 
-        Cookie jwtCookie = new Cookie("jwt_token", authResponse.getToken());
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setPath("/");
-        jwtCookie.setMaxAge(24 * 60 * 60);
-        response.addCookie(jwtCookie);
-
-        Cookie newRefreshCookie = new Cookie("refresh_token", authResponse.getRefreshToken());
-        newRefreshCookie.setHttpOnly(true);
-        newRefreshCookie.setPath("/api/auth/refresh");
-        newRefreshCookie.setMaxAge(7 * 24 * 60 * 60);
-        response.addCookie(newRefreshCookie);
+        addAuthCookies(response, authResponse.getToken(), authResponse.getRefreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
     }
@@ -128,7 +99,11 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             @RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.replace("Bearer ", "");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid Authorization header"));
+        }
+        String token = authHeader.substring(7);
         String email = jwtService.extractEmailFromToken(token);
         authService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
@@ -154,5 +129,23 @@ public class AuthController {
             @Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request.getResetToken(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
+    }
+
+    private void addAuthCookies(HttpServletResponse response, String token, String refreshToken) {
+        addCookie(response, "refresh_token", refreshToken, 7 * 24 * 60 * 60, "/api/auth/refresh");
+    }
+
+    private void clearAuthCookies(HttpServletResponse response) {
+        addCookie(response, "refresh_token", null, 0, "/api/auth/refresh");
+    }
+
+    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path) {
+        Cookie cookie = new Cookie(name, value);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath(path);
+        cookie.setMaxAge(maxAge);
+        cookie.setAttribute("SameSite", "Strict");
+        response.addCookie(cookie);
     }
 }

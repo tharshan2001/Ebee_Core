@@ -6,6 +6,7 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.service.CommissionLifecycleService;
+import org.springframework.security.access.AccessDeniedException;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.notification.NotificationPort;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
@@ -105,6 +106,14 @@ public class DeliveryService {
     public DeliveryResponse updateDeliveryStatus(UUID orderId, DeliveryStatusUpdateRequest request) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            if (order.getDeliveryAssignedTo() == null ||
+                    !order.getDeliveryAssignedTo().getId().equals(currentUserId)) {
+                throw new AccessDeniedException("You can only update deliveries assigned to you");
+            }
+        }
 
         DeliveryStatus newStatus = request.getStatus();
 

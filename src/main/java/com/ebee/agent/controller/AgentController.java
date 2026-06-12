@@ -88,12 +88,14 @@ public class AgentController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> getAgentById(@PathVariable UUID id) {
         AgentResponse response = agentService.getAgentById(id);
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));
     }
 
     @GetMapping("/user/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> getAgentByUserId(@PathVariable UUID userId) {
         AgentResponse response = agentService.getAgentByUserId(userId);
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));
@@ -107,6 +109,7 @@ public class AgentController {
     }
 
     @GetMapping("/code/{agentCode}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> getAgentByAgentCode(@PathVariable String agentCode) {
         AgentResponse response = agentService.getAgentByAgentCode(agentCode);
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));

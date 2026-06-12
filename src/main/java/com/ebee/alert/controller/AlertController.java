@@ -34,6 +34,7 @@ public class AlertController {
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        size = Math.min(size, 200);
         UUID userId = getUserId(authentication);
         Page<Alert> alerts = alertRepository.findByRecipientIdOrderByCreatedAtDesc(
                 userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));

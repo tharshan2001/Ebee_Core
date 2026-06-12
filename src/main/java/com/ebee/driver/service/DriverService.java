@@ -66,17 +66,16 @@ public class DriverService {
 
         Driver savedDriver = driverRepository.save(driver);
 
-        String subject = "Welcome to Ebee – Driver Login Credentials";
+        String subject = "Welcome to Ebee – Driver Account Created";
         String message = """
                 Dear %s,
                 
                 Your driver account has been created.
                 
                 Email: %s
-                Password: %s
                 
-                Please log in and change your password.
-                """.formatted(savedUser.getFirstName(), savedUser.getEmail(), generatedPassword);
+                Please log in and use the "Forgot Password" option to set your password.
+                """.formatted(savedUser.getFirstName(), savedUser.getEmail());
         auditLogService.record(AuditAction.DRIVER_CREATE, "Driver", savedDriver.getId(),
                 "Driver " + savedUser.getFirstName() + " " + savedUser.getLastName()
                 + " (" + savedUser.getEmail() + ") created");
@@ -93,7 +92,6 @@ public class DriverService {
                 .availability(savedDriver.getAvailability())
                 .isActive(savedDriver.getIsActive())
                 .createdAt(savedDriver.getCreatedAt())
-                .generatedPassword(generatedPassword)
                 .build();
     }
 

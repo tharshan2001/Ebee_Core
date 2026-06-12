@@ -36,7 +36,7 @@ public class CommissionController {
     @PostMapping("/calculate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> calculateCommission(
-            @RequestBody CommissionCalculateRequest request) {
+            @Valid @RequestBody CommissionCalculateRequest request) {
         CommissionResponse response = calculationService.calculateCommission(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Commission calculated successfully", response));
@@ -66,6 +66,7 @@ public class CommissionController {
     }
 
     @GetMapping("/agent/{agentId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getCommissionsByAgent(
             @PathVariable UUID agentId) {
         List<CommissionResponse> response = queryService.getCommissionsByAgent(agentId);
@@ -109,6 +110,7 @@ public class CommissionController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> getCommissionById(@PathVariable UUID id) {
         CommissionResponse response = queryService.getCommissionById(id);
         return ResponseEntity.ok(ApiResponse.success("Commission retrieved successfully", response));

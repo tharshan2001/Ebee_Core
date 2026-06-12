@@ -32,6 +32,7 @@ public class AuditLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
+        size = Math.min(size, 200);
         Page<AuditLog> logs = auditLogService.getLogs(entityType, entityId, action,
                 performedBy, startDate, endDate, page, size);
         return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved", logs));

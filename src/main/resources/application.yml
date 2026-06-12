@@ -18,8 +18,8 @@ spring:
   
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     open-in-view: false
     properties:
       hibernate:
@@ -78,5 +78,5 @@ app:
 
 logging:
   level:
-    com.ebee: DEBUG
+    com.ebee: INFO
     org.springframework.security: INFO

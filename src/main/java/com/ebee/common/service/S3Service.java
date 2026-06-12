@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -31,13 +32,16 @@ public class S3Service {
             return CompletableFuture.completedFuture(null);
         }
 
-        String fileName = folder + "/" + java.util.UUID.randomUUID() + "-" + file.getOriginalFilename();
+        String originalName = file.getOriginalFilename();
+        String safeName = originalName != null ? originalName.replaceAll("[^a-zA-Z0-9._-]", "_") : "file";
+        String fileName = folder + "/" + java.util.UUID.randomUUID() + "-" + safeName;
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(fileName)
                     .contentType(file.getContentType())
+                    .serverSideEncryption(ServerSideEncryption.AES256)
                     .build();
 
             s3Client.putObject(putObjectRequest,

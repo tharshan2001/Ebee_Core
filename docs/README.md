@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ebee is a commission-based order management system for Sri Lanka. This API covers order processing, agent management, commission calculation, customer management, agent applications, and delivery tracking with district-based trip routing and driver management.
+Ebee is a POS (Point-of-Sale) and Commission Management System for Sri Lanka. It covers order processing, agent management, commission calculation, customer management, agent applications, expense tracking, financial reporting, inventory management, and delivery tracking with district-based routing and driver management.
 
 ---
 
@@ -54,6 +54,8 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
 | Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
 | Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
+| Expenses | [EXPENSE_API.md](EXPENSE_API.md) | ADMIN, AGENT, DRIVER |
+| Finance | [FINANCE_API.md](FINANCE_API.md) | ADMIN |
 | Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |
 | Messages | [MESSAGE_API.md](MESSAGE_API.md) | ADMIN |
 | Reminders | [REMINDER_API.md](REMINDER_API.md) | ADMIN |
@@ -196,6 +198,20 @@ All endpoints return a consistent JSON envelope:
 
 ## Env Configuration
 
-All secrets are loaded from environment variables. See `.env.example` for the required variables.
+All secrets are loaded from environment variables (see `.env` in the project root).
 
-Required vars: `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD`, `DIALOG_SMS_USERNAME`, `DIALOG_SMS_PASSWORD`, `JWT_SECRET`, `JWT_RESET_SECRET`, `DB_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GMAIL_USERNAME` | Gmail SMTP username | `dev` |
+| `GMAIL_APP_PASSWORD` | Gmail app password | `dev` |
+| `DIALOG_SMS_USERNAME` | Dialog SMS API username | `dev` |
+| `DIALOG_SMS_PASSWORD` | Dialog SMS API password | `dev` |
+| `DIALOG_SMS_API_URL` | Dialog SMS API base URL | `https://richcommunication.dialog.lk/api` |
+| `DIALOG_SMS_MASK` | SMS sender mask | `KISMET PLUS` |
+| `DIALOG_SMS_CAMPAIGN` | SMS campaign name | `Notification` |
+| `JWT_SECRET` | JWT signing secret (256-bit) | `temp-test-secret-...` |
+| `DB_PASSWORD` | PostgreSQL password | _(empty, trust auth)_ |
+| `AWS_ACCESS_KEY_ID` | AWS access key | `testkey` |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | `testsecret` |
+| `AWS_REGION` | AWS region | `eu-north-1` |
+| `AWS_BUCKET_NAME` | AWS S3 bucket | `pathfinder-app-media` |

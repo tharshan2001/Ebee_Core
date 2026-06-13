@@ -12,6 +12,7 @@ target/
 .settings/
 .project
 .classpath
+.run/
 
 # Maven
 pom.xml.tag
@@ -43,3 +44,6 @@ backups/
 surefire-reports/
 failsafe-reports/
 cookies.txt
+
+# OpenCode
+.opencode/node_modules/

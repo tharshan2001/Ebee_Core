@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +41,6 @@ public class ExpenseService {
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
     private final S3Service s3Service;
-    private final ExpenseBudgetService expenseBudgetService;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request, MultipartFile receipt) {
@@ -76,10 +74,6 @@ public class ExpenseService {
         }
 
         expense = expenseRepository.save(expense);
-
-        if (expense.getStatus() == ExpenseStatus.APPROVED) {
-            expenseBudgetService.addSpending(expense.getCategory(), expense.getDateIncurred(), expense.getAmount());
-        }
 
         auditLogService.record(AuditAction.CREATE, "Expense", expense.getId(),
                 "Expense " + expense.getCategory() + " LKR " + expense.getAmount() + " created by " + currentUser.getEmail());
@@ -132,8 +126,6 @@ public class ExpenseService {
         expense.setApprovedBy(admin);
         expense.setApprovedAt(LocalDateTime.now());
         expense = expenseRepository.save(expense);
-
-        expenseBudgetService.addSpending(expense.getCategory(), expense.getDateIncurred(), expense.getAmount());
 
         auditLogService.record(AuditAction.EXPENSE_APPROVE, "Expense", expense.getId(),
                 "Expense " + expense.getCategory() + " LKR " + expense.getAmount() + " approved by " + admin.getEmail());

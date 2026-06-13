@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import com.ebee.finance.dto.CategoryBreakdown;
 
 @Data
 @Builder
@@ -15,5 +16,4 @@ public class FinanceSummaryResponse {
     private BigDecimal netProfit;
     private PeriodInfo period;
     private List<CategoryBreakdown> expenseByCategory;
-    private List<BudgetUtilization> budgetUtilization;
 }

@@ -2,10 +2,7 @@ package com.ebee.finance.service;
 
 import com.ebee.common.util.DateUtils;
 import com.ebee.commission.repository.CommissionRepository;
-import com.ebee.expense.entity.ExpenseBudget;
-import com.ebee.expense.repository.ExpenseBudgetRepository;
 import com.ebee.expense.repository.ExpenseRepository;
-import com.ebee.finance.dto.BudgetUtilization;
 import com.ebee.finance.dto.CategoryBreakdown;
 import com.ebee.finance.dto.FinanceSummaryResponse;
 import com.ebee.finance.dto.PeriodInfo;
@@ -16,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -29,7 +25,6 @@ public class FinanceService {
     private final OrderRepository orderRepository;
     private final CommissionRepository commissionRepository;
     private final ExpenseRepository expenseRepository;
-    private final ExpenseBudgetRepository budgetRepository;
 
     public FinanceSummaryResponse getSummary(LocalDate start, LocalDate end) {
         var startDt = DateUtils.toStartDateTime(start);
@@ -47,26 +42,6 @@ public class FinanceService {
                         (BigDecimal) row[1]))
                 .toList();
 
-        List<ExpenseBudget> budgets = budgetRepository.findAllByOrderByPeriodStartDescCategoryAsc();
-        List<BudgetUtilization> budgetUtilization = budgets.stream()
-                .map(b -> {
-                    BigDecimal remaining = b.getAllocatedAmount().subtract(b.getSpentAmount());
-                    BigDecimal utilization = b.getAllocatedAmount().compareTo(BigDecimal.ZERO) > 0
-                            ? b.getSpentAmount().multiply(BigDecimal.valueOf(100))
-                                    .divide(b.getAllocatedAmount(), 1, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    return BudgetUtilization.builder()
-                            .category(b.getCategory().name())
-                            .periodStart(b.getPeriodStart())
-                            .periodEnd(b.getPeriodEnd())
-                            .allocatedAmount(b.getAllocatedAmount())
-                            .spentAmount(b.getSpentAmount())
-                            .remainingAmount(remaining)
-                            .utilizationPercent(utilization)
-                            .build();
-                })
-                .toList();
-
         return FinanceSummaryResponse.builder()
                 .totalRevenue(revenue)
                 .totalCommissions(commissions)
@@ -74,7 +49,6 @@ public class FinanceService {
                 .netProfit(netProfit)
                 .period(PeriodInfo.builder().start(start).end(end).build())
                 .expenseByCategory(expenseByCategory)
-                .budgetUtilization(budgetUtilization)
                 .build();
     }
 }

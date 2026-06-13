@@ -623,7 +623,7 @@ Items where `currentStock < reorderLevel`, with the shortfall amount. **No perio
 
 ### GET /api/reports/financial/profit-loss
 
-Profit and loss statement: revenue, cost of goods sold, gross profit/margin, commissions, net profit.
+Profit and loss statement: revenue, cost of goods sold, gross profit/margin, commissions, expenses, net profit.
 
 **Response:**
 ```json
@@ -636,7 +636,8 @@ Profit and loss statement: revenue, cost of goods sold, gross profit/margin, com
     "grossProfit": 113523.31,
     "grossMargin": 20.8,
     "totalCommissions": 40753.59,
-    "netProfit": 72769.72,
+    "totalExpenses": 17200.00,
+    "netProfit": 55569.72,
     "period": { "startDate": "2026-06-01", "endDate": "2026-06-10" }
   }
 }

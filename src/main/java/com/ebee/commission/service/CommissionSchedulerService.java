@@ -2,6 +2,7 @@ package com.ebee.commission.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ public class CommissionSchedulerService {
     private final CommissionLifecycleService lifecycleService;
 
     @Scheduled(cron = "0 0 2 * * *")
+    @SchedulerLock(name = "processApprovedCommissions")
     public void processApprovedCommissions() {
         log.info("Running scheduled auto-processing of approved commissions (10-day hold)");
         try {

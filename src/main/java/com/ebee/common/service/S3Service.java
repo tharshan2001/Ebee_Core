@@ -11,8 +11,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
-import java.util.concurrent.CompletableFuture;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,10 +31,9 @@ public class S3Service {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 
-    @Async
-    public CompletableFuture<String> uploadFile(MultipartFile file, String folder) {
+    public String uploadFile(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
-            return CompletableFuture.completedFuture(null);
+            return null;
         }
 
         String contentType = file.getContentType();
@@ -59,8 +56,7 @@ public class S3Service {
             s3Client.putObject(putObjectRequest,
                     software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.getBytes()));
 
-            String url = "https://s3." + region + ".amazonaws.com/" + bucketName + "/" + fileName;
-            return CompletableFuture.completedFuture(url);
+            return "https://s3." + region + ".amazonaws.com/" + bucketName + "/" + fileName;
 
         } catch (S3Exception e) {
             log.error("Failed to upload file to S3: {}", e.getMessage(), e);

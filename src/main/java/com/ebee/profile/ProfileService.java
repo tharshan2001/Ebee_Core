@@ -53,7 +53,7 @@ public class ProfileService {
             s3Service.deleteFile(user.getProfilePictureUrl());
         }
 
-        String url = s3Service.uploadFile(file, "profiles").join();
+        String url = s3Service.uploadFile(file, "profiles");
         user.setProfilePictureUrl(url);
         user.setProfilePictureName(file.getOriginalFilename());
         user.setProfilePictureType(file.getContentType());

@@ -12,6 +12,8 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
+import com.ebee.agent.entity.AgentCodeSequence;
+import com.ebee.agent.repository.AgentCodeSequenceRepository;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
@@ -45,6 +47,7 @@ public class AgentService {
     private final NotificationPort notificationPort;
     private final CommissionConfigRepository commissionConfigRepository;
     private final AuditLogService auditLogService;
+    private final AgentCodeSequenceRepository agentCodeSequenceRepository;
 
 
     @Transactional
@@ -397,14 +400,15 @@ public class AgentService {
     }
 
     private String generateAgentCode(District district) {
-        String prefix = district.name();
-        String maxCode = agentRepository.findMaxAgentCodeByPattern(prefix + "-%");
-        int nextSeq = 1;
-        if (maxCode != null) {
-            String[] parts = maxCode.split("-");
-            nextSeq = Integer.parseInt(parts[parts.length - 1]) + 1;
-        }
-        return String.format("%s-%03d", prefix, nextSeq);
+        String districtName = district.name();
+        AgentCodeSequence seq = agentCodeSequenceRepository.findByDistrictWithLock(districtName)
+                .orElseGet(() -> agentCodeSequenceRepository.save(
+                        AgentCodeSequence.builder().district(districtName).nextValue(1).build()
+                ));
+        int code = seq.getNextValue();
+        seq.setNextValue(code + 1);
+        agentCodeSequenceRepository.save(seq);
+        return String.format("%s-%03d", districtName, code);
     }
 
 }

@@ -27,7 +27,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -69,8 +68,7 @@ public class ExpenseService {
         Expense expense = builder.build();
 
         if (receipt != null && !receipt.isEmpty()) {
-            CompletableFuture<String> future = s3Service.uploadFile(receipt, "expenses");
-            expense.setReceiptUrl(future.join());
+            expense.setReceiptUrl(s3Service.uploadFile(receipt, "expenses"));
         }
 
         expense = expenseRepository.save(expense);

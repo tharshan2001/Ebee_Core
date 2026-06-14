@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.stream.Collectors;
 import com.ebee.common.util.DateUtils;
 import com.ebee.common.util.NumberUtils;
 import java.util.*;
@@ -48,13 +49,17 @@ public class CommissionReportService {
 
     public List<CommissionByAgentReport> getByAgent(PeriodRange range) {
         List<Agent> agents = agentRepository.findAllWithUser();
-        List<CommissionByAgentReport> list = new ArrayList<>();
+        List<UUID> agentIds = agents.stream().map(Agent::getId).toList();
+        Map<UUID, Object[]> summaryMap = commissionRepository.findCommissionSummaryByAgentIds(agentIds)
+                .stream()
+                .collect(Collectors.toMap(row -> (UUID) row[0], row -> row));
 
+        List<CommissionByAgentReport> list = new ArrayList<>();
         for (Agent agent : agents) {
-            BigDecimal total = commissionRepository.sumCommissionAmountByAgentId(agent.getId());
-            BigDecimal paid = commissionRepository.sumCommissionAmountByAgentIdAndStatus(agent.getId(), CommissionStatus.PAID);
-            BigDecimal pending = commissionRepository.sumCommissionAmountByAgentIdAndStatus(agent.getId(), CommissionStatus.PROCESSING)
-                    .add(commissionRepository.sumCommissionAmountByAgentIdAndStatus(agent.getId(), CommissionStatus.APPROVED));
+            Object[] summary = summaryMap.get(agent.getId());
+            BigDecimal total = summary != null ? (BigDecimal) summary[1] : BigDecimal.ZERO;
+            BigDecimal paid = summary != null ? (BigDecimal) summary[2] : BigDecimal.ZERO;
+            BigDecimal pending = summary != null ? (BigDecimal) summary[3] : BigDecimal.ZERO;
 
             list.add(CommissionByAgentReport.builder()
                     .agentId(agent.getId())

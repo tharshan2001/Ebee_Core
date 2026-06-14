@@ -8,6 +8,7 @@ import com.ebee.reminder.entity.Reminder;
 import com.ebee.reminder.repository.ReminderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class ReminderSchedulerService {
     private final NotificationPort notificationPort;
 
     @Scheduled(fixedRate = 60_000)
+    @SchedulerLock(name = "processReminders", lockAtMostFor = "PT2M", lockAtLeastFor = "PT55S")
     @Transactional
     public void processReminders() {
         LocalDate today = LocalDate.now();

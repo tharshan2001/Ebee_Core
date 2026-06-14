@@ -4,7 +4,7 @@ import java.security.SecureRandom;
 
 public final class PasswordGenerator {
 
-    private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+    private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*()_+";
     private static final int LENGTH = 12;
     private static final SecureRandom RANDOM = new SecureRandom();
 

@@ -83,23 +83,27 @@ public class UserService {
         }
     }
 
+    @Transactional(readOnly = true)
     public UserResponse getUserById(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         return userMapper.toResponse(user);
     }
 
+    @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         return userMapper.toProfileResponse(user);
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
         List<User> users = userRepository.findAll();
         return userMapper.toResponseList(users);
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponse> getUsersByRole(RoleType role) {
         List<User> users = userRepository.findByRole(role);
         return userMapper.toResponseList(users);

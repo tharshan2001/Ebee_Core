@@ -12,9 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,31 +40,40 @@ public class CommissionQueryService {
 
     public List<CommissionResponse> getCommissionsByAgent(UUID agentId) {
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);
-        return commissionRepository.findByAgentId(agentId).stream()
+        return commissionRepository.findByAgentIdWithDetails(agentId).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), totalSales))
                 .toList();
     }
 
     public List<CommissionResponse> getCommissionsByStatus(CommissionStatus status) {
-        return commissionRepository.findByStatus(status).stream()
+        return commissionRepository.findByStatusWithDetails(status).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
                 .toList();
     }
 
     public CommissionResponse getCommissionById(UUID id) {
-        Commission commission = commissionRepository.findById(id)
+        Commission commission = commissionRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new EntityNotFoundException("Commission not found: " + id));
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(commission.getAgent().getId());
         return enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
     }
 
     public List<CommissionResponse> getAllCommissions() {
-        return commissionRepository.findAll().stream()
-                .map(c -> {
-                    BigDecimal totalSales = commissionRepository.sumSalesByAgentId(c.getAgent().getId());
-                    return enrichWithAgentTotals(mapper.toResponse(c), totalSales);
-                })
+        List<Commission> commissions = commissionRepository.findAllWithDetails();
+        Map<UUID, BigDecimal> salesMap = buildSalesMap(commissions);
+        return commissions.stream()
+                .map(c -> enrichWithAgentTotals(mapper.toResponse(c), salesMap.get(c.getAgent().getId())))
                 .toList();
+    }
+
+    private Map<UUID, BigDecimal> buildSalesMap(List<Commission> commissions) {
+        List<UUID> agentIds = commissions.stream()
+                .map(c -> c.getAgent().getId())
+                .distinct()
+                .toList();
+        return commissionRepository.sumSalesByAgentIds(agentIds)
+                .stream()
+                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (BigDecimal) row[1]));
     }
 
     private CommissionResponse enrichWithAgentTotals(CommissionResponse response, BigDecimal totalSales) {

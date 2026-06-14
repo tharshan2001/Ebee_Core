@@ -36,10 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -99,24 +98,31 @@ public class OrderService {
                 .items(new ArrayList<>())
                 .build();
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        AtomicInteger sequence = new AtomicInteger(1);
+        List<String> itemCodes = request.getItems().stream()
+                .map(OrderItemRequest::getProductItemCode)
+                .toList();
+        Map<String, Product> productMap = productRepository.findByItemCodeIn(itemCodes).stream()
+                .collect(Collectors.toMap(Product::getItemCode, Function.identity()));
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            Product product = productRepository.findByItemCode(itemRequest.getProductItemCode())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "itemCode", itemRequest.getProductItemCode()));
-
+        for (String itemCode : itemCodes) {
+            Product product = productMap.get(itemCode);
+            if (product == null) {
+                throw new ResourceNotFoundException("Product", "itemCode", itemCode);
+            }
             if (!Boolean.TRUE.equals(product.getIsActive())) {
                 throw new IllegalArgumentException("Product is not active: " + product.getName());
             }
+        }
 
-            if (!inventoryService.hasSufficientStock(product.getId(), itemRequest.getQuantity())) {
-                Integer available = inventoryService.getAvailableStock(product.getId());
-                String msg = available == 0
-                        ? "Out of stock: " + product.getName()
-                        : "Insufficient stock for " + product.getName() + ". Available: " + available;
-                throw new IllegalArgumentException(msg);
-            }
+        List<UUID> stockProductIds = new ArrayList<>();
+        List<Integer> stockQuantities = new ArrayList<>();
+        List<String> stockNotes = new ArrayList<>();
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (int i = 0; i < request.getItems().size(); i++) {
+            OrderItemRequest itemRequest = request.getItems().get(i);
+            Product product = productMap.get(itemRequest.getProductItemCode());
 
             BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
@@ -131,13 +137,12 @@ public class OrderService {
             order.getItems().add(item);
             totalAmount = totalAmount.add(subtotal);
 
-            inventoryService.recordOrderStock(
-                    product.getId(),
-                    itemRequest.getQuantity(),
-                    StockMovementType.OUT,
-                    "Order " + orderNumber + " - Item " + sequence.getAndIncrement()
-            );
+            stockProductIds.add(product.getId());
+            stockQuantities.add(itemRequest.getQuantity());
+            stockNotes.add("Order " + orderNumber + " - Item " + (i + 1));
         }
+
+        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
 
         order.setTotalAmount(totalAmount);
         Order savedOrder = orderRepository.save(order);
@@ -250,16 +255,16 @@ public class OrderService {
             throw new IllegalArgumentException("Cannot cancel a " + order.getStatus().name().toLowerCase() + " order");
         }
 
-        for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-
-            inventoryService.recordOrderStock(
-                    product.getId(),
-                    item.getQuantity(),
-                    StockMovementType.RETURN,
-                    "Order " + order.getOrderNumber() + " cancelled - Item restored"
-            );
-        }
+        List<UUID> stockProductIds = order.getItems().stream()
+                .map(item -> item.getProduct().getId())
+                .toList();
+        List<Integer> stockQuantities = order.getItems().stream()
+                .map(OrderItem::getQuantity)
+                .toList();
+        List<String> stockNotes = order.getItems().stream()
+                .map(item -> "Order " + order.getOrderNumber() + " cancelled - Item restored")
+                .toList();
+        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 

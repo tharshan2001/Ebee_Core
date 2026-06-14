@@ -26,6 +26,7 @@ public class ReminderService {
     private final ReminderMapper reminderMapper;
     private final UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public List<ReminderResponse> getRemindersByDateRange(UUID userId, LocalDate start, LocalDate end) {
         return reminderRepository.findByUserIdAndReminderDateBetweenOrderByReminderTimeAsc(userId, start, end)
                 .stream()
@@ -33,6 +34,7 @@ public class ReminderService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ReminderResponse> getTodayReminders(UUID userId) {
         LocalDate today = LocalDate.now();
         return reminderRepository.findByUserIdAndReminderDateBetweenOrderByReminderTimeAsc(userId, today, today)
@@ -41,6 +43,7 @@ public class ReminderService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public ReminderResponse getReminderById(UUID id) {
         Reminder reminder = reminderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reminder", "id", id));

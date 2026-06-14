@@ -14,12 +14,17 @@ import com.ebee.stock.entity.Stock;
 import com.ebee.stock.mapper.StockMapper;
 import com.ebee.stock.repository.StockRepository;
 import com.ebee.stock.service.StockMovementRecorder;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,30 +59,35 @@ public class InventoryService {
         return inventoryMapper.toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public InventoryResponse getInventoryByProductId(UUID productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
         return inventoryMapper.toResponse(inventory);
     }
 
+    @Transactional(readOnly = true)
     public InventoryResponse getInventoryById(UUID id) {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "id", id));
         return inventoryMapper.toResponse(inventory);
     }
 
+    @Transactional(readOnly = true)
     public List<InventoryResponse> getAllInventories() {
         return inventoryRepository.findAll().stream()
                 .map(inventoryMapper::toResponse)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<InventoryResponse> getLowStockInventories() {
         return inventoryRepository.findLowStockInventories().stream()
                 .map(inventoryMapper::toResponse)
                 .toList();
     }
 
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse adjustStock(StockRequest request) {
         Inventory inventory = inventoryRepository.findByProductId(request.getProductId())
@@ -103,6 +113,7 @@ public class InventoryService {
         return inventoryMapper.toResponse(inventory);
     }
 
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public StockResponse recordOrderStock(UUID productId, Integer quantity, StockMovementType movementType, String notes) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
@@ -128,6 +139,43 @@ public class InventoryService {
     }
 
     @Transactional
+    public List<StockResponse> recordOrderStocks(List<UUID> productIds, List<Integer> quantities,
+                                                  StockMovementType movementType, List<String> notes) {
+        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+
+        for (int i = 0; i < productIds.size(); i++) {
+            Inventory inv = inventoryMap.get(productIds.get(i));
+            if (inv == null) {
+                throw new ResourceNotFoundException("Inventory", "productId", productIds.get(i));
+            }
+            int change = movementType == StockMovementType.OUT ? -quantities.get(i) : quantities.get(i);
+            if (inv.getQuantity() + change < 0) {
+                throw new IllegalArgumentException(
+                        (inv.getQuantity() == 0 ? "Out of stock: " : "Insufficient stock for product: ")
+                                + inv.getProduct().getName());
+            }
+        }
+
+        List<StockResponse> results = new ArrayList<>();
+        for (int i = 0; i < productIds.size(); i++) {
+            Inventory inv = inventoryMap.get(productIds.get(i));
+            int qty = quantities.get(i);
+            int before = inv.getQuantity();
+            int change = movementType == StockMovementType.OUT ? -qty : qty;
+            int after = before + change;
+            inv.setQuantity(after);
+            Stock stock = stockMovementRecorder.record(inv, change, before, after, movementType, notes.get(i));
+            inventoryAlertService.checkAndNotify(inv);
+            results.add(stockMapper.toResponse(stock));
+        }
+        inventoryRepository.saveAll(inventoryMap.values());
+        return results;
+    }
+
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
+    @Transactional
     public InventoryResponse reserveStock(UUID productId, Integer quantity) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
@@ -145,6 +193,7 @@ public class InventoryService {
         return inventoryMapper.toResponse(saved);
     }
 
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse releaseReservedStock(UUID productId, Integer quantity) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
@@ -159,6 +208,7 @@ public class InventoryService {
         return inventoryMapper.toResponse(saved);
     }
 
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse confirmOrderStock(UUID productId, Integer quantity) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
@@ -176,18 +226,21 @@ public class InventoryService {
         return inventoryMapper.toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public boolean hasSufficientStock(UUID productId, Integer quantity) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
         return inventory.hasSufficientStock(quantity);
     }
 
+    @Transactional(readOnly = true)
     public Integer getAvailableStock(UUID productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
         return inventory.getAvailableQuantity();
     }
 
+    @Transactional(readOnly = true)
     public List<StockResponse> getStockHistoryByProductId(UUID productId) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));

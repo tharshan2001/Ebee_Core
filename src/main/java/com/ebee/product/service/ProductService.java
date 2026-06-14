@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +112,16 @@ public class ProductService {
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .toList();
         return buildResponsesWithBatchImages(products);
+    }
+
+    public Page<ProductResponse> getAllProductsPaginated(Pageable pageable) {
+        return productRepository.findAllWithInventoryAndImages(pageable)
+                .map(this::toResponseWithRelations);
+    }
+
+    public Page<ProductResponse> searchProducts(String search, Pageable pageable) {
+        return productRepository.findBySearchTerm(search, pageable)
+                .map(this::toResponseWithRelations);
     }
 
     private List<ProductResponse> buildResponsesWithBatchImages(List<Product> products) {

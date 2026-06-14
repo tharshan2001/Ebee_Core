@@ -224,49 +224,77 @@ If the customer already has an address, it is **updated in place**. If they don'
 
 ---
 
-### 5. List All Customers
+### 5. List All Customers (Paginated)
 
 **GET** `/api/customers`
 
 **Access:** ADMIN, AGENT
 
-**Success Response (200 OK):**
+Returns customers with pagination, sorting, and search support.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` (e.g., `createdAt,desc`, `firstName,asc`) |
+| `search` | String | — | Search term (matches phoneNumber, firstName, lastName, or email) |
+
+```bash
+# Get page 0 with 20 items, newest first
+curl "http://localhost:8085/api/customers?page=0&size=20&sort=createdAt,desc"
+
+# Search by phone, name, or email
+curl "http://localhost:8085/api/customers?search=0771234567&size=10"
+curl "http://localhost:8085/api/customers?search=Arun&size=10"
+```
+
+**Response (Paginated):**
 ```json
 {
   "success": true,
   "message": "Customers retrieved successfully",
-  "data": [
-    {
-      "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
-      "firstName": "Arun",
-      "lastName": "Kumar",
-      "phoneNumber": "+94111111111",
-      "email": "arun@example.com",
-      "totalOrders": 0,
-      "address": {
-        "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
-        "street": "123 Main St",
-        "city": "Jaffna",
-        "district": "Jaffna",
-        "postalCode": "40000"
-      },
-      "createdAt": "2026-06-03T23:58:55",
-      "updatedAt": "2026-06-03T23:58:55"
-    },
-    {
-      "id": "7bc5d61f-f4d4-4154-be94-5bedbfc41416",
-      "firstName": "Jane",
-      "lastName": "Smith",
-      "phoneNumber": "+94771234598",
-      "email": null,
-      "totalOrders": 0,
-      "address": null,
-      "createdAt": "2026-06-03T23:59:00",
-      "updatedAt": "2026-06-03T23:59:00"
-    }
-  ]
+  "data": {
+    "content": [
+      {
+        "id": "2465d540-dcfa-443f-93c8-d5b3efbc0cc8",
+        "firstName": "Arun",
+        "lastName": "Kumar",
+        "phoneNumber": "+94111111111",
+        "email": "arun@example.com",
+        "totalOrders": 0,
+        "address": {
+          "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
+          "street": "123 Main St",
+          "city": "Jaffna",
+          "district": "Jaffna",
+          "postalCode": "40000"
+        },
+        "createdAt": "2026-06-03T23:58:55",
+        "updatedAt": "2026-06-03T23:58:55"
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 42,
+    "totalPages": 3,
+    "first": true,
+    "last": false
+  }
 }
 ```
+
+**Response Fields (PageResponse):**
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Array of customer objects |
+| `pageNumber` | Integer | Current page (zero-based) |
+| `pageSize` | Integer | Items per page |
+| `totalElements` | Long | Total matching records |
+| `totalPages` | Integer | Total pages available |
+| `first` | Boolean | Whether this is the first page |
+| `last` | Boolean | Whether this is the last page |
 
 ---
 

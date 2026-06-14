@@ -94,13 +94,69 @@ curl http://localhost:8085/api/products/active
 
 ---
 
-### Get All Products
+### Get All Products (Paginated)
 
 **GET** `/api/products`
 
 **Access:** Public
 
-Returns all products (active and inactive).
+Returns all products (active and inactive) with pagination, sorting, and search support.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` (e.g., `name,asc`, `price,desc`) |
+| `search` | String | — | Search term (matches name, itemCode, or category) |
+
+```bash
+# Get page 0 with 20 items, sorted by name ascending
+curl "http://localhost:8085/api/products?page=0&size=20&sort=name,asc"
+
+# Search for "Test" in name, itemCode, or category
+curl "http://localhost:8085/api/products?search=Test&size=10"
+```
+
+**Response (Paginated):**
+```json
+{
+  "success": true,
+  "message": "Products retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "171ab477-cba6-4589-934d-01906d480852",
+        "name": "Updated Product A",
+        "itemCode": "PA-001",
+        "category": "Electronics",
+        "price": 59.99,
+        "isActive": true,
+        "imageUrls": [...],
+        "inventory": { "availableQuantity": 141, "isLowStock": false }
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 150,
+    "totalPages": 8,
+    "first": true,
+    "last": false
+  }
+}
+```
+
+**Response Fields (PageResponse):**
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Array of product objects |
+| `pageNumber` | Integer | Current page (zero-based) |
+| `pageSize` | Integer | Items per page |
+| `totalElements` | Long | Total matching records |
+| `totalPages` | Integer | Total pages available |
+| `first` | Boolean | Whether this is the first page |
+| `last` | Boolean | Whether this is the last page |
 
 ---
 

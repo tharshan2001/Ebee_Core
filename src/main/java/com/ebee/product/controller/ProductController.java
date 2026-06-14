@@ -1,11 +1,16 @@
 package com.ebee.product.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
 import com.ebee.product.service.ProductService;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -76,8 +81,30 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
-        List<ProductResponse> response = productService.getAllProducts();
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) String search) {
+
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<ProductResponse> productsPage = search != null && !search.trim().isEmpty()
+                ? productService.searchProducts(search.trim(), pageable)
+                : productService.getAllProductsPaginated(pageable);
+
+        PageResponse<ProductResponse> response = new PageResponse<>(
+                productsPage.getContent(),
+                productsPage.getNumber(),
+                productsPage.getSize(),
+                productsPage.getTotalElements(),
+                productsPage.getTotalPages(),
+                productsPage.isFirst(),
+                productsPage.isLast()
+        );
+
         return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
     }
 

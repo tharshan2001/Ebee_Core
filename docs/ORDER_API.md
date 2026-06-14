@@ -304,24 +304,69 @@ Retrieves orders belonging to the currently authenticated agent (resolved from t
 
 ---
 
-### 7. Get All Orders (Admin Only)
+### 7. Get All Orders (Admin Only - Paginated)
 **GET** `/api/orders`
 
-Retrieves all orders in the system.
+Retrieves all orders with pagination, sorting, and filtering support.
 
 **Access:** ADMIN only
 
-**Success Response (200 OK):**
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` (e.g., `createdAt,desc`, `totalAmount,asc`) |
+| `status` | OrderStatus | — | Filter by order status (PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, RETURNED, FAILED) |
+
+```bash
+# Get page 0 with 20 items, newest first
+curl "http://localhost:8085/api/orders?page=0&size=20&sort=createdAt,desc"
+
+# Filter by status
+curl "http://localhost:8085/api/orders?status=PENDING&size=10"
+```
+
+**Response (Paginated):**
 ```json
 {
   "success": true,
   "message": "Orders retrieved successfully",
-  "data": [
-    { ... },
-    { ... }
-  ]
+  "data": {
+    "content": [
+      {
+        "id": "fbd1b509-09a4-4848-92aa-8ad00360b9f3",
+        "orderNumber": "TM-D-20260614-001",
+        "agentCode": null,
+        "agentName": "Direct Order",
+        "customerName": "Arun Kumar",
+        "totalAmount": 120.00,
+        "status": "PENDING",
+        "orderSource": "DIRECT",
+        "createdAt": "2026-06-14T22:23:36.573066"
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 245,
+    "totalPages": 13,
+    "first": true,
+    "last": false
+  }
 }
 ```
+
+**Response Fields (PageResponse):**
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Array of order objects |
+| `pageNumber` | Integer | Current page (zero-based) |
+| `pageSize` | Integer | Items per page |
+| `totalElements` | Long | Total matching records |
+| `totalPages` | Integer | Total pages available |
+| `first` | Boolean | Whether this is the first page |
+| `last` | Boolean | Whether this is the last page |
 
 ---
 

@@ -1,6 +1,8 @@
 package com.ebee.product.repository;
 
 import com.ebee.product.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -31,6 +33,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images")
     List<Product> findAllWithInventoryAndImages();
 
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images")
+    Page<Product> findAllWithInventoryAndImages(Pageable pageable);
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
     Optional<Product> findByItemCodeWithRelations(@Param("itemCode") String itemCode);
 
@@ -41,4 +46,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query(value = "SELECT p.category, COUNT(DISTINCT p.id), COALESCE(SUM(oi.quantity), 0), COALESCE(SUM(oi.subtotal), 0) FROM products p LEFT JOIN order_items oi ON oi.product_id = p.id LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY p.category ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC", nativeQuery = true)
     List<Object[]> findProductCategorySummary(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
+    Page<Product> findBySearchTerm(@Param("search") String search, Pageable pageable);
 }

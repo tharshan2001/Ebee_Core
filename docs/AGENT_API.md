@@ -129,51 +129,90 @@ curl -X POST http://localhost:8085/api/agents \
 
 ---
 
-### Get All Agents
+### Get All Agents (Paginated)
 
 **GET** `/api/agents`
 
 **Access:** ADMIN only
 
-**Response:**
+Returns agents with pagination, sorting, and search support.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` (e.g., `createdAt,desc`, `agentCode,asc`) |
+| `search` | String | — | Search term (matches agentCode, firstName, lastName, phoneNumber, nicNumber, district, email) |
+
+```bash
+# Get page 0 with 20 items, newest first
+curl "http://localhost:8085/api/agents?page=0&size=20&sort=createdAt,desc"
+
+# Search agents by code, name, phone, email, NIC, or district
+curl "http://localhost:8085/api/agents?search=JF-001&size=10"
+curl "http://localhost:8085/api/agents?search=John&size=10"
+```
+
+**Response (Paginated):**
 ```json
 {
   "success": true,
   "message": "Agents retrieved successfully",
-  "data": [
-    {
-      "id": "uuid",
-      "userId": "uuid",
-      "email": "agent@example.com",
-      "firstName": "John",
-      "lastName": "Doe",
-      "fullName": "John Doe",
-      "agentCode": "JF-001",
-      "address": "123 Main Street, Jaffna",
-      "district": "Jaffna",
-      "phoneNumber": "0771234567",
-      "commissionRate": 7.5,
-      "commissionType": "DEFAULT",
-      "totalSales": 0.0,
-      "totalCommission": 0.0,
-      "isActive": true,
-      "userStatus": "ACTIVE",
-      "nicNumber": null,
-      "nicDocumentUrl": null,
-      "nicDocumentName": null,
-      "nicDocumentType": null,
-      "bankPassbookDocumentUrl": null,
-      "bankPassbookDocumentName": null,
-      "bankPassbookDocumentType": null,
-      "bankAccountNumber": null,
-      "bankName": null,
-      "bankBranch": null,
-      "createdAt": "2026-06-02T23:17:32.567441",
-      "updatedAt": "2026-06-02T23:17:32.567441"
-    }
-  ]
+  "data": {
+    "content": [
+      {
+        "id": "uuid",
+        "userId": "uuid",
+        "email": "agent@example.com",
+        "firstName": "John",
+        "lastName": "Doe",
+        "fullName": "John Doe",
+        "agentCode": "JF-001",
+        "address": "123 Main Street, Jaffna",
+        "district": "Jaffna",
+        "phoneNumber": "0771234567",
+        "commissionRate": 7.5,
+        "commissionType": "DEFAULT",
+        "totalSales": 0.0,
+        "totalCommission": 0.0,
+        "isActive": true,
+        "userStatus": "ACTIVE",
+        "nicNumber": null,
+        "nicDocumentUrl": null,
+        "nicDocumentName": null,
+        "nicDocumentType": null,
+        "bankPassbookDocumentUrl": null,
+        "bankPassbookDocumentName": null,
+        "bankPassbookDocumentType": null,
+        "bankAccountNumber": null,
+        "bankName": null,
+        "bankBranch": null,
+        "createdAt": "2026-06-02T23:17:32.567441",
+        "updatedAt": "2026-06-02T23:17:32.567441"
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 82,
+    "totalPages": 5,
+    "first": true,
+    "last": false
+  }
 }
 ```
+
+**Response Fields (PageResponse):**
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Array of agent objects |
+| `pageNumber` | Integer | Current page (zero-based) |
+| `pageSize` | Integer | Items per page |
+| `totalElements` | Long | Total matching records |
+| `totalPages` | Integer | Total pages available |
+| `first` | Boolean | Whether this is the first page |
+| `last` | Boolean | Whether this is the last page |
 
 ---
 

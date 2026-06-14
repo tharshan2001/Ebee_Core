@@ -1,0 +1,476 @@
+package com.ebee.order.service;
+
+import com.ebee.agent.entity.Agent;
+import com.ebee.agent.repository.AgentRepository;
+import com.ebee.audit.enums.AuditAction;
+import com.ebee.audit.service.AuditLogService;
+import com.ebee.commission.entity.Commission;
+import com.ebee.commission.enums.CommissionStatus;
+import com.ebee.commission.service.CommissionCalculationService;
+import com.ebee.commission.service.CommissionLifecycleService;
+import com.ebee.common.enums.District;
+import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
+import com.ebee.customer.entity.Address;
+import com.ebee.customer.entity.Customer;
+import com.ebee.customer.service.CustomerService;
+import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.inventory.service.InventoryService;
+import com.ebee.order.dto.OrderItemRequest;
+import com.ebee.order.dto.OrderRequest;
+import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.entity.Order;
+import com.ebee.order.entity.OrderItem;
+import com.ebee.order.enums.OrderSource;
+import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.mapper.OrderMapper;
+import com.ebee.order.repository.OrderRepository;
+import com.ebee.product.entity.Product;
+import com.ebee.product.repository.ProductRepository;
+import com.ebee.stock.enums.StockMovementType;
+import com.ebee.user.entity.User;
+import com.ebee.user.enums.RoleType;
+import com.ebee.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock private OrderRepository orderRepository;
+    @Mock private AgentRepository agentRepository;
+    @Mock private ProductRepository productRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private OrderMapper orderMapper;
+    @Mock private SecurityService securityService;
+    @Mock private InventoryService inventoryService;
+    @Mock private OrderNumberService orderNumberService;
+    @Mock private CommissionCalculationService commissionCalculationService;
+    @Mock private CommissionLifecycleService commissionLifecycleService;
+    @Mock private CustomerService customerService;
+    @Mock private OrderNotificationService orderNotificationService;
+    @Mock private AuditLogService auditLogService;
+
+    @InjectMocks private OrderService orderService;
+
+    @Captor private ArgumentCaptor<Order> orderCaptor;
+
+    private UUID adminUserId;
+    private UUID agentUserId;
+    private User adminUser;
+    private User agentUser;
+    private Agent agent;
+    private Customer customer;
+    private Product product1;
+    private Product product2;
+    private OrderRequest orderRequest;
+    private Order order;
+
+    @BeforeEach
+    void setUp() {
+        adminUserId = UUID.randomUUID();
+        agentUserId = UUID.randomUUID();
+
+        adminUser = User.builder()
+                .id(adminUserId)
+                .email("admin@ebee.com")
+                .firstName("Admin")
+                .lastName("User")
+                .role(RoleType.ADMIN)
+                .build();
+
+        agentUser = User.builder()
+                .id(agentUserId)
+                .email("agent@ebee.com")
+                .firstName("Agent")
+                .lastName("User")
+                .role(RoleType.AGENT)
+                .build();
+
+        agent = Agent.builder()
+                .id(UUID.randomUUID())
+                .user(agentUser)
+                .agentCode("JF-008")
+                .commissionRate(7.5)
+                .isActive(true)
+                .build();
+
+        Address address = Address.builder()
+                .id(UUID.randomUUID())
+                .street("123 Main St")
+                .city("Jaffna")
+                .district(District.JF)
+                .build();
+
+        customer = Customer.builder()
+                .id(UUID.randomUUID())
+                .firstName("John")
+                .lastName("Doe")
+                .phoneNumber("0771234567")
+                .address(address)
+                .build();
+
+        product1 = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("PROD-001")
+                .name("Product One")
+                .price(new BigDecimal("2500.00"))
+                .isActive(true)
+                .build();
+
+        product2 = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("PROD-002")
+                .name("Product Two")
+                .price(new BigDecimal("1500.00"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item1 = new OrderItemRequest();
+        item1.setProductItemCode("PROD-001");
+        item1.setQuantity(2);
+
+        OrderItemRequest item2 = new OrderItemRequest();
+        item2.setProductItemCode("PROD-002");
+        item2.setQuantity(1);
+
+        orderRequest = new OrderRequest();
+        orderRequest.setAgentCode("JF-008");
+        orderRequest.setCustomerPhoneNumber("0771234567");
+        orderRequest.setNotes("Test order");
+        orderRequest.setItems(List.of(item1, item2));
+
+        order = Order.builder()
+                .id(UUID.randomUUID())
+                .agent(agent)
+                .customer(customer)
+                .createdBy(adminUser)
+                .orderNumber("JF-A-20250614-001")
+                .notes("Test order")
+                .status(OrderStatus.PENDING)
+                .orderSource(OrderSource.AGENT)
+                .items(List.of(
+                        OrderItem.builder()
+                                .product(product1)
+                                .quantity(2)
+                                .unitPrice(new BigDecimal("2500.00"))
+                                .subtotal(new BigDecimal("5000.00"))
+                                .build(),
+                        OrderItem.builder()
+                                .product(product2)
+                                .quantity(1)
+                                .unitPrice(new BigDecimal("1500.00"))
+                                .subtotal(new BigDecimal("1500.00"))
+                                .build()
+                ))
+                .totalAmount(new BigDecimal("6500.00"))
+                .build();
+    }
+
+    @Test
+    void createOrder_asAdminWithAgentCode_createsOrderSuccessfully() {
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-001");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product1, product2));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder()
+                        .id(UUID.randomUUID())
+                        .commissionAmount(new BigDecimal("487.50"))
+                        .commissionRate(new BigDecimal("7.5"))
+                        .status(CommissionStatus.CALCULATED)
+                        .build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        var result = orderService.createOrder(orderRequest);
+
+        assertThat(result).isNotNull();
+        verify(inventoryService).recordOrderStocks(
+                anyList(), anyList(), eq(StockMovementType.OUT), anyList());
+        verify(commissionCalculationService).calculateCommissionForOrder(any());
+        verify(auditLogService).record(eq(AuditAction.CREATE), eq("Order"), any(), anyString());
+        verify(customerService).incrementTotalOrders(customer.getId());
+        verify(orderNotificationService).sendOrderCreated(any(), any());
+    }
+
+    @Test
+    void createOrder_asAgent_createsOrderSuccessfully() {
+        orderRequest.setAgentCode(null);
+
+        when(securityService.isAdmin()).thenReturn(false);
+        when(securityService.getCurrentUserId()).thenReturn(agentUserId);
+        when(agentRepository.findByUserId(agentUserId)).thenReturn(Optional.of(agent));
+        when(userRepository.findById(agentUserId)).thenReturn(Optional.of(agentUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-001");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product1, product2));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder()
+                        .id(UUID.randomUUID())
+                        .commissionAmount(new BigDecimal("487.50"))
+                        .status(CommissionStatus.CALCULATED)
+                        .build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        var result = orderService.createOrder(orderRequest);
+
+        assertThat(result).isNotNull();
+        verify(agentRepository).findByUserId(agentUserId);
+    }
+
+    @Test
+    void createOrder_inactiveAgent_throwsIllegalArgument() {
+        agent.setIsActive(false);
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+
+        assertThatThrownBy(() -> orderService.createOrder(orderRequest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Agent is not active");
+    }
+
+    @Test
+    void createOrder_productNotFound_throwsResourceNotFound() {
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-001");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product1));
+
+        assertThatThrownBy(() -> orderService.createOrder(orderRequest))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Product");
+    }
+
+    @Test
+    void createOrder_inactiveProduct_throwsIllegalArgument() {
+        product2.setIsActive(false);
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-001");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product1, product2));
+
+        assertThatThrownBy(() -> orderService.createOrder(orderRequest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Product is not active");
+    }
+
+    @Test
+    void getOrderById_success() {
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse());
+
+        var result = orderService.getOrderById(orderId);
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void getOrderById_notFound_throws() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getOrderById(orderId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Order not found");
+    }
+
+    @Test
+    void getOrderByOrderNumber_success() {
+        when(orderRepository.findByOrderNumberWithDetails("JF-A-20250614-001"))
+                .thenReturn(Optional.of(order));
+        when(orderMapper.toResponse(order)).thenReturn(new OrderResponse());
+
+        var result = orderService.getOrderByOrderNumber("JF-A-20250614-001");
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void getOrdersByAgentId_success() {
+        UUID agentId = agent.getId();
+        when(agentRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(orderRepository.findByAgentIdWithDetails(agentId)).thenReturn(List.of(order));
+        when(orderMapper.toResponseList(anyList())).thenReturn(List.of(new OrderResponse()));
+
+        var results = orderService.getOrdersByAgentId(agentId);
+
+        assertThat(results).hasSize(1);
+    }
+
+    @Test
+    void getMyOrders_success() {
+        when(securityService.getCurrentUserId()).thenReturn(agentUserId);
+        when(agentRepository.findByUserId(agentUserId)).thenReturn(Optional.of(agent));
+        when(orderRepository.findByAgentIdWithDetails(agent.getId())).thenReturn(List.of(order));
+        when(orderMapper.toResponseList(anyList())).thenReturn(List.of(new OrderResponse()));
+
+        var results = orderService.getMyOrders();
+
+        assertThat(results).hasSize(1);
+    }
+
+    @Test
+    void getAllOrders_success() {
+        when(orderRepository.findAllWithDetails()).thenReturn(List.of(order));
+        when(orderMapper.toResponseList(anyList())).thenReturn(List.of(new OrderResponse()));
+
+        var results = orderService.getAllOrders();
+
+        assertThat(results).hasSize(1);
+    }
+
+    @Test
+    void updateOrderStatus_validTransition_succeeds() {
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(orderId, OrderStatus.CONFIRMED);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId), anyString());
+        verify(orderNotificationService).sendOrderStatus(any());
+    }
+
+    @Test
+    void updateOrderStatus_cancelledOrder_throws() {
+        order.setStatus(OrderStatus.CANCELLED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(order.getId(), OrderStatus.CONFIRMED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot update status of a cancelled order");
+    }
+
+    @Test
+    void updateOrderStatus_deliveredOrder_throws() {
+        order.setStatus(OrderStatus.DELIVERED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(order.getId(), OrderStatus.CONFIRMED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot update status of a delivered order");
+    }
+
+    @Test
+    void updateOrderStatus_returnedOrder_throws() {
+        order.setStatus(OrderStatus.RETURNED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(order.getId(), OrderStatus.CONFIRMED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot update status of a returned order");
+    }
+
+    @Test
+    void updateOrderStatus_terminalStatusViaUpdate_throws() {
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Order status can only be updated up to SHIPPED");
+    }
+
+    @Test
+    void updateOrderStatus_shipped_setsDeliveryPending() {
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(orderCaptor.getValue().getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+    }
+
+    @Test
+    void cancelOrder_success() {
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.cancelOrder(orderId);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(inventoryService).recordOrderStocks(
+                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
+        verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
+        verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId), anyString());
+        verify(orderNotificationService).sendOrderCancelled(any());
+    }
+
+    @Test
+    void cancelOrder_alreadyCancelled_throws() {
+        order.setStatus(OrderStatus.CANCELLED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Order is already cancelled");
+    }
+
+    @Test
+    void cancelOrder_shipped_throws() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot cancel a shipped order");
+    }
+
+    @Test
+    void cancelOrder_delivered_throws() {
+        order.setStatus(OrderStatus.DELIVERED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot cancel a delivered order");
+    }
+}

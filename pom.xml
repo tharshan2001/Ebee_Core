@@ -28,6 +28,9 @@
 		<lombok.version>1.18.30</lombok.version>
 		<mockito.version>5.5.0</mockito.version>
 		<awssdk.version>2.20.0</awssdk.version>
+		<testcontainers.version>1.20.4</testcontainers.version>
+		<awaitility.version>4.2.2</awaitility.version>
+		<jacoco.version>0.8.12</jacoco.version>
 	</properties>
 
 	<dependencyManagement>
@@ -183,6 +186,35 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
+			<version>${awaitility.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.rest-assured</groupId>
+			<artifactId>rest-assured</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -229,10 +261,47 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.1.2</version>
 				<configuration>
-					<argLine>
-						--add-opens java.base/java.lang=ALL-UNNAMED
-					</argLine>
+					<argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
 				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<goals><goal>prepare-agent</goal></goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>verify</phase>
+						<goals><goal>report</goal></goals>
+					</execution>
+					<execution>
+						<id>check</id>
+						<phase>verify</phase>
+						<goals><goal>check</goal></goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit>
+									</limits>
+								</rule>
+							</rules>
+							<excludes>
+								<exclude>com/ebee/**/dto/*</exclude>
+								<exclude>com/ebee/**/entity/*</exclude>
+								<exclude>com/ebee/**/enums/*</exclude>
+								<exclude>com/ebee/**/config/*</exclude>
+								<exclude>com/ebee/common/response/*</exclude>
+								<exclude>com/ebee/EbeeApplication.class</exclude>
+							</excludes>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

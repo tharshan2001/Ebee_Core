@@ -1,0 +1,59 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///ebee_test?TC_REUSABLE=true
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    hikari:
+      maximum-pool-size: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: false
+  mail:
+    host: localhost
+    port: 3025
+    username: test
+    password: test
+  data:
+    redis:
+      host: localhost
+      port: 16379
+
+aws:
+  access-key: test
+  secret-key: test
+  region: eu-north-1
+  bucket-name: test-bucket
+
+jwt:
+  secret: this-is-a-test-secret-that-is-at-least-256-bits-long-for-hs256-test
+  reset-secret: this-is-a-different-test-secret-for-reset-tokens-at-least-256-bits
+  expiration: 86400000
+  refreshExpiration: 604800000
+
+rate-limiting:
+  login:
+    max-attempts: 100
+    window-minutes: 15
+  generic:
+    max-requests: 1000
+    window-minutes: 15
+  ip:
+    max-requests: 10000
+    window-minutes: 1
+
+app:
+  backup:
+    dir: /tmp/ebee-test-backups
+
+notification:
+  sms:
+    api-base-url: http://localhost:9999
+    username: test
+    password: test
+    default-mask: TEST
+    default-campaign: Test

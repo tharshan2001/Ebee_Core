@@ -5,6 +5,7 @@ import com.ebee.order.entity.Order;
 import com.ebee.stock.entity.Stock;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.enums.UserStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -80,12 +81,15 @@ public class User {
     @Builder.Default
     private Boolean phoneVerified = false;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "user")
     private List<Agent> agents = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "createdBy")
     private List<Stock> stockMovements = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "createdBy")
     private List<Order> orders = new ArrayList<>();
 

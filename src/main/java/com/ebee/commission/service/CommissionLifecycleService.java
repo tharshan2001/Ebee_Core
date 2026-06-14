@@ -9,7 +9,7 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionRepository;
-import jakarta.persistence.EntityNotFoundException;
+import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -122,6 +122,6 @@ public class CommissionLifecycleService {
 
     private Commission getCommissionEntity(UUID id) {
         return commissionRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Commission not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + id));
     }
 }

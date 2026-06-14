@@ -13,6 +13,7 @@ import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.notification.NotificationPort;
+import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.order.entity.Order;
 import com.ebee.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ public class CommissionCalculationService {
         }
 
         Order order = orderRepository.findById(request.getOrderId())
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Order not found: " + request.getOrderId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + request.getOrderId()));
 
         Commission commission = calculateCommissionForOrder(order);
 

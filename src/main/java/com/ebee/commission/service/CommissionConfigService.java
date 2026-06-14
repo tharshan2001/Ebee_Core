@@ -6,7 +6,7 @@ import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
-import jakarta.persistence.EntityNotFoundException;
+import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +79,7 @@ public class CommissionConfigService {
 
     public CommissionConfigResponse getDefaultConfig() {
         CommissionConfig config = configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
-                .orElseThrow(() -> new EntityNotFoundException("No active default commission config found"));
+                .orElseThrow(() -> new ResourceNotFoundException("No active default commission config found"));
         return mapper.toConfigResponse(config);
     }
 
@@ -104,6 +104,6 @@ public class CommissionConfigService {
 
     private CommissionConfig getConfigEntity(UUID id) {
         return configRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Commission config not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Commission config not found: " + id));
     }
 }

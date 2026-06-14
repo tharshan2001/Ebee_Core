@@ -6,7 +6,7 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionRepository;
-import jakarta.persistence.EntityNotFoundException;
+import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +53,7 @@ public class CommissionQueryService {
 
     public CommissionResponse getCommissionById(UUID id) {
         Commission commission = commissionRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new EntityNotFoundException("Commission not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + id));
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(commission.getAgent().getId());
         return enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
     }

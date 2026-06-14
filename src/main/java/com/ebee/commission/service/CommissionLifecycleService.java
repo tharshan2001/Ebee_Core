@@ -33,6 +33,11 @@ public class CommissionLifecycleService {
     @Transactional
     public CommissionResponse approveCommission(UUID commissionId) {
         Commission commission = getCommissionEntity(commissionId);
+        if (commission.getStatus() != CommissionStatus.CALCULATED) {
+            throw new IllegalStateException(
+                    "Commission " + commissionId + " must be CALCULATED to approve (current: "
+                    + commission.getStatus() + ")");
+        }
         commission.setStatus(CommissionStatus.APPROVED);
         commission.setApprovedAt(LocalDateTime.now());
         commission = commissionRepository.save(commission);
@@ -48,6 +53,19 @@ public class CommissionLifecycleService {
     @Transactional
     public CommissionResponse markAsProcessing(UUID commissionId) {
         Commission commission = getCommissionEntity(commissionId);
+        if (commission.getStatus() != CommissionStatus.APPROVED) {
+            throw new IllegalStateException(
+                    "Commission " + commissionId + " must be APPROVED to process (current: "
+                    + commission.getStatus() + ")");
+        }
+        if (commission.getApprovedAt() == null
+                || commission.getApprovedAt().plusDays(10).isAfter(LocalDateTime.now())) {
+            LocalDateTime releaseDate = commission.getApprovedAt() != null
+                    ? commission.getApprovedAt().plusDays(10) : null;
+            throw new IllegalStateException(
+                    "Commission " + commissionId + " is within the 10-day holding period. "
+                    + "It can be processed after " + releaseDate + ".");
+        }
         commission.setStatus(CommissionStatus.PROCESSING);
         commission = commissionRepository.save(commission);
         auditLogService.record(AuditAction.COMMISSION_PROCESS, "Commission", commissionId,
@@ -67,6 +85,14 @@ public class CommissionLifecycleService {
     @Transactional
     public CommissionResponse rejectCommission(UUID commissionId, String reason) {
         Commission commission = getCommissionEntity(commissionId);
+        if (commission.getStatus() == CommissionStatus.PAID
+                || commission.getStatus() == CommissionStatus.PROCESSING
+                || commission.getStatus() == CommissionStatus.REJECTED
+                || commission.getStatus() == CommissionStatus.CANCELLED) {
+            throw new IllegalStateException(
+                    "Cannot reject commission " + commissionId + " in status "
+                    + commission.getStatus());
+        }
         commission.setStatus(CommissionStatus.REJECTED);
         commission.setErrorMessage(reason);
         commission = commissionRepository.save(commission);
@@ -82,6 +108,13 @@ public class CommissionLifecycleService {
     @Transactional
     public void cancelCommissionForOrder(UUID orderId) {
         commissionRepository.findCommissionByOrderId(orderId).ifPresent(commission -> {
+
+            if (commission.getStatus() == CommissionStatus.CANCELLED
+                    || commission.getStatus() == CommissionStatus.REJECTED) {
+                log.warn("Commission for order {} is already {}, skipping cancel",
+                        orderId, commission.getStatus());
+                return;
+            }
 
             if (commission.getStatus() == CommissionStatus.PAID) {
                 Agent agent = commission.getAgent();

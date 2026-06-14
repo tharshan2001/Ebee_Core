@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -83,6 +84,7 @@ class CommissionLifecycleServiceTest {
     @Test
     void markAsProcessing_transitionsToProcessing() {
         commission.setStatus(CommissionStatus.APPROVED);
+        commission.setApprovedAt(LocalDateTime.now().minusDays(11));
         when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
         when(commissionRepository.save(any())).thenReturn(commission);
         when(mapper.toResponse(commission)).thenReturn(new CommissionResponse());
@@ -103,5 +105,69 @@ class CommissionLifecycleServiceTest {
 
         assertThat(commission.getStatus()).isEqualTo(CommissionStatus.REJECTED);
         assertThat(commission.getErrorMessage()).isEqualTo("Invalid documentation");
+    }
+
+    @Test
+    void approveCommission_whenNotCalculated_throws() {
+        commission.setStatus(CommissionStatus.APPROVED);
+        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+
+        assertThatThrownBy(() -> commissionLifecycleService.approveCommission(commissionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be CALCULATED");
+    }
+
+    @Test
+    void markAsProcessing_whenNotApproved_throws() {
+        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+
+        assertThatThrownBy(() -> commissionLifecycleService.markAsProcessing(commissionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be APPROVED");
+    }
+
+    @Test
+    void markAsProcessing_whenWithinHoldingPeriod_throws() {
+        commission.setStatus(CommissionStatus.APPROVED);
+        commission.setApprovedAt(LocalDateTime.now().minusDays(5));
+        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+
+        assertThatThrownBy(() -> commissionLifecycleService.markAsProcessing(commissionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("holding period");
+    }
+
+    @Test
+    void rejectCommission_whenTerminalStatus_throws() {
+        commission.setStatus(CommissionStatus.PAID);
+        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+
+        assertThatThrownBy(() -> commissionLifecycleService.rejectCommission(commissionId, "reason"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot reject");
+    }
+
+    @Test
+    void cancelCommissionForOrder_whenAlreadyCancelled_doesNothing() {
+        commission.setStatus(CommissionStatus.CANCELLED);
+        when(commissionRepository.findCommissionByOrderId(commission.getOrder().getId()))
+                .thenReturn(Optional.of(commission));
+
+        commissionLifecycleService.cancelCommissionForOrder(commission.getOrder().getId());
+
+        verify(commissionNotificationService, never()).sendCommissionNotification(any(), any(), any());
+        verify(auditLogService, never()).record(any(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void cancelCommissionForOrder_whenAlreadyRejected_doesNothing() {
+        commission.setStatus(CommissionStatus.REJECTED);
+        when(commissionRepository.findCommissionByOrderId(commission.getOrder().getId()))
+                .thenReturn(Optional.of(commission));
+
+        commissionLifecycleService.cancelCommissionForOrder(commission.getOrder().getId());
+
+        verify(commissionNotificationService, never()).sendCommissionNotification(any(), any(), any());
+        verify(auditLogService, never()).record(any(), anyString(), any(), anyString());
     }
 }

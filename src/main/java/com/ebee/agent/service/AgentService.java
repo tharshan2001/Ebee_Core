@@ -104,7 +104,8 @@ public class AgentService {
         auditLogService.record(AuditAction.CREATE, "Agent", savedAgent.getId(),
                 "Agent " + savedAgent.getAgentCode() + " (" + savedAgent.getUser().getEmail() + ") created");
 
-        sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, savedAgent);
+        log.info("Generated password for {}: {}", savedUser.getEmail(), generatedPassword);
+        sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, savedAgent, generatedPassword);
 
         return AgentWithCredentialsResponse.builder()
                 .agentId(savedAgent.getId())
@@ -352,7 +353,7 @@ public class AgentService {
     }
 
     private void sendWelcomeNotification(String firstName, String lastName, String agentCode,
-                                          Agent agent) {
+                                          Agent agent, String rawPassword) {
         try {
             String subject = "Welcome to Ebee — Agent Registration Successful";
             String message = """
@@ -360,14 +361,16 @@ public class AgentService {
                     
                     Congratulations! Your agent account has been successfully created.
                     
+                    Login Credentials:
                     Agent Code : %s
                     Email      : %s
+                    Password   : %s
                     
-                    Please log in and use the "Forgot Password" option to set your password.
+                    For security reasons, please change your password after logging in.
                     
                     Best regards,
                     Ebee Team
-                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail());
+                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), rawPassword);
             notificationPort.notifyAgent(agent, subject, message);
             notificationPort.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {

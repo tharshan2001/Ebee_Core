@@ -54,6 +54,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
+        log.info("Generated password for {}: {}", savedUser.getEmail(), rawPassword);
         sendWelcomeNotification(savedUser, rawPassword);
 
         return userMapper.toResponse(savedUser);
@@ -67,11 +68,15 @@ public class UserService {
                     
                     Welcome to Ebee! Your account has been created successfully.
                     
-                    You can log in using your registered email address. If you need to set or reset your password, please use the "Forgot Password" option on the login page.
+                    Login Credentials:
+                    Email    : %s
+                    Password : %s
+                    
+                    For security reasons, please change your password after logging in.
                     
                     Best regards,
                     Ebee Team
-                    """.formatted(user.getFirstName());
+                    """.formatted(user.getFirstName(), user.getEmail(), rawPassword);
             notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)

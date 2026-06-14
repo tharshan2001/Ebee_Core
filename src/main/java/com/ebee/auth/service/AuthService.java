@@ -134,7 +134,7 @@ public class AuthService {
                         .build());
             }
         } catch (Exception e) {
-            log.warn("Failed to send login alert to {}: {}", user.getEmail(), e.getMessage());
+            log.warn("Failed to send login alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }
     }
 
@@ -162,7 +162,7 @@ public class AuthService {
                         .build());
             }
         } catch (Exception e) {
-            log.warn("Failed to send logout alert to {}: {}", user.getEmail(), e.getMessage());
+            log.warn("Failed to send logout alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }
     }
 
@@ -187,7 +187,7 @@ public class AuthService {
                         .build());
             }
         } catch (Exception e) {
-            log.warn("Failed to send password changed alert to {}: {}", user.getEmail(), e.getMessage());
+            log.error("Failed to send password changed alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }
     }
 

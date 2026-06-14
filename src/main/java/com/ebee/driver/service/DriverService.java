@@ -18,6 +18,7 @@ import com.ebee.user.enums.RoleType;
 import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DriverService {
@@ -66,16 +68,19 @@ public class DriverService {
 
         Driver savedDriver = driverRepository.save(driver);
 
+        log.info("Generated password for {}: {}", savedUser.getEmail(), generatedPassword);
         String subject = "Welcome to Ebee – Driver Account Created";
         String message = """
                 Dear %s,
                 
                 Your driver account has been created.
                 
-                Email: %s
+                Login Credentials:
+                Email    : %s
+                Password : %s
                 
-                Please log in and use the "Forgot Password" option to set your password.
-                """.formatted(savedUser.getFirstName(), savedUser.getEmail());
+                For security reasons, please change your password after logging in.
+                """.formatted(savedUser.getFirstName(), savedUser.getEmail(), generatedPassword);
         auditLogService.record(AuditAction.DRIVER_CREATE, "Driver", savedDriver.getId(),
                 "Driver " + savedUser.getFirstName() + " " + savedUser.getLastName()
                 + " (" + savedUser.getEmail() + ") created");

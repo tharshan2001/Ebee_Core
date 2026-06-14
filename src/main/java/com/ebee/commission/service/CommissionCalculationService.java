@@ -78,6 +78,9 @@ public class CommissionCalculationService {
         }
 
         Agent agent = order.getAgent();
+        if (!Boolean.TRUE.equals(agent.getIsActive())) {
+            throw new IllegalArgumentException("Agent is not active");
+        }
         CommissionConfig config = findApplicableConfig(agent);
 
         BigDecimal commissionRate = config != null ?

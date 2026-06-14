@@ -1,12 +1,17 @@
 package com.ebee.order.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -67,8 +72,30 @@ public class OrderController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {
-        List<OrderResponse> response = orderService.getAllOrders();
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getAllOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) OrderStatus status) {
+
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<OrderResponse> ordersPage = status != null
+                ? orderService.getOrdersByStatusPaginated(status, pageable)
+                : orderService.getAllOrdersPaginated(pageable);
+
+        PageResponse<OrderResponse> response = new PageResponse<>(
+                ordersPage.getContent(),
+                ordersPage.getNumber(),
+                ordersPage.getSize(),
+                ordersPage.getTotalElements(),
+                ordersPage.getTotalPages(),
+                ordersPage.isFirst(),
+                ordersPage.isLast()
+        );
+
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }
 

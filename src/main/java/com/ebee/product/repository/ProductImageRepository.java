@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -16,6 +17,11 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, UUID
     List<ProductImage> findByProductIdOrderBySortOrder(UUID productId);
 
     List<ProductImage> findByProductIdInOrderBySortOrder(List<UUID> productIds);
+
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id IN :productIds ORDER BY pi.product.id, pi.sortOrder")
+    List<ProductImage> findByProductIdsWithProductOrderBySortOrder(List<UUID> productIds);
+
+    Optional<ProductImage> findByIdAndProductId(UUID id, UUID productId);
 
     void deleteByProductId(UUID productId);
 

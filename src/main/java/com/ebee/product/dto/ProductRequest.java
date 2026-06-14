@@ -30,4 +30,13 @@ public class ProductRequest {
     private List<MultipartFile> images;
 
     private List<String> removeImageUrls;
+
+    private String discountType;
+
+    private BigDecimal discountValue;
+
+    @Size(max = 100, message = "Brand must not exceed 100 characters")
+    private String brand;
+
+    private String tags;
 }

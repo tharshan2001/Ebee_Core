@@ -1,11 +1,16 @@
 package com.ebee.customer.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,8 +59,30 @@ public class CustomerController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
-    public ResponseEntity<ApiResponse<List<CustomerResponse>>> getAllCustomers() {
-        List<CustomerResponse> response = customerService.getAllCustomers();
+    public ResponseEntity<ApiResponse<PageResponse<CustomerResponse>>> getAllCustomers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) String search) {
+
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<CustomerResponse> customersPage = search != null && !search.trim().isEmpty()
+                ? customerService.searchCustomersPaginated(search.trim(), pageable)
+                : customerService.getAllCustomersPaginated(pageable);
+
+        PageResponse<CustomerResponse> response = new PageResponse<>(
+                customersPage.getContent(),
+                customersPage.getNumber(),
+                customersPage.getSize(),
+                customersPage.getTotalElements(),
+                customersPage.getTotalPages(),
+                customersPage.isFirst(),
+                customersPage.isLast()
+        );
+
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved successfully", response));
     }
 }

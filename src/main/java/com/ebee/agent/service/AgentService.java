@@ -27,6 +27,8 @@ import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -237,6 +239,16 @@ public class AgentService {
         return agentRepository.findAllWithUser().stream()
                 .map(agentMapper::toResponse)
                 .toList();
+    }
+
+    public Page<AgentResponse> getAllAgentsPaginated(Pageable pageable) {
+        Page<Agent> agents = agentRepository.findAllWithUser(pageable);
+        return agents.map(agentMapper::toResponse);
+    }
+
+    public Page<AgentResponse> searchAgentsPaginated(String search, Pageable pageable) {
+        Page<Agent> agents = agentRepository.findBySearchTerm(search, pageable);
+        return agents.map(agentMapper::toResponse);
     }
 
     @Transactional

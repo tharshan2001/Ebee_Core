@@ -13,6 +13,8 @@ import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.notification.NotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -131,6 +133,18 @@ public class CustomerService {
         return customerRepository.findAll().stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CustomerResponse> getAllCustomersPaginated(Pageable pageable) {
+        Page<Customer> customers = customerRepository.findAll(pageable);
+        return customers.map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CustomerResponse> searchCustomersPaginated(String search, Pageable pageable) {
+        Page<Customer> customers = customerRepository.findBySearchTerm(search, pageable);
+        return customers.map(this::toResponse);
     }
 
     @Transactional

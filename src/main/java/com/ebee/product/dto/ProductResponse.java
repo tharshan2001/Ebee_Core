@@ -19,7 +19,13 @@ public class ProductResponse {
     private BigDecimal price;
     private BigDecimal costPrice;
     private Boolean isActive;
+    private String discountType;
+    private BigDecimal discountValue;
+    private String brand;
+    private String tags;
+    private BigDecimal effectivePrice;
     private List<String> imageUrls;
+    private List<ProductImageResponse> images;
     private InventoryResponse inventory;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

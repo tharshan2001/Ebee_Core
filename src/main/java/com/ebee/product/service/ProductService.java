@@ -5,6 +5,7 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
 import com.ebee.inventory.mapper.InventoryMapper;
 import com.ebee.inventory.service.InventoryService;
+import com.ebee.product.dto.ProductImageResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
 import com.ebee.product.entity.Product;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,7 @@ public class ProductService {
         }
 
         categoryService.findByNameOrThrow(request.getCategory());
+        validateDiscount(request);
 
         Product product = productMapper.toEntity(request);
         Product savedProduct = productRepository.save(product);
@@ -93,7 +96,7 @@ public class ProductService {
     }
 
     public List<ProductResponse> getAllProducts() {
-        List<Product> products = productRepository.findAllWithInventory();
+        List<Product> products = productRepository.findAllWithInventoryAndImages();
         return buildResponsesWithBatchImages(products);
     }
 
@@ -103,7 +106,7 @@ public class ProductService {
     }
 
     public List<ProductResponse> getActiveProducts() {
-        List<Product> products = productRepository.findAllWithInventory().stream()
+        List<Product> products = productRepository.findAllWithInventoryAndImages().stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .toList();
         return buildResponsesWithBatchImages(products);
@@ -112,12 +115,10 @@ public class ProductService {
     private List<ProductResponse> buildResponsesWithBatchImages(List<Product> products) {
         if (products.isEmpty()) return List.of();
 
+        List<UUID> productIds = products.stream().map(Product::getId).toList();
         Map<UUID, List<String>> imageUrlsByProductId = productImageRepository
-                .findByProductIdInOrderBySortOrder(
-                        products.stream().map(Product::getId).toList()
-                )
+                .findByProductIdsWithProductOrderBySortOrder(productIds)
                 .stream()
-                .filter(pi -> pi.getProduct() != null)
                 .collect(Collectors.groupingBy(
                         pi -> pi.getProduct().getId(),
                         Collectors.mapping(ProductImage::getImageUrl, Collectors.toList())
@@ -127,6 +128,12 @@ public class ProductService {
                 .map(p -> {
                     ProductResponse response = productMapper.toResponse(p);
                     response.setImageUrls(imageUrlsByProductId.getOrDefault(p.getId(), List.of()));
+                    List<ProductImageResponse> images = productImageRepository
+                            .findByProductIdOrderBySortOrder(p.getId())
+                            .stream()
+                            .map(this::toProductImageResponse)
+                            .toList();
+                    response.setImages(images);
                     if (p.getInventory() != null) {
                         response.setInventory(inventoryMapper.toResponse(p.getInventory()));
                     }
@@ -162,6 +169,19 @@ public class ProductService {
         }
         if (request.getCostPrice() != null) {
             product.setCostPrice(request.getCostPrice());
+        }
+        validateDiscount(request);
+        if (request.getDiscountType() != null) {
+            product.setDiscountType(request.getDiscountType());
+        }
+        if (request.getDiscountValue() != null) {
+            product.setDiscountValue(request.getDiscountValue());
+        }
+        if (request.getBrand() != null) {
+            product.setBrand(request.getBrand());
+        }
+        if (request.getTags() != null) {
+            product.setTags(request.getTags());
         }
 
         boolean imagesChanged = false;
@@ -256,15 +276,57 @@ public class ProductService {
         productRepository.save(product);
     }
 
+    @Transactional
+    public void deleteProductImage(UUID productId, UUID imageId) {
+        ProductImage productImage = productImageRepository.findByIdAndProductId(imageId, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProductImage", "id", imageId));
+        String imageUrl = productImage.getImageUrl();
+        s3Service.deleteFile(imageUrl);
+        productImageRepository.delete(productImage);
+    }
+
     private ProductResponse toResponseWithRelations(Product product) {
         ProductResponse response = productMapper.toResponse(product);
         List<String> imageUrls = product.getImages() != null
                 ? product.getImages().stream().map(ProductImage::getImageUrl).toList()
                 : List.of();
         response.setImageUrls(imageUrls);
+        List<ProductImageResponse> images = product.getImages() != null
+                ? product.getImages().stream()
+                        .map(this::toProductImageResponse)
+                        .toList()
+                : List.of();
+        response.setImages(images);
         if (product.getInventory() != null) {
             response.setInventory(inventoryMapper.toResponse(product.getInventory()));
         }
         return response;
+    }
+
+    private ProductImageResponse toProductImageResponse(ProductImage productImage) {
+        ProductImageResponse response = new ProductImageResponse();
+        response.setId(productImage.getId());
+        response.setImageUrl(productImage.getImageUrl());
+        response.setImageName(productImage.getImageName());
+        response.setImageType(productImage.getImageType());
+        response.setSortOrder(productImage.getSortOrder());
+        return response;
+    }
+
+    private void validateDiscount(ProductRequest request) {
+        if (request.getDiscountType() != null || request.getDiscountValue() != null) {
+            if (request.getDiscountType() == null) {
+                throw new IllegalArgumentException("discountType is required when discountValue is set");
+            }
+            if (request.getDiscountValue() == null) {
+                throw new IllegalArgumentException("discountValue is required when discountType is set");
+            }
+            if (!List.of("PERCENTAGE", "FIXED").contains(request.getDiscountType())) {
+                throw new IllegalArgumentException("discountType must be PERCENTAGE or FIXED");
+            }
+            if (request.getDiscountValue().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("discountValue must not be negative");
+            }
+        }
     }
 }

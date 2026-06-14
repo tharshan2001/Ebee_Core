@@ -11,6 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +53,18 @@ public class Product {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "discount_type", length = 10)
+    private String discountType;
+
+    @Column(name = "discount_value", precision = 10, scale = 2)
+    private BigDecimal discountValue;
+
+    @Column(length = 100)
+    private String brand;
+
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private Inventory inventory;
 
@@ -69,4 +82,17 @@ public class Product {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public BigDecimal getEffectivePrice() {
+        if (discountType == null || discountValue == null) {
+            return price;
+        }
+        return switch (discountType) {
+            case "PERCENTAGE" -> price.multiply(BigDecimal.ONE.subtract(
+                            discountValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP);
+            case "FIXED" -> price.subtract(discountValue).max(BigDecimal.ZERO);
+            default -> price;
+        };
+    }
 }

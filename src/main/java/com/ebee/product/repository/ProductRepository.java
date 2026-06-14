@@ -28,6 +28,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory")
     List<Product> findAllWithInventory();
 
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images")
+    List<Product> findAllWithInventoryAndImages();
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
     Optional<Product> findByItemCodeWithRelations(@Param("itemCode") String itemCode);
 

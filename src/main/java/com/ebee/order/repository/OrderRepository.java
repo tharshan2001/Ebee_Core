@@ -10,6 +10,8 @@ import com.ebee.sales.projection.AgentSalesProjection;
 import com.ebee.sales.projection.CategorySalesProjection;
 import com.ebee.sales.projection.ProductSalesProjection;
 import com.ebee.sales.projection.SalesSummaryProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +35,18 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product")
     List<Order> findAllWithDetails();
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product")
+    Page<Order> findAllWithDetails(Pageable pageable);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.status = :status")
+    Page<Order> findByStatusWithDetails(@Param("status") com.ebee.order.enums.OrderStatus status, Pageable pageable);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.agent.id = :agentId")
+    Page<Order> findByAgentIdWithDetails(@Param("agentId") UUID agentId, Pageable pageable);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.customer.id = :customerId")
+    Page<Order> findByCustomerIdWithDetails(@Param("customerId") UUID customerId, Pageable pageable);
 
     Optional<Order> findByOrderNumber(String orderNumber);
 

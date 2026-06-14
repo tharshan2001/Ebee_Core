@@ -36,7 +36,13 @@ Product responses include:
 | `price` | `BigDecimal` | Selling price |
 | `costPrice` | `BigDecimal` | Cost price |
 | `isActive` | `Boolean` | Whether product is active/orderable |
+| `discountType` | `String` | `PERCENTAGE`, `FIXED`, or `null` (no discount) |
+| `discountValue` | `BigDecimal` | Discount value (percentage or fixed amount) |
+| `brand` | `String` | Brand name |
+| `tags` | `String` | Comma-separated tags (e.g. `"premium,sport"`) |
+| `effectivePrice` | `BigDecimal` | Computed price after discount: `price * (1 - value/100)` or `price - value` |
 | `imageUrls` | `String[]` | S3 URLs of product images |
+| `images` | `ProductImageResponse[]` | Structured image data with IDs, URLs, names, types, and sortOrder |
 | `inventory` | `Object` | Inventory snapshot (`availableQuantity`, `isLowStock`) |
 | `createdAt` | `LocalDateTime` | Creation timestamp |
 | `updatedAt` | `LocalDateTime` | Last update timestamp |
@@ -138,6 +144,10 @@ Returns all products (active and inactive).
 | `category` | `String` | Yes | Active category name |
 | `price` | `BigDecimal` | Yes | Selling price (positive) |
 | `costPrice` | `BigDecimal` | Yes | Cost price (positive) |
+| `discountType` | `String` | No | `PERCENTAGE` or `FIXED` |
+| `discountValue` | `BigDecimal` | No | Required if `discountType` is set |
+| `brand` | `String` | No | Brand name (max 100 chars) |
+| `tags` | `String` | No | Comma-separated tags |
 | `images` | `File[]` | No | Up to 10 product images |
 
 ```bash
@@ -148,6 +158,10 @@ curl -X POST http://localhost:8085/api/products \
   -F "category=Electronics" \
   -F "price=99.99" \
   -F "costPrice=50.00" \
+  -F "discountType=PERCENTAGE" \
+  -F "discountValue=10" \
+  -F "brand=Nike" \
+  -F "tags=premium,sport" \
   -F "images=@product.jpg"
 ```
 
@@ -173,15 +187,17 @@ All fields are optional — only provided fields are updated.
 | `category` | `String` | No | Active category name |
 | `price` | `BigDecimal` | No | Selling price |
 | `costPrice` | `BigDecimal` | No | Cost price |
+| `discountType` | `String` | No | `PERCENTAGE` or `FIXED` (set to clear, omit to leave unchanged) |
+| `discountValue` | `BigDecimal` | No | Required if `discountType` is set |
+| `brand` | `String` | No | Brand name |
+| `tags` | `String` | No | Comma-separated tags |
 | `images` | `File[]` | No | New images to **append** (up to 10 total) |
-| `removeImages` | `String[]` | No | Image URLs to **delete** from S3 and DB (repeat the param for multiple) |
 
 ```bash
-# Update fields, remove old image, add new image
+# Update fields, add new image
 curl -X PATCH http://localhost:8085/api/products/<UUID> \
   -H "Authorization: Bearer <TOKEN>" \
   -F "name=Updated Name" \
-  -F "removeImages=https://s3.amazonaws.com/.../old-image.jpg" \
   -F "images=@new-photo.jpg"
 ```
 
@@ -212,6 +228,55 @@ curl -X POST http://localhost:8085/api/products/<UUID>/images \
 
 ---
 
+### Delete Product Image
+
+**DELETE** `/api/products/{productId}/images/{imageId}`
+
+**Access:** ADMIN
+
+Deletes a **single** product image by its UUID. This provides fine-grained control over product images, replacing the bulk `removeImages` approach.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `productId` | `UUID` | Path Variable | ID of the product |
+| `imageId` | `UUID` | Path Variable | ID of the image to delete (must exist and belong to the product) |
+
+**Form Fields:**
+
+```bash
+curl -X DELETE http://localhost:8085/api/products/<PRODUCT_UUID>/<IMAGE_UUID> \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+**Response (200):** Success message confirming deletion.
+
+**Behavior:**
+- Deletes the image from S3 storage
+- Removes the record from the `product_images` database table
+- Removes the image from the `images` field in the response (while keeping `imageUrls` for backward compatibility)
+- Fails with `404` if the image doesn't exist or doesn't belong to the product
+- Removes the `removeImages` parameter from the PATCH `/api/products/{id}` endpoint (legacy bulk removal is deprecated)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product image deleted successfully",
+  "data": null
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "ProductImage not found",
+  "data": null
+}
+```
+
+---
+
 ### Delete Product (Soft-Delete)
 
 **DELETE** `/api/products/{id}`
@@ -233,6 +298,53 @@ curl -X DELETE http://localhost:8085/api/products/<UUID> \
   "data": null
 }
 ```
+
+---
+
+### ProductImageResponse
+
+Structure used in the `images` field of Product responses:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `UUID` | Unique image ID |
+| `imageUrl` | `String` | S3 URL of the image |
+| `imageName` | `String` | Original filename |
+| `imageType` | `String` | MIME type (e.g. `image/jpeg`) |
+| `sortOrder` | `Integer` | Display order (0 for primary) |
+
+**Example:**
+```json
+"images": [
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "imageUrl": "https://s3.amazonaws.com/.../product1-001.jpg",
+    "imageName": "product1-001.jpg",
+    "imageType": "image/jpeg",
+    "sortOrder": 0
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655441111",
+    "imageUrl": "https://s3.amazonaws.com/.../product1-002.jpg",
+    "imageName": "product1-002.jpg",
+    "imageType": "image/png",
+    "sortOrder": 1
+  }
+]
+```
+
+The `images` field provides structured image metadata for frontend targeting, while `imageUrls` (String array) remains for backward compatibility. Use `DELETE /api/products/{productId}/images/{imageId}` for targeted deletion.
+
+---
+
+### Error Responses
+
+| HTTP Status | Scenario |
+|-------------|----------|
+| 400 | Validation failure, duplicate item code, category not found, already active, max 10 images reached |
+| 401 / 403 | Missing/invalid JWT, non-ADMIN role for mutations |
+| 404 | Product not found, product image not found |
+| 500 | S3 upload failure, server error |
 
 ---
 

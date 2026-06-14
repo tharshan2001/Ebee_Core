@@ -7,7 +7,12 @@ import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.service.AgentService;
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -103,8 +108,30 @@ public class AgentController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<AgentResponse>>> getAllAgents() {
-        List<AgentResponse> response = agentService.getAllAgents();
+    public ResponseEntity<ApiResponse<PageResponse<AgentResponse>>> getAllAgents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) String search) {
+
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<AgentResponse> agentsPage = search != null && !search.trim().isEmpty()
+                ? agentService.searchAgentsPaginated(search.trim(), pageable)
+                : agentService.getAllAgentsPaginated(pageable);
+
+        PageResponse<AgentResponse> response = new PageResponse<>(
+                agentsPage.getContent(),
+                agentsPage.getNumber(),
+                agentsPage.getSize(),
+                agentsPage.getTotalElements(),
+                agentsPage.getTotalPages(),
+                agentsPage.isFirst(),
+                agentsPage.isLast()
+        );
+
         return ResponseEntity.ok(ApiResponse.success("Agents retrieved successfully", response));
     }
 

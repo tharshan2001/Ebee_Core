@@ -31,6 +31,8 @@ import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -124,13 +126,14 @@ public class OrderService {
             OrderItemRequest itemRequest = request.getItems().get(i);
             Product product = productMap.get(itemRequest.getProductItemCode());
 
-            BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal effectivePrice = product.getEffectivePrice();
+            BigDecimal subtotal = effectivePrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
             OrderItem item = OrderItem.builder()
                     .order(order)
                     .product(product)
                     .quantity(itemRequest.getQuantity())
-                    .unitPrice(product.getPrice())
+                    .unitPrice(effectivePrice)
                     .subtotal(subtotal)
                     .build();
 
@@ -208,6 +211,18 @@ public class OrderService {
     public List<OrderResponse> getAllOrders() {
         List<Order> orders = orderRepository.findAllWithDetails();
         return orderMapper.toResponseList(orders);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
+        Page<Order> orders = orderRepository.findAllWithDetails(pageable);
+        return orders.map(orderMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable) {
+        Page<Order> orders = orderRepository.findByStatusWithDetails(status, pageable);
+        return orders.map(orderMapper::toResponse);
     }
 
     @Transactional

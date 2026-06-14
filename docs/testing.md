@@ -8,10 +8,9 @@ Ebee uses a **layered testing strategy**:
 |-------|-----------|-------|----------|----------|
 | **Unit** (services, utils) | JUnit 5 + Mockito | ~5s | None | `mvn test` |
 | **Controller** (`@WebMvcTest`) | Spring MockMvc | ~5s | None | `mvn test` |
-| **Repository** (`@DataJpaTest`, planned) | Testcontainers | ~30s | PostgreSQL 16 | `mvn test` |
-| **Integration** (`@SpringBootTest`, planned) | Testcontainers | ~60s | PostgreSQL 16 | `mvn test` |
+| **Integration** (`@SpringBootTest`) | Full Spring context | ~5s | Local PostgreSQL | `mvn test` |
 
-Service tests mock all dependencies and run in milliseconds. Controller tests slice the web layer. Repository and integration tests use Testcontainers for real PostgreSQL fidelity.
+Service tests mock all dependencies and run in milliseconds. Controller tests slice the web layer (mocking security + Redis). Integration tests load the full Spring context against your local PostgreSQL (Flyway migrations included); Redis is mocked to avoid needing a running Redis instance.
 
 ---
 
@@ -52,7 +51,8 @@ src/test/
 │   │       └── JwtServiceTest.java
 │   ├── commission/service/
 │   │   ├── CommissionCalculationServiceTest.java
-│   │   └── CommissionLifecycleServiceTest.java
+│   │   ├── CommissionLifecycleServiceTest.java
+│   │   └── CommissionLockTest.java
 │   ├── common/util/
 │   │   ├── DateUtilsTest.java
 │   │   ├── PasswordGeneratorTest.java
@@ -281,41 +281,70 @@ void generatedPassword_containsAtLeastOneLetter() {
 
 ---
 
-## Integration Tests (`@SpringBootTest` with Testcontainers)
+## Integration Tests (`@SpringBootTest`)
 
-### Base Class
+### Running Without Docker
+
+Integration tests use `@SpringBootTest` with your **local PostgreSQL** (no Docker, no Testcontainers). Redis is mocked with `@MockBean` to avoid needing a running Redis instance.
+
+### Pattern
+
+```java
+@SpringBootTest
+@Transactional
+class CommissionLockTest {
+
+    @MockBean
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired private CommissionRepository commissionRepository;
+    @Autowired private CommissionLifecycleService commissionLifecycleService;
+
+    @BeforeEach
+    void setUp() {
+        // Seed data via repositories (rolled back after each test by @Transactional)
+    }
+
+    @Test
+    void commission_approved5DaysAgo_cannotBeProcessed() {
+        Commission commission = commissionRepository.save(Commission.builder()
+                .status(CommissionStatus.APPROVED)
+                .approvedAt(LocalDateTime.now().minusDays(5))
+                .build());
+
+        assertThatThrownBy(() -> commissionLifecycleService.markAsProcessing(commission.getId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("holding period");
+    }
+}
+```
+
+### Key Setup
+
+| Annotation | Purpose |
+|-----------|---------|
+| `@SpringBootTest` | Loads full application context (Flyway migrations, repos, services) |
+| `@MockBean StringRedisTemplate` | Mocks Redis — avoids needing a running Redis instance |
+| `@Transactional` | Rolls back all seeded data after each test method |
+
+### Requirements
+
+- **Local PostgreSQL** running on `localhost:5432` (configured in `application.yml`)
+- **Flyway migrations** must have been applied (schema validation on startup)
+- No Redis needed (mocked)
+
+### Legacy: `AbstractIntegrationTest` (Testcontainers)
+
+The `AbstractIntegrationTest` base class using Testcontainers is preserved for CI runs where Docker is available:
 
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
-public abstract class AbstractIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("ebee_test")
-            .withReuse(true);
-
-    static {
-        postgres.start();
-        System.setProperty("spring.datasource.url", postgres.getJdbcUrl());
-        System.setProperty("spring.datasource.username", postgres.getUsername());
-        System.setProperty("spring.datasource.password", postgres.getPassword());
-    }
-}
+public abstract class AbstractIntegrationTest { ... }
 ```
 
-Subclasses get a full Spring context with a real PostgreSQL container.
-
-### Application Test Profile
-
-`src/test/resources/application-test.yml` provides overrides for:
-- **Datasource**: Testcontainers JDBC URL (`jdbc:tc:postgresql:16-alpine:///ebee_test`)
-- **Redis**: localhost:16379 (matching CI service container)
-- **Mail**: localhost:3025 (matching FakeSMTP or greenmail)
-- **JWT**: fixed test secrets
-- **Rate limiting**: relaxed limits (10000 IP req/min)
-- **AWS S3**: fake credentials
+It connects to `application-test.yml` which uses `jdbc:tc:postgresql:16-alpine:///ebee_test` and Redis on `localhost:16379`. This approach is used in the GitHub Actions CI workflow.
 
 ---
 
@@ -405,14 +434,15 @@ Redis on port 16379 matches the `application-test.yml` Redis config. The Postgre
 
 ---
 
-## Test Count (Current: 143)
+## Test Count (Current: 151)
 
 | Test Class | Count |
 |-----------|-------|
 | AuthServiceTest | 10 |
 | JwtServiceTest | 11 |
 | CommissionCalculationServiceTest | 8 |
-| CommissionLifecycleServiceTest | 4 |
+| CommissionLifecycleServiceTest | 10 |
+| CommissionLockTest | 2 |
 | DateUtilsTest | 4 |
 | PasswordGeneratorTest | 3 |
 | PhoneUtilsTest | 8 |
@@ -423,7 +453,7 @@ Redis on port 16379 matches the `application-test.yml` Redis config. The Postgre
 | AuthControllerTest | 4 |
 | ExpenseControllerTest | 10 |
 | AbstractIntegrationTest | 0 (base) |
-| **Total** | **143** |
+| **Total** | **151** |
 
 ---
 

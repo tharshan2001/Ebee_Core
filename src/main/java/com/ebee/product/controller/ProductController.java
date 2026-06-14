@@ -36,7 +36,11 @@ public class ProductController {
             @RequestParam("category") String category,
             @RequestParam("price") BigDecimal price,
             @RequestParam("costPrice") BigDecimal costPrice,
-            @RequestParam(value = "images", required = false) MultipartFile[] images) {
+            @RequestParam(value = "images", required = false) MultipartFile[] images,
+            @RequestParam(value = "discountType", required = false) String discountType,
+            @RequestParam(value = "discountValue", required = false) BigDecimal discountValue,
+            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "tags", required = false) String tags) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -45,6 +49,10 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
+        request.setDiscountType(discountType);
+        request.setDiscountValue(discountValue);
+        request.setBrand(brand);
+        request.setTags(tags);
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
@@ -90,7 +98,10 @@ public class ProductController {
             @RequestParam(value = "price", required = false) BigDecimal price,
             @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
             @RequestParam(value = "images", required = false) MultipartFile[] images,
-            @RequestParam(value = "removeImages", required = false) List<String> removeImages) {
+            @RequestParam(value = "discountType", required = false) String discountType,
+            @RequestParam(value = "discountValue", required = false) BigDecimal discountValue,
+            @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "tags", required = false) String tags) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -99,10 +110,13 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
+        request.setDiscountType(discountType);
+        request.setDiscountValue(discountValue);
+        request.setBrand(brand);
+        request.setTags(tags);
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
-        request.setRemoveImageUrls(removeImages);
         validate(request);
 
         ProductResponse response = productService.updateProduct(id, request);
@@ -124,6 +138,16 @@ public class ProductController {
 
         ProductResponse response = productService.addImagesToProduct(id, Arrays.asList(images));
         return ResponseEntity.ok(ApiResponse.success("Images uploaded successfully", response));
+    }
+
+    @DeleteMapping("/{productId}/images/{imageId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteProductImage(
+            @PathVariable UUID productId,
+            @PathVariable UUID imageId) {
+
+        productService.deleteProductImage(productId, imageId);
+        return ResponseEntity.ok(ApiResponse.success("Product image deleted successfully"));
     }
 
     @PatchMapping("/{id}/activate")

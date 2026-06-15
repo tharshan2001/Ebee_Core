@@ -156,9 +156,7 @@ public class CustomerService {
 
     @Transactional
     public void incrementTotalOrders(UUID customerId) {
-        customerRepository.findById(customerId).ifPresent(c -> {
-            c.setTotalOrders(c.getTotalOrders() + 1);
-        });
+        customerRepository.incrementTotalOrders(customerId);
     }
 
     private Address buildAddress(AddressRequest request, Customer customer) {

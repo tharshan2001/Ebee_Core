@@ -56,7 +56,7 @@ public class CategoryService {
 
         String newName = request.getName().trim();
         if (!category.getName().equalsIgnoreCase(newName) &&
-            categoryRepository.existsByNameIgnoreCaseAndIsActiveTrue(newName)) {
+            categoryRepository.existsByNameIgnoreCaseAndIdNot(newName, id)) {
             throw new IllegalArgumentException("Category already exists: " + newName);
         }
 

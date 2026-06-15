@@ -75,6 +75,10 @@ public class DeliveryService {
             throw new IllegalArgumentException("Cannot assign delivery — driver is suspended");
         }
 
+        if (driverProfile.getAvailability() == DriverAvailability.ON_TRIP) {
+            throw new IllegalArgumentException("Cannot assign delivery — driver is already on a trip");
+        }
+
         driverProfile.setAvailability(DriverAvailability.ON_TRIP);
         driverRepository.save(driverProfile);
 
@@ -115,10 +119,21 @@ public class DeliveryService {
             }
         }
 
+        DeliveryStatus previousStatus = order.getDeliveryStatus();
         DeliveryStatus newStatus = request.getStatus();
 
         DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
                 order, newStatus, request.getReason(), securityService.isAdmin());
+
+        if (previousStatus == DeliveryStatus.FAILED
+                && newStatus == DeliveryStatus.PENDING
+                && order.getDeliveryAssignedTo() != null) {
+            UUID previousDriverUserId = order.getDeliveryAssignedTo().getId();
+            driverRepository.findByUserId(previousDriverUserId).ifPresent(driver -> {
+                driver.setAvailability(DriverAvailability.AVAILABLE);
+                driverRepository.save(driver);
+            });
+        }
 
         if (result.wasDelivered()) {
             commissionLifecycleService.approveCommissionForOrder(order.getId());

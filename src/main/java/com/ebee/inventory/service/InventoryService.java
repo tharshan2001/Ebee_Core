@@ -103,6 +103,12 @@ public class InventoryService {
             throw new IllegalArgumentException(msg);
         }
 
+        if (quantityAfter < inventory.getReservedQuantity()) {
+            throw new IllegalArgumentException(
+                    "Cannot reduce stock below reserved quantity. Reserved: "
+                            + inventory.getReservedQuantity() + ", would leave: " + quantityAfter);
+        }
+
         inventory.setQuantity(quantityAfter);
         inventoryRepository.save(inventory);
 
@@ -130,6 +136,12 @@ public class InventoryService {
             throw new IllegalArgumentException(msg);
         }
 
+        if (quantityAfter < inventory.getReservedQuantity()) {
+            throw new IllegalArgumentException(
+                    "Cannot reduce stock below reserved quantity for product: " + inventory.getProduct().getName()
+                            + ". Reserved: " + inventory.getReservedQuantity() + ", would leave: " + quantityAfter);
+        }
+
         inventory.setQuantity(quantityAfter);
         inventoryRepository.save(inventory);
 
@@ -151,10 +163,16 @@ public class InventoryService {
                 throw new ResourceNotFoundException("Inventory", "productId", productIds.get(i));
             }
             int change = movementType == StockMovementType.OUT ? -quantities.get(i) : quantities.get(i);
-            if (inv.getQuantity() + change < 0) {
+            int projectedQuantity = inv.getQuantity() + change;
+            if (projectedQuantity < 0) {
                 throw new IllegalArgumentException(
                         (inv.getQuantity() == 0 ? "Out of stock: " : "Insufficient stock for product: ")
                                 + inv.getProduct().getName());
+            }
+            if (projectedQuantity < inv.getReservedQuantity()) {
+                throw new IllegalArgumentException(
+                        "Cannot reduce stock below reserved quantity for product: " + inv.getProduct().getName()
+                                + ". Reserved: " + inv.getReservedQuantity() + ", would leave: " + projectedQuantity);
             }
         }
 

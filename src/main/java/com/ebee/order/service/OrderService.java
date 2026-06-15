@@ -31,8 +31,13 @@ import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +47,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -60,6 +66,7 @@ public class OrderService {
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
 
+    @Retryable(retryFor = DataIntegrityViolationException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
         Agent agent = null;
@@ -242,6 +249,7 @@ public class OrderService {
             throw new IllegalArgumentException("Order status can only be updated up to SHIPPED. Use delivery or cancel endpoints for further changes.");
         }
 
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
         if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
             order.setDeliveryStatus(DeliveryStatus.PENDING);
@@ -250,7 +258,7 @@ public class OrderService {
 
         auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
                 "Order " + updatedOrder.getOrderNumber() + " status changed from "
-                + order.getStatus() + " to " + status);
+                + oldStatus + " to " + status);
 
         orderNotificationService.sendOrderStatus(updatedOrder);
 
@@ -266,7 +274,9 @@ public class OrderService {
             throw new IllegalArgumentException("Order is already cancelled");
         }
 
-        if (order.getStatus() == OrderStatus.SHIPPED || order.getStatus() == OrderStatus.DELIVERED) {
+        if (order.getStatus() == OrderStatus.SHIPPED
+                || order.getStatus() == OrderStatus.DELIVERED
+                || order.getStatus() == OrderStatus.RETURNED) {
             throw new IllegalArgumentException("Cannot cancel a " + order.getStatus().name().toLowerCase() + " order");
         }
 
@@ -292,6 +302,12 @@ public class OrderService {
         orderNotificationService.sendOrderCancelled(updatedOrder);
 
         return orderMapper.toResponse(updatedOrder);
+    }
+
+    @Recover
+    public OrderResponse recoverDuplicateOrderNumber(DataIntegrityViolationException ex, OrderRequest request) {
+        log.error("Failed to create order after retries due to duplicate order number: {}", ex.getMessage());
+        throw new IllegalStateException("Unable to generate unique order number. Please try again.", ex);
     }
 
 }

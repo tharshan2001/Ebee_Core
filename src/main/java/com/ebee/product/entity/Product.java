@@ -90,7 +90,8 @@ public class Product {
         return switch (discountType) {
             case "PERCENTAGE" -> price.multiply(BigDecimal.ONE.subtract(
                             discountValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
-                    .setScale(2, RoundingMode.HALF_UP);
+                    .setScale(2, RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO);
             case "FIXED" -> price.subtract(discountValue).max(BigDecimal.ZERO);
             default -> price;
         };

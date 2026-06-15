@@ -124,6 +124,14 @@ public class ProductService {
                 .map(this::toResponseWithRelations);
     }
 
+    public java.util.Map<String, Long> getProductStats() {
+        java.util.Map<String, Long> stats = new java.util.HashMap<>();
+        stats.put("total", productRepository.count());
+        stats.put("active", productRepository.countByIsActiveTrue());
+        stats.put("lowStock", productRepository.countLowStockProducts());
+        return stats;
+    }
+
     public Page<ProductResponse> searchProducts(String search, Pageable pageable) {
         return productRepository.findBySearchTerm(search, pageable)
                 .map(this::toResponseWithRelations);
@@ -140,24 +148,17 @@ public class ProductService {
         if (products.isEmpty()) return List.of();
 
         List<UUID> productIds = products.stream().map(Product::getId).toList();
-        Map<UUID, List<String>> imageUrlsByProductId = productImageRepository
+        Map<UUID, List<ProductImage>> imagesByProductId = productImageRepository
                 .findByProductIdsWithProductOrderBySortOrder(productIds)
                 .stream()
-                .collect(Collectors.groupingBy(
-                        pi -> pi.getProduct().getId(),
-                        Collectors.mapping(ProductImage::getImageUrl, Collectors.toList())
-                ));
+                .collect(Collectors.groupingBy(pi -> pi.getProduct().getId()));
 
         return products.stream()
                 .map(p -> {
                     ProductResponse response = productMapper.toResponse(p);
-                    response.setImageUrls(imageUrlsByProductId.getOrDefault(p.getId(), List.of()));
-                    List<ProductImageResponse> images = productImageRepository
-                            .findByProductIdOrderBySortOrder(p.getId())
-                            .stream()
-                            .map(this::toProductImageResponse)
-                            .toList();
-                    response.setImages(images);
+                    List<ProductImage> productImages = imagesByProductId.getOrDefault(p.getId(), List.of());
+                    response.setImageUrls(productImages.stream().map(ProductImage::getImageUrl).toList());
+                    response.setImages(productImages.stream().map(this::toProductImageResponse).toList());
                     if (p.getInventory() != null) {
                         response.setInventory(inventoryMapper.toResponse(p.getInventory()));
                     }
@@ -214,6 +215,7 @@ public class ProductService {
                 s3Service.deleteFile(imageUrl);
                 productImageRepository.deleteByProductIdAndImageUrl(id, imageUrl);
             }
+            product.getImages().removeIf(img -> request.getRemoveImageUrls().contains(img.getImageUrl()));
             imagesChanged = true;
         }
 
@@ -350,6 +352,10 @@ public class ProductService {
             }
             if (request.getDiscountValue().compareTo(BigDecimal.ZERO) < 0) {
                 throw new IllegalArgumentException("discountValue must not be negative");
+            }
+            if ("PERCENTAGE".equals(request.getDiscountType())
+                    && request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("PERCENTAGE discountValue must not exceed 100");
             }
         }
     }

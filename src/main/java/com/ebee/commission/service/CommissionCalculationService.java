@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Service
@@ -89,7 +90,7 @@ public class CommissionCalculationService {
 
         BigDecimal commissionAmount = order.getTotalAmount()
                 .multiply(commissionRate)
-                .divide(BigDecimal.valueOf(100));
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
         Commission commission = Commission.builder()
                 .agent(agent)

@@ -224,7 +224,55 @@ If the customer already has an address, it is **updated in place**. If they don'
 
 ---
 
-### 5. List All Customers (Paginated)
+### 5. Search Customers (Non-Paginated)
+
+**GET** `/api/customers/search?q=...`
+
+**Access:** ADMIN, AGENT
+
+Returns **all** matching customers as a flat array. No pagination — useful for autocomplete dropdowns and typeahead searches.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | String | yes | Search query (matches phoneNumber, firstName, lastName, or email) |
+
+```bash
+curl "http://localhost:8085/api/customers/search?q=Praveen" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Customers retrieved successfully",
+  "data": [
+    {
+      "id": "uuid",
+      "firstName": "Praveen",
+      "lastName": "P",
+      "phoneNumber": "0771684348",
+      "email": null,
+      "totalOrders": 5,
+      "address": {
+        "id": "uuid",
+        "street": "123 Main St",
+        "city": "Jaffna",
+        "district": "Mullaitivu",
+        "postalCode": "40000"
+      }
+    }
+  ]
+}
+```
+
+`data` is a **flat array** (not a `PageResponse` wrapper). Each item has the same shape as the paginated endpoint items.
+
+---
+
+### 6. List All Customers (Paginated)
 
 **GET** `/api/customers`
 

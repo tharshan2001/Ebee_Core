@@ -51,16 +51,72 @@ Product responses include:
 
 ## Endpoints
 
-### Get Active Products
+### Search Products (Non-Paginated)
+
+**GET** `/api/products/search?q=...`
+
+**Access:** Public
+
+Returns **all** matching active products as a flat array. No pagination — useful for autocomplete dropdowns and typeahead searches.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | String | yes | Search query (matches name, itemCode, or category) |
+
+```bash
+curl "http://localhost:8085/api/products/search?q=Test"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Products retrieved successfully",
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Test Product",
+      "itemCode": "TEST-001",
+      "category": "Electronics",
+      "price": 59.99,
+      "isActive": true,
+      "imageUrls": [],
+      "inventory": {
+        "availableQuantity": 100,
+        "isLowStock": false
+      }
+    }
+  ]
+}
+```
+
+`data` is a **flat array** (not a `PageResponse` wrapper). Each item has the same shape as the paginated endpoint items.
+
+Only **active** products are returned.
+
+---
+
+### Get Active Products (Paginated)
 
 **GET** `/api/products/active`
 
 **Access:** Public
 
-Returns products where `isActive = true`. These are the only products available for new orders.
+Returns active products (`isActive = true`) with pagination. These are the only products available for new orders.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` |
 
 ```bash
-curl http://localhost:8085/api/products/active
+# Get active products, page 0, 20 items
+curl "http://localhost:8085/api/products/active?page=0&size=20"
 ```
 
 **Response:**
@@ -68,29 +124,39 @@ curl http://localhost:8085/api/products/active
 {
   "success": true,
   "message": "Active products retrieved successfully",
-  "data": [
-    {
-      "id": "171ab477-cba6-4589-934d-01906d480852",
-      "name": "Updated Product A",
-      "itemCode": "PA-001",
-      "description": "Updated description",
-      "category": "Electronics",
-      "price": 59.99,
-      "costPrice": 30.0,
-      "isActive": true,
-      "imageUrls": [
-        "https://s3.amazonaws.com/.../image1.jpg"
-      ],
-      "inventory": {
-        "availableQuantity": 141,
-        "isLowStock": false
-      },
-      "createdAt": "2026-05-15T10:30:00",
-      "updatedAt": "2026-06-09T14:00:00"
-    }
-  ]
+  "data": {
+    "content": [
+      {
+        "id": "171ab477-cba6-4589-934d-01906d480852",
+        "name": "Updated Product A",
+        "itemCode": "PA-001",
+        "description": "Updated description",
+        "category": "Electronics",
+        "price": 59.99,
+        "costPrice": 30.0,
+        "isActive": true,
+        "imageUrls": [
+          "https://s3.amazonaws.com/.../image1.jpg"
+        ],
+        "inventory": {
+          "availableQuantity": 141,
+          "isLowStock": false
+        },
+        "createdAt": "2026-05-15T10:30:00",
+        "updatedAt": "2026-06-09T14:00:00"
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 45,
+    "totalPages": 3,
+    "first": true,
+    "last": false
+  }
 }
 ```
+
+`data` is a `PageResponse` wrapper (same shape as "Get All Products" below).
 
 ---
 

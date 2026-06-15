@@ -216,6 +216,49 @@ curl "http://localhost:8085/api/agents?search=John&size=10"
 
 ---
 
+### Search Agents (Non-Paginated)
+
+**GET** `/api/agents/search?q=...`
+
+**Access:** ADMIN only
+
+Returns **all** matching agents as a flat array. No pagination — useful for autocomplete dropdowns and typeahead searches.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | String | yes | Search query (matches agentCode, fullName, phoneNumber, email, nicNumber, district) |
+
+```bash
+curl "http://localhost:8085/api/agents/search?q=AP" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Agents retrieved successfully",
+  "data": [
+    {
+      "id": "uuid",
+      "agentCode": "AP-007",
+      "fullName": "AP Race1",
+      "email": "ap_race_1@ebee.com",
+      "phoneNumber": "0771234567",
+      "district": "Ampara",
+      "isActive": true,
+      "userStatus": "ACTIVE"
+    }
+  ]
+}
+```
+
+`data` is a **flat array** (not a `PageResponse` wrapper). Each item has the same shape as the paginated endpoint items.
+
+---
+
 ### Get Agent by ID
 
 **GET** `/api/agents/{id}`

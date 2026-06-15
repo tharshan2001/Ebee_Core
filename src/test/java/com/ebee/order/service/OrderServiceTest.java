@@ -473,4 +473,108 @@ class OrderServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot cancel a delivered order");
     }
+
+    @Test
+    void createOrder_productWithPercentageDiscount_usesDiscountedPriceInTotal() {
+        // Admin places order for a product with 20% discount.
+        // Order total must reflect the discounted price.
+        Product discountedProduct = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("DISC-001")
+                .name("Discounted Product")
+                .price(new BigDecimal("1000.00"))
+                .discountType("PERCENTAGE")
+                .discountValue(new BigDecimal("20"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest discountedItem = new OrderItemRequest();
+        discountedItem.setProductItemCode("DISC-001");
+        discountedItem.setQuantity(3);
+
+        OrderRequest discountedRequest = new OrderRequest();
+        discountedRequest.setAgentCode("JF-008");
+        discountedRequest.setCustomerPhoneNumber("0771234567");
+        discountedRequest.setItems(List.of(discountedItem));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-002");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(discountedProduct));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder()
+                        .id(UUID.randomUUID())
+                        .commissionAmount(new BigDecimal("240.00"))
+                        .commissionRate(new BigDecimal("7.5"))
+                        .status(CommissionStatus.CALCULATED)
+                        .build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.createOrder(discountedRequest);
+
+        // Verify the order was saved with the discounted total:
+        // 1000.00 * 0.8 = 800.00, then 800.00 * 3 = 2400.00
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+        assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo(new BigDecimal("2400.00"));
+
+        // Verify commission was calculated on the discounted total:
+        // 2400.00 * 7.5% = 180.00
+        ArgumentCaptor<Order> commissionCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(commissionCalculationService).calculateCommissionForOrder(commissionCaptor.capture());
+        assertThat(commissionCaptor.getValue().getTotalAmount())
+                .isEqualByComparingTo(new BigDecimal("2400.00"));
+    }
+
+    @Test
+    void createOrder_productWithFixedDiscount_usesDiscountedPriceInTotal() {
+        // Admin places order for a product with 250 LKR fixed discount.
+        Product fixedDiscountProduct = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("FIX-001")
+                .name("Fixed Discount Product")
+                .price(new BigDecimal("1000.00"))
+                .discountType("FIXED")
+                .discountValue(new BigDecimal("250"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("FIX-001");
+        item.setQuantity(2);
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-003");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(fixedDiscountProduct));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder().id(UUID.randomUUID()).build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.createOrder(req);
+
+        // Verify: 1000.00 - 250.00 = 750.00, then 750.00 * 2 = 1500.00
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getTotalAmount())
+                .isEqualByComparingTo(new BigDecimal("1500.00"));
+    }
 }

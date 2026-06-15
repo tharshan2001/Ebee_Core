@@ -31,6 +31,8 @@ All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD
 ### Logic Bug Fixes
 
 - **PERCENTAGE discount > 100 produces negative price** (`Product.getEffectivePrice`) — Added `.max(BigDecimal.ZERO)` floor. `ProductService.validateDiscount` now rejects PERCENTAGE values > 100 at creation/update time.
+
+> **Discount behavior (verified by tests):** Admins set per-product discount via `POST/PATCH /api/products` with `discountType` (`PERCENTAGE` or `FIXED`) and `discountValue`. Orders automatically use `product.getEffectivePrice()` — the discounted price is applied at order creation. The order's `totalAmount` is the discounted total, and the commission is calculated on this discounted total (see `CommissionCalculationService` line 91). Agent commissions are always based on the final discounted order amount.
 - **Driver availability not restored on FAILED→PENDING retry** (`DeliveryService.updateDeliveryStatus`) — When a failed delivery is retried, the previous driver's availability is restored to `AVAILABLE`.
 - **Driver assignment doesn't check ON_TRIP** (`DeliveryService.assignDelivery`) — ON_TRIP drivers are now rejected to prevent double-booking.
 - **Image sort-order corruption after deletion** (`ProductService.updateProduct`) — In-memory `product.getImages()` collection is updated after DB deletion. New images get correct sort orders with no gaps/overlaps.

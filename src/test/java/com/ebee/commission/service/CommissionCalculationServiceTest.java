@@ -197,7 +197,7 @@ class CommissionCalculationServiceTest {
         request.setOrderId(order.getId());
 
         when(commissionRepository.existsByOrderId(order.getId())).thenReturn(false);
-        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.findById(request.getOrderId())).thenReturn(Optional.of(order));
         when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)).thenReturn(Optional.empty());
 
         Commission commission = Commission.builder()
@@ -216,5 +216,89 @@ class CommissionCalculationServiceTest {
 
         verify(notificationPort).notifyAgent(eq(agent), anyString(), anyString());
         verify(notificationPort).createInternalAlert(any(), anyString(), anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    void calculateCommissionOnDiscountedOrder_usesDiscountedTotalAmount() {
+        // Scenario: Admin creates an order with a product that has 20% discount.
+        // Order total is the discounted total. Commission must be calculated
+        // on this discounted total, not on the original undiscounted price.
+
+        // Original undiscounted order would be: 100.00 * 5 = 500.00
+        // After 20% discount: 80.00 * 5 = 400.00
+        // Commission at 10%: 400.00 * 10% = 40.00
+        Order discountedOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .orderNumber("COL-A-20250601-002")
+                .agent(agent)
+                .totalAmount(new BigDecimal("400.00"))
+                .status(OrderStatus.PENDING)
+                .build();
+
+        CommissionConfig config = CommissionConfig.builder()
+                .commissionRate(10.0)
+                .type(CommissionType.DEFAULT)
+                .isActive(true)
+                .build();
+
+        when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT))
+                .thenReturn(Optional.of(config));
+
+        Commission savedCommission = Commission.builder()
+                .id(UUID.randomUUID())
+                .agent(agent)
+                .order(discountedOrder)
+                .config(config)
+                .orderAmount(new BigDecimal("400.00"))
+                .commissionRate(BigDecimal.valueOf(10.0))
+                .commissionAmount(new BigDecimal("40.00"))
+                .status(CommissionStatus.CALCULATED)
+                .build();
+        when(commissionRepository.save(any())).thenReturn(savedCommission);
+
+        Commission result = commissionCalculationService.calculateCommissionForOrder(discountedOrder);
+
+        // Verify commission is calculated on the discounted amount, not original
+        assertThat(result.getOrderAmount()).isEqualByComparingTo(new BigDecimal("400.00"));
+        assertThat(result.getCommissionAmount()).isEqualByComparingTo(new BigDecimal("40.00"));
+    }
+
+    @Test
+    void calculateCommissionOnFreeOrder_zeroCommission() {
+        // Scenario: Product has 100% discount (free). Order total is 0.
+        // Commission should be 0.
+
+        Order freeOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .orderNumber("COL-A-20250601-003")
+                .agent(agent)
+                .totalAmount(BigDecimal.ZERO)
+                .status(OrderStatus.PENDING)
+                .build();
+
+        CommissionConfig config = CommissionConfig.builder()
+                .commissionRate(10.0)
+                .type(CommissionType.DEFAULT)
+                .isActive(true)
+                .build();
+
+        when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT))
+                .thenReturn(Optional.of(config));
+
+        Commission savedCommission = Commission.builder()
+                .id(UUID.randomUUID())
+                .agent(agent)
+                .order(freeOrder)
+                .config(config)
+                .orderAmount(BigDecimal.ZERO)
+                .commissionRate(BigDecimal.valueOf(10.0))
+                .commissionAmount(BigDecimal.ZERO)
+                .status(CommissionStatus.CALCULATED)
+                .build();
+        when(commissionRepository.save(any())).thenReturn(savedCommission);
+
+        Commission result = commissionCalculationService.calculateCommissionForOrder(freeOrder);
+
+        assertThat(result.getCommissionAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

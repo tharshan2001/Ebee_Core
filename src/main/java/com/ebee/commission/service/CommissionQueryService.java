@@ -8,6 +8,8 @@ import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,12 +60,10 @@ public class CommissionQueryService {
         return enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
     }
 
-    public List<CommissionResponse> getAllCommissions() {
-        List<Commission> commissions = commissionRepository.findAllWithDetails();
-        Map<UUID, BigDecimal> salesMap = buildSalesMap(commissions);
-        return commissions.stream()
-                .map(c -> enrichWithAgentTotals(mapper.toResponse(c), salesMap.get(c.getAgent().getId())))
-                .toList();
+    public Page<CommissionResponse> getAllCommissions(Pageable pageable) {
+        Page<Commission> commissions = commissionRepository.findAllWithDetails(pageable);
+        Map<UUID, BigDecimal> salesMap = buildSalesMap(commissions.getContent());
+        return commissions.map(c -> enrichWithAgentTotals(mapper.toResponse(c), salesMap.get(c.getAgent().getId())));
     }
 
     private Map<UUID, BigDecimal> buildSalesMap(List<Commission> commissions) {

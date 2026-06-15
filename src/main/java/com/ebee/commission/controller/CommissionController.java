@@ -14,6 +14,10 @@ import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.commission.service.CommissionQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,8 +79,14 @@ public class CommissionController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<CommissionResponse>>> getAllCommissions() {
-        List<CommissionResponse> response = queryService.getAllCommissions();
+    public ResponseEntity<ApiResponse<Page<CommissionResponse>>> getAllCommissions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "calculatedAt,desc") String sort) {
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Page<CommissionResponse> response = queryService.getAllCommissions(pageable);
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
     }
 

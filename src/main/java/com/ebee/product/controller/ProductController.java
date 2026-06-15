@@ -139,6 +139,11 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Long>>> getProductStats() {
+        return ResponseEntity.ok(ApiResponse.success("Product stats retrieved successfully", productService.getProductStats()));
+    }
+
     @PatchMapping(value = "/{id}", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(

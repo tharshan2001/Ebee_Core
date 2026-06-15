@@ -2,6 +2,8 @@ package com.ebee.commission.repository;
 
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -25,6 +27,10 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
 
     @Query("SELECT c FROM Commission c JOIN FETCH c.agent a JOIN FETCH a.user")
     List<Commission> findAllWithDetails();
+
+    @Query(value = "SELECT c FROM Commission c JOIN FETCH c.agent a JOIN FETCH a.user",
+           countQuery = "SELECT COUNT(c) FROM Commission c")
+    Page<Commission> findAllWithDetails(Pageable pageable);
 
     @Query("SELECT c FROM Commission c JOIN FETCH c.agent a JOIN FETCH a.user WHERE c.status = :status")
     List<Commission> findByStatusWithDetails(@Param("status") CommissionStatus status);

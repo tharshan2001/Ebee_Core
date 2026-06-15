@@ -55,4 +55,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.isActive = true")
     Page<Product> findAllActiveWithInventoryAndImages(Pageable pageable);
+
+    long countByIsActiveTrue();
+
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.inventory IS NOT NULL AND p.inventory.quantity <= COALESCE(p.inventory.reorderLevel, 0)")
+    long countLowStockProducts();
 }

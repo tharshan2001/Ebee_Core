@@ -35,6 +35,16 @@ public class ProductRequest {
 
     private BigDecimal discountValue;
 
+    /**
+     * Optional cap on the per-order discount an admin can apply at order time.
+     * When set, admin can supply a discount on each order item up to this cap.
+     * When null, per-order discounts are not allowed (product uses its own
+     * discountType/discountValue only).
+     */
+    private String maxDiscountType;
+
+    private BigDecimal maxDiscountValue;
+
     @Size(max = 100, message = "Brand must not exceed 100 characters")
     private String brand;
 

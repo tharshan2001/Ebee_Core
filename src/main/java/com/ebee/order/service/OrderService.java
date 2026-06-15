@@ -133,15 +133,23 @@ public class OrderService {
             OrderItemRequest itemRequest = request.getItems().get(i);
             Product product = productMap.get(itemRequest.getProductItemCode());
 
-            BigDecimal effectivePrice = product.getEffectivePrice();
-            BigDecimal subtotal = effectivePrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            // Admin can apply an optional per-item discount at order time, capped
+            // by the product's maxDiscount (set at product creation/update).
+            // getPriceWithDiscount() throws IllegalArgumentException if the
+            // discount exceeds the cap, so we let it bubble up to a 400.
+            BigDecimal unitPrice = product.getPriceWithDiscount(
+                    itemRequest.getDiscountType(),
+                    itemRequest.getDiscountValue());
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
             OrderItem item = OrderItem.builder()
                     .order(order)
                     .product(product)
                     .quantity(itemRequest.getQuantity())
-                    .unitPrice(effectivePrice)
+                    .unitPrice(unitPrice)
                     .subtotal(subtotal)
+                    .discountType(itemRequest.getDiscountType())
+                    .discountValue(itemRequest.getDiscountValue())
                     .build();
 
             order.getItems().add(item);

@@ -202,6 +202,12 @@ public class ProductService {
         if (request.getDiscountValue() != null) {
             product.setDiscountValue(request.getDiscountValue());
         }
+        if (request.getMaxDiscountType() != null) {
+            product.setMaxDiscountType(request.getMaxDiscountType());
+        }
+        if (request.getMaxDiscountValue() != null) {
+            product.setMaxDiscountValue(request.getMaxDiscountValue());
+        }
         if (request.getBrand() != null) {
             product.setBrand(request.getBrand());
         }
@@ -356,6 +362,29 @@ public class ProductService {
             if ("PERCENTAGE".equals(request.getDiscountType())
                     && request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
                 throw new IllegalArgumentException("PERCENTAGE discountValue must not exceed 100");
+            }
+        }
+        if (request.getMaxDiscountType() != null || request.getMaxDiscountValue() != null) {
+            if (request.getMaxDiscountType() == null) {
+                throw new IllegalArgumentException("maxDiscountType is required when maxDiscountValue is set");
+            }
+            if (request.getMaxDiscountValue() == null) {
+                throw new IllegalArgumentException("maxDiscountValue is required when maxDiscountType is set");
+            }
+            if (!List.of("PERCENTAGE", "FIXED").contains(request.getMaxDiscountType())) {
+                throw new IllegalArgumentException("maxDiscountType must be PERCENTAGE or FIXED");
+            }
+            if (request.getMaxDiscountValue().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("maxDiscountValue must not be negative");
+            }
+            if ("PERCENTAGE".equals(request.getMaxDiscountType())
+                    && request.getMaxDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("PERCENTAGE maxDiscountValue must not exceed 100");
+            }
+            if (request.getPrice() != null
+                    && "FIXED".equals(request.getMaxDiscountType())
+                    && request.getMaxDiscountValue().compareTo(request.getPrice()) > 0) {
+                throw new IllegalArgumentException("FIXED maxDiscountValue must not exceed the product price");
             }
         }
     }

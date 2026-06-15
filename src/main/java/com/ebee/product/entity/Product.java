@@ -59,6 +59,12 @@ public class Product {
     @Column(name = "discount_value", precision = 10, scale = 2)
     private BigDecimal discountValue;
 
+    @Column(name = "max_discount_type", length = 10)
+    private String maxDiscountType;
+
+    @Column(name = "max_discount_value", precision = 10, scale = 2)
+    private BigDecimal maxDiscountValue;
+
     @Column(length = 100)
     private String brand;
 
@@ -93,6 +99,54 @@ public class Product {
                     .setScale(2, RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO);
             case "FIXED" -> price.subtract(discountValue).max(BigDecimal.ZERO);
+            default -> price;
+        };
+    }
+
+    /**
+     * Computes the effective price using a custom discount supplied at order time
+     * (e.g. admin-applied per-order discount). The custom discount is capped at
+     * the product's {@code maxDiscount} (set by admin at product creation/update).
+     * If {@code maxDiscount} is null, the custom discount is rejected (admin did
+     * not authorize any per-order discount for this product).
+     *
+     * @param customType   "PERCENTAGE" or "FIXED" (nullable for no discount)
+     * @param customValue  the discount value (nullable for no discount)
+     * @return price after applying the custom discount
+     * @throws IllegalArgumentException if custom discount exceeds the cap
+     */
+    public BigDecimal getPriceWithDiscount(String customType, BigDecimal customValue) {
+        if (customType == null || customValue == null) {
+            return price;
+        }
+        if (maxDiscountType == null || maxDiscountValue == null) {
+            throw new IllegalArgumentException(
+                    "Product '" + (name != null ? name : itemCode)
+                            + "' does not allow per-order discount (maxDiscount not set)");
+        }
+        if (!"PERCENTAGE".equals(customType) && !"FIXED".equals(customType)) {
+            throw new IllegalArgumentException("discountType must be PERCENTAGE or FIXED");
+        }
+        if (!maxDiscountType.equals(customType)) {
+            throw new IllegalArgumentException(
+                    "discountType '" + customType + "' does not match product maxDiscountType '"
+                            + maxDiscountType + "'");
+        }
+        if (customValue.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("discountValue must not be negative");
+        }
+        if (customValue.compareTo(maxDiscountValue) > 0) {
+            throw new IllegalArgumentException(
+                    "Discount " + customValue + " " + customType
+                            + " exceeds the maximum allowed (" + maxDiscountValue + " " + maxDiscountType
+                            + ") for product '" + (name != null ? name : itemCode) + "'");
+        }
+        return switch (customType) {
+            case "PERCENTAGE" -> price.multiply(BigDecimal.ONE.subtract(
+                            customValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
+                    .setScale(2, RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO);
+            case "FIXED" -> price.subtract(customValue).max(BigDecimal.ZERO);
             default -> price;
         };
     }

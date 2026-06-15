@@ -476,21 +476,23 @@ class OrderServiceTest {
 
     @Test
     void createOrder_productWithPercentageDiscount_usesDiscountedPriceInTotal() {
-        // Admin places order for a product with 20% discount.
+        // Admin places order for a product with 20% discount cap.
         // Order total must reflect the discounted price.
         Product discountedProduct = Product.builder()
                 .id(UUID.randomUUID())
                 .itemCode("DISC-001")
                 .name("Discounted Product")
                 .price(new BigDecimal("1000.00"))
-                .discountType("PERCENTAGE")
-                .discountValue(new BigDecimal("20"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("20"))
                 .isActive(true)
                 .build();
 
         OrderItemRequest discountedItem = new OrderItemRequest();
         discountedItem.setProductItemCode("DISC-001");
         discountedItem.setQuantity(3);
+        discountedItem.setDiscountType("PERCENTAGE");
+        discountedItem.setDiscountValue(new BigDecimal("20"));
 
         OrderRequest discountedRequest = new OrderRequest();
         discountedRequest.setAgentCode("JF-008");
@@ -535,20 +537,22 @@ class OrderServiceTest {
 
     @Test
     void createOrder_productWithFixedDiscount_usesDiscountedPriceInTotal() {
-        // Admin places order for a product with 250 LKR fixed discount.
+        // Admin places order for a product with 250 LKR fixed discount cap.
         Product fixedDiscountProduct = Product.builder()
                 .id(UUID.randomUUID())
                 .itemCode("FIX-001")
                 .name("Fixed Discount Product")
                 .price(new BigDecimal("1000.00"))
-                .discountType("FIXED")
-                .discountValue(new BigDecimal("250"))
+                .maxDiscountType("FIXED")
+                .maxDiscountValue(new BigDecimal("250"))
                 .isActive(true)
                 .build();
 
         OrderItemRequest item = new OrderItemRequest();
         item.setProductItemCode("FIX-001");
         item.setQuantity(2);
+        item.setDiscountType("FIXED");
+        item.setDiscountValue(new BigDecimal("250"));
 
         OrderRequest req = new OrderRequest();
         req.setAgentCode("JF-008");
@@ -576,5 +580,127 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getTotalAmount())
                 .isEqualByComparingTo(new BigDecimal("1500.00"));
+    }
+
+    @Test
+    void createOrder_perItemDiscountExceedsProductCap_throws() {
+        // Product cap is 10% but admin tries 25% -> should be rejected
+        Product cappedProduct = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("CAP-001")
+                .name("Capped Product")
+                .price(new BigDecimal("1000.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("10"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("CAP-001");
+        item.setQuantity(1);
+        item.setDiscountType("PERCENTAGE");
+        item.setDiscountValue(new BigDecimal("25")); // exceeds 10% cap
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-004");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(cappedProduct));
+
+        assertThatThrownBy(() -> orderService.createOrder(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceeds the maximum allowed");
+    }
+
+    @Test
+    void createOrder_perItemDiscountOnProductWithoutCap_throws() {
+        // Product has no maxDiscount set -> admin cannot apply any per-order discount
+        Product uncappedProduct = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("UNCAP-001")
+                .name("Uncapped Product")
+                .price(new BigDecimal("1000.00"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("UNCAP-001");
+        item.setQuantity(1);
+        item.setDiscountType("PERCENTAGE");
+        item.setDiscountValue(new BigDecimal("10"));
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-005");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(uncappedProduct));
+
+        assertThatThrownBy(() -> orderService.createOrder(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not allow per-order discount");
+    }
+
+    @Test
+    void createOrder_noPerItemDiscount_usesOriginalPrice() {
+        // Admin does NOT apply any per-order discount -> original price used
+        Product product = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("NODISC-001")
+                .name("No Discount Item")
+                .price(new BigDecimal("500.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("10"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("NODISC-001");
+        item.setQuantity(2);
+        // No discountType / discountValue set
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-006");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder().id(UUID.randomUUID()).build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.createOrder(req);
+
+        // No discount -> 500 * 2 = 1000.00
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getTotalAmount())
+                .isEqualByComparingTo(new BigDecimal("1000.00"));
     }
 }

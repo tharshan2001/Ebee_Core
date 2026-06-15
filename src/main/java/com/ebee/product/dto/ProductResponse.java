@@ -21,6 +21,8 @@ public class ProductResponse {
     private Boolean isActive;
     private String discountType;
     private BigDecimal discountValue;
+    private String maxDiscountType;
+    private BigDecimal maxDiscountValue;
     private String brand;
     private String tags;
     private BigDecimal effectivePrice;

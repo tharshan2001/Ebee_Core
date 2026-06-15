@@ -3,6 +3,7 @@ package com.ebee.driver.service;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
@@ -19,6 +20,9 @@ import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +40,7 @@ public class DriverService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationPort notificationPort;
     private final AuditLogService auditLogService;
+    private final SecurityService securityService;
 
 
     @Transactional
@@ -68,7 +73,7 @@ public class DriverService {
 
         Driver savedDriver = driverRepository.save(driver);
 
-        log.info("Generated password for {}: {}", savedUser.getEmail(), generatedPassword);
+        log.info("Driver created: {}", savedUser.getEmail());
         String subject = "Welcome to Ebee – Driver Account Created";
         String message = """
                 Dear %s,
@@ -108,14 +113,14 @@ public class DriverService {
     }
 
     @Transactional(readOnly = true)
-    public List<DriverResponse> getDrivers(DriverAvailability availability) {
-        List<Driver> drivers;
+    public Page<DriverResponse> getDrivers(DriverAvailability availability, Pageable pageable) {
+        Page<Driver> drivers;
         if (availability != null) {
-            drivers = driverRepository.findByAvailability(availability);
+            drivers = driverRepository.findByAvailability(availability, pageable);
         } else {
-            drivers = driverRepository.findAll();
+            drivers = driverRepository.findAll(pageable);
         }
-        return drivers.stream().map(this::toResponse).toList();
+        return drivers.map(this::toResponse);
     }
 
     @Transactional
@@ -144,6 +149,10 @@ public class DriverService {
     public DriverResponse updateAvailability(UUID id, AvailabilityRequest request) {
         Driver driver = driverRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver", "id", id));
+
+        if (!securityService.isAdmin() && !securityService.isCurrentUser(driver.getUser().getId(), null)) {
+            throw new AccessDeniedException("You can only update your own availability");
+        }
 
         driver.setAvailability(request.getAvailability());
         Driver savedDriver = driverRepository.save(driver);

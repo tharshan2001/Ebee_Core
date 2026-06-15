@@ -12,6 +12,7 @@ import com.ebee.driver.repository.DriverRepository;
 import com.ebee.notification.NotificationPort;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
+import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import com.ebee.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -20,9 +21,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,6 +52,7 @@ class AuthServiceTest {
     @Mock private DriverRepository driverRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private RateLimitingService rateLimitingService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private AuthService authService;
 
@@ -60,6 +64,8 @@ class AuthServiceTest {
                 .firstName("Test")
                 .lastName("User")
                 .role(role)
+                .status(UserStatus.ACTIVE)
+                .isActive(true)
                 .mustChangePassword(mustChangePassword)
                 .phoneNumber("0771234567")
                 .loginAlertsEnabled(false)
@@ -134,12 +140,26 @@ class AuthServiceTest {
         request.setPassword("wrong");
 
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(false);
-        when(authenticationManager.authenticate(any()))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Too many login attempts");
+    }
+
+    @Test
+    void login_rateLimited_doesNotAttemptAuthentication() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("admin@ebee.com");
+        request.setPassword("correct-password");
+
+        when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Too many login attempts");
+
+        verify(authenticationManager, never()).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(rateLimitingService, never()).resetLoginAttempts(anyString());
     }
 
     @Test
@@ -228,6 +248,7 @@ class AuthServiceTest {
         assertThat(user.getMustChangePassword()).isFalse();
         verify(userRepository).save(user);
         verify(auditLogService).record(eq(AuditAction.PASSWORD_CHANGE), eq("User"), eq(user.getId()), anyString());
+        verify(eventPublisher).publishEvent(any(com.ebee.auth.event.PasswordChangedEvent.class));
     }
 
     @Test
@@ -239,5 +260,64 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.changePassword(email, "wrong", "new"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Current password is incorrect");
+    }
+
+    @Test
+    void refreshToken_withActiveUser_returnsNewTokens() {
+        String email = "admin@ebee.com";
+        String refreshToken = "valid-refresh-token";
+        User user = createUser(email, RoleType.ADMIN, false);
+        when(jwtService.extractEmailFromToken(refreshToken)).thenReturn(email);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(jwtService.generateToken(any(Authentication.class))).thenReturn("new-access-token");
+        when(jwtService.generateRefreshToken(any(Authentication.class))).thenReturn("new-refresh-token");
+
+        var response = authService.refreshToken(refreshToken);
+
+        assertThat(response.getToken()).isEqualTo("new-access-token");
+        assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
+        assertThat(response.getEmail()).isEqualTo(email);
+    }
+
+    @Test
+    void refreshToken_withInactiveUser_throwsDisabledException() {
+        String email = "admin@ebee.com";
+        String refreshToken = "valid-refresh-token";
+        User user = createUser(email, RoleType.ADMIN, false);
+        user.setStatus(UserStatus.INACTIVE);
+        when(jwtService.extractEmailFromToken(refreshToken)).thenReturn(email);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+                .isInstanceOf(DisabledException.class)
+                .hasMessageContaining("User account is not active");
+    }
+
+    @Test
+    void refreshToken_withLockedUser_throwsDisabledException() {
+        String email = "admin@ebee.com";
+        String refreshToken = "valid-refresh-token";
+        User user = createUser(email, RoleType.ADMIN, false);
+        user.setStatus(UserStatus.LOCKED);
+        when(jwtService.extractEmailFromToken(refreshToken)).thenReturn(email);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+                .isInstanceOf(DisabledException.class)
+                .hasMessageContaining("User account is not active");
+    }
+
+    @Test
+    void refreshToken_withIsActiveFalse_throwsDisabledException() {
+        String email = "admin@ebee.com";
+        String refreshToken = "valid-refresh-token";
+        User user = createUser(email, RoleType.ADMIN, false);
+        user.setIsActive(false);
+        when(jwtService.extractEmailFromToken(refreshToken)).thenReturn(email);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+                .isInstanceOf(DisabledException.class)
+                .hasMessageContaining("User account is not active");
     }
 }

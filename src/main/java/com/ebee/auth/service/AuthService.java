@@ -5,6 +5,7 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.auth.dto.AuthResponse;
 import com.ebee.auth.dto.LoginRequest;
 import com.ebee.auth.dto.RegisterRequest;
+import com.ebee.auth.event.PasswordChangedEvent;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.auth.security.RateLimitingService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -20,11 +21,14 @@ import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
+import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import com.ebee.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -37,6 +41,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -54,12 +59,16 @@ public class AuthService {
     private final DriverRepository driverRepository;
     private final AuditLogService auditLogService;
     private final RateLimitingService rateLimitingService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail();
         String loginKey = "login:" + email;
 
-        boolean rateLimited = !rateLimitingService.isLoginAllowed(loginKey);
+        if (!rateLimitingService.isLoginAllowed(loginKey)) {
+            log.warn("Login rate limit exceeded for: {}", email);
+            throw new IllegalStateException("Too many login attempts. Please try again later.");
+        }
 
         Authentication authentication;
         try {
@@ -67,10 +76,7 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
         } catch (Exception e) {
-            if (rateLimited) {
-                log.warn("Login rate limit exceeded for: {}", email);
-                throw new IllegalStateException("Too many login attempts. Please try again later.");
-            }
+            log.debug("Authentication failed for: {}", email);
             throw e;
         }
 
@@ -210,7 +216,11 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
-        Collection<? extends GrantedAuthority> authorities = 
+        if (!Boolean.TRUE.equals(user.getIsActive()) || user.getStatus() != UserStatus.ACTIVE) {
+            throw new DisabledException("User account is not active");
+        }
+
+        Collection<? extends GrantedAuthority> authorities =
             java.util.Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name())
             );
@@ -278,9 +288,9 @@ public class AuthService {
         user.setPasswordChangedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
 
-        sendPasswordChangedAlert(user);
         auditLogService.record(AuditAction.PASSWORD_CHANGE, "User", user.getId(),
                 "User " + user.getEmail() + " changed their password");
+        eventPublisher.publishEvent(new PasswordChangedEvent(this, user));
     }
 
     public void forgotPassword(String email) {
@@ -292,14 +302,13 @@ public class AuthService {
     }
 
     public String verifyOtp(String email, String otp) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        Optional<User> userOpt = userRepository.findByEmail(email);
 
-        if (!otpService.verifyOtp(user.getEmail(), otp)) {
+        if (userOpt.isEmpty() || !otpService.verifyOtp(email, otp)) {
             throw new IllegalArgumentException("Invalid or expired OTP");
         }
 
-        return generateResetToken(user);
+        return generateResetToken(userOpt.get());
     }
 
     @Transactional
@@ -314,9 +323,9 @@ public class AuthService {
         user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
 
-        sendPasswordChangedAlert(user);
         auditLogService.record(AuditAction.PASSWORD_RESET, "User", user.getId(),
                 "Password reset completed for " + user.getEmail());
+        eventPublisher.publishEvent(new PasswordChangedEvent(this, user));
     }
 
     private String generateResetToken(User user) {

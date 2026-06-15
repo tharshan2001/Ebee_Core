@@ -54,7 +54,11 @@ public class BackupController {
     }
 
     @GetMapping("/backups/{filename}")
-    public ResponseEntity<InputStreamResource> downloadBackup(@PathVariable String filename) {
+    public ResponseEntity<InputStreamResource> downloadBackup(
+            Authentication authentication,
+            @PathVariable String filename,
+            @RequestParam String otp) {
+        verifyOtp(authentication, otp);
         Path file = backupService.getBackupFile(filename);
         auditLogService.record(BackupAction.DOWNLOAD, filename, null);
         try {

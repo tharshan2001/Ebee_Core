@@ -54,7 +54,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
-        log.info("Generated password for {}: {}", savedUser.getEmail(), rawPassword);
+        log.info("User created: {}", savedUser.getEmail());
         sendWelcomeNotification(savedUser, rawPassword);
 
         return userMapper.toResponse(savedUser);

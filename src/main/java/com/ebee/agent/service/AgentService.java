@@ -106,7 +106,7 @@ public class AgentService {
         auditLogService.record(AuditAction.CREATE, "Agent", savedAgent.getId(),
                 "Agent " + savedAgent.getAgentCode() + " (" + savedAgent.getUser().getEmail() + ") created");
 
-        log.info("Generated password for {}: {}", savedUser.getEmail(), generatedPassword);
+        log.info("Agent created: {}", savedUser.getEmail());
         sendWelcomeNotification(request.getFirstName(), request.getLastName(), agentCode, savedAgent, generatedPassword);
 
         return AgentWithCredentialsResponse.builder()

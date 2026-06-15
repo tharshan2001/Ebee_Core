@@ -11,13 +11,13 @@ spring:
       max-request-size: 10MB
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/ebee_db
-    username: antonabitharshan
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ebee_db}
+    username: ${DB_USERNAME:antonabitharshan}
     password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
       connection-timeout: 30000
       max-lifetime: 1800000
       leak-detection-threshold: 60000
@@ -35,10 +35,10 @@ spring:
             non_contextual_creation: true
   
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${GMAIL_USERNAME:dev}
-    password: ${GMAIL_APP_PASSWORD:dev}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${GMAIL_USERNAME:}
+    password: ${GMAIL_APP_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -55,28 +55,30 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 aws:
-  access-key: ${AWS_ACCESS_KEY_ID:testkey}
-  secret-key: ${AWS_SECRET_ACCESS_KEY:testsecret}
+  access-key: ${AWS_ACCESS_KEY_ID:}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:}
   region: ${AWS_REGION:eu-north-1}
-  bucket-name: ${AWS_BUCKET_NAME:pathfinder-app-media}
+  bucket-name: ${AWS_BUCKET_NAME:}
 
 server:
-  port: 8085
+  port: ${SERVER_PORT:8085}
 
 jwt:
-  secret: ${JWT_SECRET:temp-test-secret-that-is-at-least-256-bits-long-for-hs256-algorithm-minimum-length}
-  expiration: 86400000
-  refreshExpiration: 604800000
+  secret: ${JWT_SECRET:}
+  reset-secret: ${JWT_RESET_SECRET:}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refreshExpiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 notification:
   sms:
-    api-base-url: ${DIALOG_SMS_API_URL:https://richcommunication.dialog.lk/api}
-    username: ${DIALOG_SMS_USERNAME:dev}
-    password: ${DIALOG_SMS_PASSWORD:dev}
+    api-base-url: ${DIALOG_SMS_API_URL:}
+    username: ${DIALOG_SMS_USERNAME:}
+    password: ${DIALOG_SMS_PASSWORD:}
     default-mask: ${DIALOG_SMS_MASK:KISMET PLUS}
     default-campaign: ${DIALOG_SMS_CAMPAIGN:Notification}
 

@@ -21,7 +21,9 @@ public class OtpService {
 
     private static final long OTP_TTL_SECONDS = 300;
     private static final int OTP_LENGTH = 6;
+    private static final int MAX_OTP_ATTEMPTS = 5;
     private static final String OTP_KEY_PREFIX = "otp:";
+    private static final String OTP_ATTEMPTS_KEY_PREFIX = "otp:attempts:";
 
     private final StringRedisTemplate redisTemplate;
     private final NotificationPort notificationPort;
@@ -63,6 +65,18 @@ public class OtpService {
 
     public boolean verifyOtp(String email, String otp) {
         String key = OTP_KEY_PREFIX + email;
+        String attemptsKey = OTP_ATTEMPTS_KEY_PREFIX + email;
+
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(attemptsKey))) {
+            String attemptsStr = redisTemplate.opsForValue().get(attemptsKey);
+            int attempts = attemptsStr != null ? Integer.parseInt(attemptsStr) : 0;
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                log.warn("OTP brute-force attempt blocked for {} after {} failed attempts", email, attempts);
+                redisTemplate.delete(key);
+                return false;
+            }
+        }
+
         String storedOtp = redisTemplate.opsForValue().get(key);
 
         if (storedOtp == null) {
@@ -70,10 +84,17 @@ public class OtpService {
         }
 
         if (!storedOtp.equals(otp.trim())) {
+            Long attempts = redisTemplate.opsForValue().increment(attemptsKey);
+            if (attempts != null && attempts >= MAX_OTP_ATTEMPTS) {
+                redisTemplate.expire(attemptsKey, OTP_TTL_SECONDS, TimeUnit.SECONDS);
+                redisTemplate.delete(key);
+                log.warn("OTP invalidated for {} after {} failed attempts", email, attempts);
+            }
             return false;
         }
 
         redisTemplate.delete(key);
+        redisTemplate.delete(attemptsKey);
         return true;
     }
 

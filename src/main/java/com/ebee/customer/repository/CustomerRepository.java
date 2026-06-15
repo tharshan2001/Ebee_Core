@@ -29,4 +29,7 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search%")
     Page<Customer> findBySearchTerm(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search%")
+    List<Customer> findBySearchTerm(@Param("search") String search);
 }

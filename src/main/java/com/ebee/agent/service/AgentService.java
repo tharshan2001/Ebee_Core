@@ -251,6 +251,12 @@ public class AgentService {
         return agents.map(agentMapper::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public List<AgentResponse> searchAgents(String search) {
+        List<Agent> agents = agentRepository.findBySearchTerm(search);
+        return agents.stream().map(agentMapper::toResponse).toList();
+    }
+
     @Transactional
     public AgentResponse updateAgent(UUID id, AgentUpdateRequest request) {
         Agent agent = agentRepository.findById(id)

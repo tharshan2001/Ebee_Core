@@ -129,6 +129,13 @@ public class ProductService {
                 .map(this::toResponseWithRelations);
     }
 
+    @Transactional(readOnly = true)
+    public List<ProductResponse> searchProducts(String search) {
+        return productRepository.findBySearchTerm(search).stream()
+                .map(this::toResponseWithRelations)
+                .toList();
+    }
+
     private List<ProductResponse> buildResponsesWithBatchImages(List<Product> products) {
         if (products.isEmpty()) return List.of();
 

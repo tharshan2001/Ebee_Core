@@ -50,6 +50,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
     Page<Product> findBySearchTerm(@Param("search") String search, Pageable pageable);
 
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
+    List<Product> findBySearchTerm(@Param("search") String search);
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.isActive = true")
     Page<Product> findAllActiveWithInventoryAndImages(Pageable pageable);
 }

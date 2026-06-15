@@ -106,6 +106,13 @@ public class AgentController {
         return ResponseEntity.ok(ApiResponse.success("Agent retrieved successfully", response));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<AgentResponse>>> searchAgents(@RequestParam("q") String query) {
+        List<AgentResponse> response = agentService.searchAgents(query.trim());
+        return ResponseEntity.ok(ApiResponse.success("Agents retrieved successfully", response));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<AgentResponse>>> getAllAgents(

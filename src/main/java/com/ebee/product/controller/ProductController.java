@@ -108,6 +108,12 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(@RequestParam("q") String query) {
+        List<ProductResponse> response = productService.searchProducts(query.trim());
+        return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
+    }
+
     @GetMapping("/active")
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getActiveProducts(
             @RequestParam(defaultValue = "0") int page,

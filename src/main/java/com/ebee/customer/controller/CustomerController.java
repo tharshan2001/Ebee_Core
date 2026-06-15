@@ -57,6 +57,13 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("Customer updated successfully", response));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<List<CustomerResponse>>> searchCustomers(@RequestParam("q") String query) {
+        List<CustomerResponse> response = customerService.searchCustomers(query.trim());
+        return ResponseEntity.ok(ApiResponse.success("Customers retrieved successfully", response));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<PageResponse<CustomerResponse>>> getAllCustomers(

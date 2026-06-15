@@ -147,6 +147,13 @@ public class CustomerService {
         return customers.map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> searchCustomers(String search) {
+        return customerRepository.findBySearchTerm(search).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public void incrementTotalOrders(UUID customerId) {
         customerRepository.findById(customerId).ifPresent(c -> {

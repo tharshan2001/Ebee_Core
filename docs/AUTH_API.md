@@ -1,6 +1,12 @@
 # Authentication API
 
 > **Rate Limiting:** Auth endpoints are rate-limited. Login is capped at 5 attempts per 15 minutes per email. Generic endpoints (forgot-password, verify-otp, reset-password, refresh) are capped at 10 requests per 15 minutes. All endpoints are capped at 100 requests per minute per IP. Excess requests return `429 Too Many Requests`.
+>
+> **Login rate-limit behavior:** The rate limit is checked **before** authentication. Once an email has 5 failed attempts, the account is locked for 15 minutes. **All** subsequent attempts (correct password or wrong password) are rejected with `429` until the window expires. This prevents brute-force bypass via correct-password-after-attempts-exhausted.
+>
+> **Refresh token user status:** Refresh tokens are rejected with `DisabledException` if the associated user is `inactive` or `status != ACTIVE`. Disabled users cannot generate new access tokens.
+>
+> **OTP verification:** Max 5 failed OTP attempts. After 5 wrong attempts, the OTP is invalidated and a new one must be requested. The 6-digit numeric OTP cannot be brute-forced within the 5-minute validity window.
 
 ---
 

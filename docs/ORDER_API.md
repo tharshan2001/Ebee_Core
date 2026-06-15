@@ -164,6 +164,13 @@ Admin includes `agentCode` to create an order for a specific agent.
 - 403: Forbidden (role not authorized)
 - 404: Agent not found / Customer not found / Product not found
 
+> **Order Number Concurrency:** Order numbers are unique per (district, source, date, sequence). The `order_number` column has a `UNIQUE` constraint at the database level. Concurrent requests for the same district/source/date are handled via `@Retryable` (5 attempts, exponential backoff: 50ms × 2^n). If all retries fail, the client receives `500 Unable to generate unique order number. Please try again.`
+>
+> **Order Number Format:** `TM-{D|A}-YYYYMMDD-NNN` where:
+> - `D` = direct order, `A` = agent order
+> - `YYYYMMDD` = creation date (server local time)
+> - `NNN` = zero-padded daily sequence (resets each day per district+source)
+
 ---
 
 ### 2. Get Order by ID

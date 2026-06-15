@@ -16,12 +16,14 @@ Non-admin users receive `403 Forbidden`.
 
 ## OTP Flow
 
-All mutation endpoints (backup, restore, upload) require a one-time password (OTP) sent to the admin's registered email. The OTP expires after 5 minutes and is consumed on first use.
+All endpoints (create, upload, restore, **and download**) require a one-time password (OTP) sent to the admin's registered email. The OTP expires after 5 minutes and is consumed on first use.
 
 **Flow:**
 1. Call `POST /api/admin/db/send-otp` to receive a 6-digit OTP via email
 2. Use that OTP as a query parameter (`?otp=...`) or form field on the target endpoint
 3. Each OTP is single-use — a new one must be requested for each operation
+
+> **Security:** Database backups contain complete application data (user credentials, personal information, financial records). All four sensitive backup operations (create, upload, restore, **download**) now consistently require OTP verification. A compromised admin session can no longer silently exfiltrate all database data.
 
 ---
 
@@ -149,9 +151,17 @@ Returns all `.dump` files in the backups directory, sorted newest first.
 
 Downloads a backup file as `application/octet-stream` with `Content-Disposition: attachment`.
 
+**Requires OTP.** See the [OTP Flow](#otp-flow) section — call `POST /api/admin/db/send-otp` first, then pass the OTP as a query parameter.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `otp` | String | Yes | OTP received via email from `/send-otp` |
+
 **Example:**
 ```bash
-curl -O -J "http://localhost:8085/api/admin/db/backups/ebee_db_20260609_133154.dump" \
+curl -O -J "http://localhost:8085/api/admin/db/backups/ebee_db_20260609_133154.dump?otp=483291" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -164,6 +174,7 @@ Content-Disposition: attachment; filename="ebee_db_20260609_133154.dump"
 ```
 
 **Error (not found):** `404` with standard error response.
+**Error (invalid/missing OTP):** `400` "Invalid or expired OTP".
 
 ---
 
@@ -277,6 +288,6 @@ These operations use the same underlying commands as the `scripts/db.sh` script 
 1. **Dashboard loads** → `GET /api/admin/db/backups` → displays backup list
 2. **Admin clicks "Backup Now"** → prompt appears: "An OTP has been sent to your email" (automatically calls `POST /send-otp` first) → admin enters OTP → `POST /api/admin/db/backup?otp=...` → new backup appears in list
 3. **Admin selects a backup** → option to download or restore
-4. **Admin clicks "Download"** → `GET /api/admin/db/backups/{filename}` → file downloads (no OTP needed for download)
+4. **Admin clicks "Download"** → sends OTP → admin enters OTP → `GET /api/admin/db/backups/{filename}?otp=...` → file downloads
 5. **Admin clicks "Restore"** → confirmation dialog → sends OTP → admin enters OTP → `POST /api/admin/db/restore?filename=...&otp=...` → pre-restore backup created, then restored
 6. **Admin drag-and-drops a file** → sends OTP → admin enters OTP → `POST /api/admin/db/backups/upload?otp=...` → file uploaded and verified

@@ -226,6 +226,41 @@ curl "http://localhost:8085/api/products?search=Test&size=10"
 
 ---
 
+### Get Product Stats
+
+**GET** `/api/products/stats`
+
+**Access:** Public
+
+Returns aggregate product statistics across the entire database (not limited to the current page). Use this to display dashboard counts (`Total Products`, `Active`, `Low Stock`) that reflect the full catalog rather than just the current page slice.
+
+```bash
+curl http://localhost:8085/api/products/stats
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Product stats retrieved successfully",
+  "data": {
+    "total": 150,
+    "active": 142,
+    "lowStock": 8
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total` | Long | Total number of products (active + inactive) |
+| `active` | Long | Number of products with `isActive = true` |
+| `lowStock` | Long | Number of products where `inventory.quantity <= inventory.reorderLevel` |
+
+> All counts are full-database aggregations (`COUNT(*)`), not derived from the current page.
+
+---
+
 ### Get Product by ID
 
 **GET** `/api/products/{id}`

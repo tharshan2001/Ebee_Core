@@ -198,20 +198,33 @@ All endpoints return a consistent JSON envelope:
 
 ## Env Configuration
 
-All secrets are loaded from environment variables (see `.env` in the project root).
+All secrets are loaded from environment variables (see `.env` in the project root). No secrets are stored in `application.yml` — if env vars are missing, the application starts with empty credentials rather than falling back to hardcoded values.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GMAIL_USERNAME` | Gmail SMTP username | `dev` |
-| `GMAIL_APP_PASSWORD` | Gmail app password | `dev` |
-| `DIALOG_SMS_USERNAME` | Dialog SMS API username | `dev` |
-| `DIALOG_SMS_PASSWORD` | Dialog SMS API password | `dev` |
-| `DIALOG_SMS_API_URL` | Dialog SMS API base URL | `https://richcommunication.dialog.lk/api` |
+| `DB_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/ebee_db` |
+| `DB_USERNAME` | PostgreSQL username | `antonabitharshan` |
+| `DB_PASSWORD` | PostgreSQL password | _(empty)_ |
+| `DB_POOL_MAX_SIZE` | HikariCP max pool size | `10` |
+| `DB_POOL_MIN_IDLE` | HikariCP min idle connections | `2` |
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_PASSWORD` | Redis password | _(empty)_ |
+| `MAIL_HOST` | SMTP host | `smtp.gmail.com` |
+| `MAIL_PORT` | SMTP port | `587` |
+| `GMAIL_USERNAME` | Gmail SMTP username | _(empty)_ |
+| `GMAIL_APP_PASSWORD` | Gmail app password | _(empty)_ |
+| `AWS_ACCESS_KEY_ID` | AWS access key | _(empty)_ |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | _(empty)_ |
+| `AWS_REGION` | AWS region | `eu-north-1` |
+| `AWS_BUCKET_NAME` | AWS S3 bucket | _(empty)_ |
+| `JWT_SECRET` | JWT signing secret (256-bit) | _(empty)_ |
+| `JWT_RESET_SECRET` | JWT reset-token signing secret | _(empty, falls back to JWT_SECRET)_ |
+| `JWT_EXPIRATION` | Access token TTL (ms) | `86400000` (24h) |
+| `JWT_REFRESH_EXPIRATION` | Refresh token TTL (ms) | `604800000` (7d) |
+| `DIALOG_SMS_API_URL` | Dialog SMS API base URL | _(empty)_ |
+| `DIALOG_SMS_USERNAME` | Dialog SMS API username | _(empty)_ |
+| `DIALOG_SMS_PASSWORD` | Dialog SMS API password | _(empty)_ |
 | `DIALOG_SMS_MASK` | SMS sender mask | `KISMET PLUS` |
 | `DIALOG_SMS_CAMPAIGN` | SMS campaign name | `Notification` |
-| `JWT_SECRET` | JWT signing secret (256-bit) | `temp-test-secret-...` |
-| `DB_PASSWORD` | PostgreSQL password | _(empty, trust auth)_ |
-| `AWS_ACCESS_KEY_ID` | AWS access key | `testkey` |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | `testsecret` |
-| `AWS_REGION` | AWS region | `eu-north-1` |
-| `AWS_BUCKET_NAME` | AWS S3 bucket | `pathfinder-app-media` |
+| `SERVER_PORT` | HTTP server port | `8085` |

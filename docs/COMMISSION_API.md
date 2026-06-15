@@ -237,12 +237,31 @@ Marks one or more specific commissions as `PAID`. Only commissions in `PROCESSIN
 |----------|--------|-------------|
 | **GET** `/api/commissions/{id}` | Any authenticated | Get by ID |
 | **GET** `/api/commissions/agent/{agentId}` | Any authenticated | Get by agent |
-| **GET** `/api/commissions` | ADMIN only | Get all |
+| **GET** `/api/commissions` | ADMIN only | Get all (paginated) |
 | **GET** `/api/commissions/status/{status}` | ADMIN only | Filter by status |
+
+#### GET /api/commissions (Paginated)
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `calculatedAt,desc` | Format: `field,direction` |
+
+**Response (200):** `PageResponse<CommissionResponse>` wrapper (see `PageResponse` shape in README).
+
+```bash
+curl -s "http://localhost:8085/api/commissions?page=0&size=20&sort=calculatedAt,desc" \
+  -H "Authorization: Bearer <TOKEN>"
+```
 
 Status values: `CALCULATED`, `APPROVED`, `PROCESSING`, `PAID`, `REJECTED`, `CANCELLED`.
 
 > `agentTotalSales` is computed dynamically — the sum of all non-cancelled/non-rejected order amounts for that agent. It reflects total sales regardless of payment status.
+>
+> **Commission amount precision:** Commission amounts are `BigDecimal` with `scale=2` and `RoundingMode.HALF_UP` (e.g. `33.33 * 10 / 100 = 3.33`). The DB column is `precision=12, scale=2`. No silent truncation occurs.
 
 ---
 

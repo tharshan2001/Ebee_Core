@@ -22,8 +22,10 @@ Available values: `AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`.
 
 - **Delivery assigned** → driver availability auto-set to `ON_TRIP`
 - **Delivery DELIVERED** → driver availability auto-returned to `AVAILABLE`
+- **Delivery FAILED → PENDING (retry)** → driver availability auto-restored to `AVAILABLE` (if still assigned at failure time)
+- **Delivery assignment rejected** → if driver is already `ON_TRIP` or `SUSPENDED`, the assignment throws `400` and does not change status
 
-This ensures a driver cannot be double-booked — they are `ON_TRIP` from the moment a delivery is assigned until it is marked `DELIVERED`.
+This ensures a driver cannot be double-booked — they are `ON_TRIP` from the moment a delivery is assigned until it is marked `DELIVERED` (or the delivery is reset to `PENDING` for retry).
 
 ---
 
@@ -76,20 +78,36 @@ The `generatedPassword` is only returned on creation. The driver must change it 
 ### List Drivers
 
 ```
-GET /api/drivers?availability=AVAILABLE
+GET /api/drivers?availability=AVAILABLE&page=0&size=20&sort=createdAt,desc
 Auth: ADMIN, DRIVER
 ```
 
 Optional filter: `availability` (`AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`).
 
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `availability` | String | — | Filter by availability status |
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+| `sort` | String | `createdAt,desc` | Format: `field,direction` |
+
+**Response (200):** `PageResponse<DriverResponse>` wrapper (see `PageResponse` shape in README).
+
+```bash
+curl -s "http://localhost:8085/api/drivers?page=0&size=20&sort=createdAt,desc" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
 ### List Available Drivers
 
 ```
-GET /api/drivers/available
+GET /api/drivers/available?page=0&size=50
 Auth: ADMIN, DRIVER
 ```
 
-Shorthand for `GET /api/drivers?availability=AVAILABLE`.
+Paginated shorthand for `GET /api/drivers?availability=AVAILABLE`. Max page size is 100.
 
 ### Get Driver Detail
 
@@ -130,5 +148,7 @@ Body:
 ```
 
 Valid values: `AVAILABLE`, `ON_TRIP`, `OFFLINE`, `SUSPENDED`.
+
+> **Authorization:** Drivers can only update **their own** availability. A non-admin driver attempting to change another driver's availability receives `403 Forbidden`. Admins can update any driver.
 
 

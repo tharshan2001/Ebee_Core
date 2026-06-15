@@ -109,8 +109,27 @@ public class ProductController {
     }
 
     @GetMapping("/active")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getActiveProducts() {
-        List<ProductResponse> response = productService.getActiveProducts();
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getActiveProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
+        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<ProductResponse> productsPage = productService.getActiveProductsPaginated(pageable);
+
+        PageResponse<ProductResponse> response = new PageResponse<>(
+                productsPage.getContent(),
+                productsPage.getNumber(),
+                productsPage.getSize(),
+                productsPage.getTotalElements(),
+                productsPage.getTotalPages(),
+                productsPage.isFirst(),
+                productsPage.isLast()
+        );
+
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
 

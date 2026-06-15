@@ -119,6 +119,11 @@ public class ProductService {
                 .map(this::toResponseWithRelations);
     }
 
+    public Page<ProductResponse> getActiveProductsPaginated(Pageable pageable) {
+        return productRepository.findAllActiveWithInventoryAndImages(pageable)
+                .map(this::toResponseWithRelations);
+    }
+
     public Page<ProductResponse> searchProducts(String search, Pageable pageable) {
         return productRepository.findBySearchTerm(search, pageable)
                 .map(this::toResponseWithRelations);

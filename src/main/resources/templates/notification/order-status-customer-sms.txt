@@ -1,0 +1,1 @@
+Dear {{firstName}}, your order {{orderNumber}} is now {{statusLabel}}. Thank you for choosing Ebee!

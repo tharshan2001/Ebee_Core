@@ -8,103 +8,124 @@ import com.ebee.order.util.OrderItemSummaryBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 public class OrderNotificationService {
 
+    private static final Set<String> HTML_KEYS = Set.of(
+            "itemSummaryHtml", "savingsBlock", "commissionBlock", "savingsContext"
+    );
+
     private final NotificationPort notificationPort;
 
     public void sendOrderCreated(Order order, Commission commission) {
-        String itemSummary = OrderItemSummaryBuilder.buildItemSummaryWithDiscount(order);
-        java.math.BigDecimal totalSavings = OrderItemSummaryBuilder.totalSavings(order);
-        boolean hasSavings = totalSavings.compareTo(java.math.BigDecimal.ZERO) > 0;
-        java.math.BigDecimal originalAmount = OrderItemSummaryBuilder.totalOriginalAmount(order);
-        String savingsBlock = hasSavings
-                ? "Subtotal: LKR %.2f\nDiscount: −LKR %.2f\nTotal: LKR %.2f".formatted(
-                        originalAmount, totalSavings, order.getTotalAmount())
-                : "Total: LKR %.2f".formatted(order.getTotalAmount());
+        BigDecimal totalSavings = OrderItemSummaryBuilder.totalSavings(order);
+        boolean hasSavings = totalSavings.compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal originalAmount = OrderItemSummaryBuilder.totalOriginalAmount(order);
+        BigDecimal totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
+
+        String itemSummaryHtml = OrderItemSummaryBuilder.buildItemSummaryHtml(order);
+        String itemSummaryTxt = OrderItemSummaryBuilder.buildItemSummaryWithDiscount(order);
+
+        String savingsBlockHtml = hasSavings
+                ? "<div class=\"discount-breakdown\"><p><strong>You saved LKR "
+                + totalSavings.toPlainString() + " on this order!</strong></p></div>"
+                : "";
+        String savingsBlockTxt = hasSavings
+                ? "You saved LKR " + totalSavings.toPlainString() + " on this order! "
+                : "";
 
         if (order.getCustomer() != null) {
-            String customerSubject = "Order Placed – " + order.getOrderNumber();
-            String customerMessage = """
-                    Dear %s,
-
-                    Your order %s has been placed successfully.
-
-                    Items:
-                    %s
-                    %s
-
-                    We will notify you once it's confirmed.
-                    Thank you for choosing Ebee!
-                    """.formatted(
-                    OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()),
-                    order.getOrderNumber(),
-                    itemSummary,
-                    savingsBlock
-            );
-            notificationPort.notifyCustomer(order.getCustomer(), customerSubject, customerMessage);
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
+            p.put("orderNumber", order.getOrderNumber());
+            p.put("itemSummaryHtml", itemSummaryHtml);
+            p.put("itemSummary", itemSummaryTxt);
+            p.put("subtotal", originalAmount.toPlainString());
+            p.put("discount", totalSavings.toPlainString());
+            p.put("totalAmount", totalAmount.toPlainString());
+            p.put("savingsBlock", savingsBlockHtml);
+            p.put("savingsBlockTxt", savingsBlockTxt);
+            notificationPort.notifyCustomer(order.getCustomer(),
+                    "Order Placed – " + order.getOrderNumber(),
+                    "order-created-customer", p, HTML_KEYS);
         }
 
         if (order.getAgent() != null) {
-            String agentSubject = "New Order Assigned – " + order.getOrderNumber();
-            String customerInfo = order.getCustomer() != null
-                    ? "Customer: " + OrderItemSummaryBuilder.customerDisplayName(order.getCustomer())
-                    : "Customer: Walk-in";
-            String commissionInfo = commission != null
-                    ? "Commission: LKR %.2f (%.2f%% rate)".formatted(
-                            commission.getCommissionAmount(), commission.getCommissionRate())
+            String agentName = order.getAgent().getUser().getFirstName();
+            String customerName = order.getCustomer() != null
+                    ? OrderItemSummaryBuilder.customerDisplayName(order.getCustomer())
+                    : "Walk-in";
+
+            String commissionBlockHtml = commission != null
+                    ? "<div class=\"commission-box\"><p><strong>Commission:</strong> LKR "
+                    + commission.getCommissionAmount().toPlainString()
+                    + " (" + commission.getCommissionRate().toPlainString() + "% rate)</p></div>"
                     : "";
-            String agentMessage = """
-                    Dear %s,
+            String commissionBlockTxt = commission != null
+                    ? "Commission: LKR " + commission.getCommissionAmount().toPlainString()
+                    + " (" + commission.getCommissionRate().toPlainString() + "% rate). "
+                    : "";
 
-                    A new order %s has been assigned to you.
+            Map<String, String> p = new HashMap<>();
+            p.put("agentName", agentName);
+            p.put("customerName", customerName);
+            p.put("orderNumber", order.getOrderNumber());
+            p.put("itemSummaryHtml", itemSummaryHtml);
+            p.put("itemSummary", itemSummaryTxt);
+            p.put("subtotal", originalAmount.toPlainString());
+            p.put("discount", totalSavings.toPlainString());
+            p.put("totalAmount", totalAmount.toPlainString());
+            p.put("savingsBlock", savingsBlockHtml);
+            p.put("savingsBlockTxt", savingsBlockTxt);
+            p.put("commissionBlock", commissionBlockHtml);
+            p.put("commissionBlockTxt", commissionBlockTxt);
+            notificationPort.notifyAgent(order.getAgent(),
+                    "New Order Assigned – " + order.getOrderNumber(),
+                    "order-created-agent", p, HTML_KEYS);
 
-                    %s
-                    Items:
-                    %s
-                    %s
-                    %s
-
-                    Please process the order at your earliest convenience.
-                    """.formatted(
-                    order.getAgent().getUser().getFirstName(),
-                    order.getOrderNumber(),
-                    customerInfo,
-                    itemSummary,
-                    savingsBlock,
-                    commissionInfo
-            );
-            notificationPort.notifyAgent(order.getAgent(), agentSubject, agentMessage);
-            notificationPort.createInternalAlert(order.getAgent().getUser(), agentSubject, agentMessage,
+            String alertMsg = "Order " + order.getOrderNumber() + " assigned for " + customerName
+                    + ". Total: LKR " + totalAmount.toPlainString();
+            notificationPort.createInternalAlert(order.getAgent().getUser(),
+                    "New Order Assigned – " + order.getOrderNumber(), alertMsg,
                     AlertType.ORDER_CREATED, order.getId(), "order");
 
             if (commission != null) {
-                String commissionSubject = "Commission Calculated – Order " + order.getOrderNumber();
-                String amountContext = hasSavings
-                        ? "Order Amount (after discount): LKR %.2f\nSubtotal (before discount): LKR %.2f\nCustomer Savings: LKR %.2f".formatted(
-                                order.getTotalAmount(), originalAmount, totalSavings)
-                        : "Order Amount: LKR %.2f".formatted(order.getTotalAmount());
-                String commissionMsg = """
-                        Dear %s,
+                String savingsContextHtml = hasSavings
+                        ? "<p><strong>Subtotal (before discount):</strong> LKR "
+                        + originalAmount.toPlainString() + "</p>\n"
+                        + "<p class=\"savings\"><strong>Customer Savings:</strong> LKR "
+                        + totalSavings.toPlainString() + "</p>"
+                        : "";
+                String savingsContextTxt = hasSavings
+                        ? "Subtotal: LKR " + originalAmount.toPlainString()
+                        + ", Customer Savings: LKR " + totalSavings.toPlainString() + ". "
+                        : "";
 
-                        A commission of LKR %.2f has been calculated for order %s.
+                Map<String, String> cp = new HashMap<>();
+                cp.put("agentName", agentName);
+                cp.put("orderNumber", order.getOrderNumber());
+                cp.put("totalAmount", totalAmount.toPlainString());
+                cp.put("commissionAmount", commission.getCommissionAmount().toPlainString());
+                cp.put("commissionRate", commission.getCommissionRate().toPlainString());
+                cp.put("savingsContext", savingsContextHtml);
+                cp.put("savingsContextTxt", savingsContextTxt);
+                cp.put("originalAmount", originalAmount.toPlainString());
+                cp.put("totalSavings", totalSavings.toPlainString());
+                notificationPort.notifyAgent(order.getAgent(),
+                        "Commission Calculated – Order " + order.getOrderNumber(),
+                        "order-commission-calculated", cp, HTML_KEYS);
 
-                        %s
-                        Rate: %.2f%%
-                        Commission: LKR %.2f
-
-                        The commission will be processed once approved.
-                        """.formatted(
-                        order.getAgent().getUser().getFirstName(),
-                        commission.getCommissionAmount(),
-                        order.getOrderNumber(),
-                        amountContext,
-                        commission.getCommissionRate(),
-                        commission.getCommissionAmount()
-                );
-                notificationPort.notifyAgent(order.getAgent(), commissionSubject, commissionMsg);
-                notificationPort.createInternalAlert(order.getAgent().getUser(), commissionSubject, commissionMsg,
+                String commissionAlert = "Commission LKR " + commission.getCommissionAmount().toPlainString()
+                        + " at " + commission.getCommissionRate().toPlainString()
+                        + "% for order " + order.getOrderNumber() + ".";
+                notificationPort.createInternalAlert(order.getAgent().getUser(),
+                        "Commission Calculated – Order " + order.getOrderNumber(), commissionAlert,
                         AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
             }
         }
@@ -112,49 +133,53 @@ public class OrderNotificationService {
 
     public void sendOrderStatus(Order order) {
         if (order.getCustomer() != null) {
-            String statusMessage = switch (order.getStatus()) {
-                case CONFIRMED -> "has been confirmed and is being prepared.";
-                case PROCESSING -> "is now being processed.";
-                case SHIPPED -> "has been shipped and is on its way!";
-                case DELIVERED -> "has been delivered. Thank you for shopping with us!";
-                case RETURNED -> "has been returned. Please contact support if you have any questions.";
+            String statusLabel = switch (order.getStatus()) {
+                case CONFIRMED -> "Confirmed";
+                case PROCESSING -> "Processing";
+                case SHIPPED -> "Shipped";
+                case DELIVERED -> "Delivered";
+                case RETURNED -> "Returned";
                 default -> null;
             };
 
-            if (statusMessage != null) {
-                String subject = "Order " + order.getStatus().name() + " – " + order.getOrderNumber();
-                String message = "Dear %s,\n\nYour order %s %s".formatted(
-                        OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()),
-                        order.getOrderNumber(),
-                        statusMessage
-                );
-                notificationPort.notifyCustomer(order.getCustomer(), subject, message);
+            if (statusLabel != null) {
+                Map<String, String> p = new HashMap<>();
+                p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
+                p.put("orderNumber", order.getOrderNumber());
+                p.put("statusLabel", statusLabel);
+                notificationPort.notifyCustomer(order.getCustomer(),
+                        "Order " + statusLabel + " – " + order.getOrderNumber(),
+                        "order-status-customer", p, Set.of());
             }
         }
 
         if (order.getAgent() != null) {
-            String statusMessage = switch (order.getStatus()) {
-                case CONFIRMED -> "has been confirmed.";
-                case PROCESSING -> "is now being processed.";
-                case SHIPPED -> "has been shipped.";
-                case DELIVERED -> "has been delivered.";
-                case RETURNED -> "has been returned.";
+            String statusLabel = switch (order.getStatus()) {
+                case CONFIRMED -> "Confirmed";
+                case PROCESSING -> "Processing";
+                case SHIPPED -> "Shipped";
+                case DELIVERED -> "Delivered";
+                case RETURNED -> "Returned";
                 default -> null;
             };
 
-            if (statusMessage != null) {
-                String customerInfo = order.getCustomer() != null
+            if (statusLabel != null) {
+                String customerName = order.getCustomer() != null
                         ? OrderItemSummaryBuilder.customerDisplayName(order.getCustomer())
                         : "Walk-in";
-                String subject = "Order " + order.getStatus().name() + " – " + order.getOrderNumber();
-                String message = "Dear %s,\n\nOrder %s for %s %s".formatted(
-                        order.getAgent().getUser().getFirstName(),
-                        order.getOrderNumber(),
-                        customerInfo,
-                        statusMessage
-                );
-                notificationPort.notifyAgent(order.getAgent(), subject, message);
-                notificationPort.createInternalAlert(order.getAgent().getUser(), subject, message,
+                Map<String, String> p = new HashMap<>();
+                p.put("agentName", order.getAgent().getUser().getFirstName());
+                p.put("customerName", customerName);
+                p.put("orderNumber", order.getOrderNumber());
+                p.put("statusLabel", statusLabel);
+                notificationPort.notifyAgent(order.getAgent(),
+                        "Order " + statusLabel + " – " + order.getOrderNumber(),
+                        "order-status-agent", p, Set.of());
+
+                String alertMsg = "Order " + order.getOrderNumber() + " for " + customerName
+                        + " is now " + statusLabel + ".";
+                notificationPort.createInternalAlert(order.getAgent().getUser(),
+                        "Order " + statusLabel + " – " + order.getOrderNumber(), alertMsg,
                         AlertType.ORDER_STATUS_CHANGED, order.getId(), "order");
             }
         }
@@ -162,32 +187,29 @@ public class OrderNotificationService {
 
     public void sendOrderCancelled(Order order) {
         if (order.getCustomer() != null) {
-            String subject = "Order Cancelled – " + order.getOrderNumber();
-            String message = """
-                    Dear %s,
-
-                    Your order %s has been cancelled.
-
-                    If you need assistance, please contact our support team.
-                    """.formatted(
-                    OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()),
-                    order.getOrderNumber()
-            );
-            notificationPort.notifyCustomer(order.getCustomer(), subject, message);
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
+            p.put("orderNumber", order.getOrderNumber());
+            notificationPort.notifyCustomer(order.getCustomer(),
+                    "Order Cancelled – " + order.getOrderNumber(),
+                    "order-cancelled-customer", p, Set.of());
         }
 
         if (order.getAgent() != null) {
-            String customerInfo = order.getCustomer() != null
+            String customerName = order.getCustomer() != null
                     ? OrderItemSummaryBuilder.customerDisplayName(order.getCustomer())
                     : "Walk-in";
-            String subject = "Order Cancelled – " + order.getOrderNumber();
-            String message = "Dear %s,\n\nOrder %s for %s has been cancelled.".formatted(
-                    order.getAgent().getUser().getFirstName(),
-                    order.getOrderNumber(),
-                    customerInfo
-            );
-            notificationPort.notifyAgent(order.getAgent(), subject, message);
-            notificationPort.createInternalAlert(order.getAgent().getUser(), subject, message,
+            Map<String, String> p = new HashMap<>();
+            p.put("agentName", order.getAgent().getUser().getFirstName());
+            p.put("customerName", customerName);
+            p.put("orderNumber", order.getOrderNumber());
+            notificationPort.notifyAgent(order.getAgent(),
+                    "Order Cancelled – " + order.getOrderNumber(),
+                    "order-cancelled-agent", p, Set.of());
+
+            String alertMsg = "Order " + order.getOrderNumber() + " for " + customerName + " has been cancelled.";
+            notificationPort.createInternalAlert(order.getAgent().getUser(),
+                    "Order Cancelled – " + order.getOrderNumber(), alertMsg,
                     AlertType.ORDER_CANCELLED, order.getId(), "order");
         }
     }

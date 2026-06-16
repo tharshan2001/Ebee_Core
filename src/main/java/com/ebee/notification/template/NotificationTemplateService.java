@@ -9,7 +9,9 @@ import org.springframework.web.util.HtmlUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -50,10 +52,12 @@ public class NotificationTemplateService {
      *   <li>{@code {templateName}-{channel}.{ext}} (e.g. {@code order-created-customer-email.html})</li>
      *   <li>{@code {templateName}.html} (generic fallback, backward compat)</li>
      * </ol>
-     * <p>Placeholder values are HTML-escaped for {@code EMAIL} channel;
-     * {@code SMS} values are substituted as-is (plain text).</p>
+     * <p>Placeholder values are HTML-escaped for {@code EMAIL} channel
+     * (unless the key is listed in {@code unescapedKeys}); {@code SMS}
+     * values are substituted as-is (plain text).</p>
      */
-    public String resolve(String templateName, NotificationChannel channel, Map<String, String> placeholders) {
+    public String resolve(String templateName, NotificationChannel channel,
+                          Map<String, String> placeholders, Set<String> unescapedKeys) {
         String channelSuffix = "-" + channel.name().toLowerCase();
         String ext = channel == NotificationChannel.EMAIL ? ".html" : ".txt";
         String channelFile = templateName + channelSuffix + ext;
@@ -71,12 +75,23 @@ public class NotificationTemplateService {
 
         String resolved = content;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-            String value = channel == NotificationChannel.EMAIL
-                    ? HtmlUtils.htmlEscape(entry.getValue())
-                    : entry.getValue();
+            String value;
+            if (channel == NotificationChannel.EMAIL && !unescapedKeys.contains(entry.getKey())) {
+                value = HtmlUtils.htmlEscape(entry.getValue());
+            } else {
+                value = entry.getValue();
+            }
             resolved = resolved.replace("{{" + entry.getKey() + "}}", value);
         }
         return resolved;
+    }
+
+    /**
+     * Channel-aware resolve with no unescaped keys (all EMAIL values are
+     * HTML-escaped, SMS values are plain text).
+     */
+    public String resolve(String templateName, NotificationChannel channel, Map<String, String> placeholders) {
+        return resolve(templateName, channel, placeholders, Collections.emptySet());
     }
 
     private String loadWithCache(String fileName) {

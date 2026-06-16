@@ -1,0 +1,1 @@
+Dear {{firstName}}, your order {{orderNumber}} has been placed successfully. {{itemSummary}} Total: LKR {{totalAmount}}. {{savingsBlockTxt}}Thank you for choosing Ebee!

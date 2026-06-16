@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -79,9 +80,9 @@ public class NotificationService implements NotificationPort {
     }
 
     @Async
-    public void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders) {
+    public void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
-            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders, unescapedKeys);
             if (!emailBody.isEmpty() && agent.getUser() != null && agent.getUser().getEmail() != null) {
                 EmailRequest emailReq = EmailRequest.builder()
                         .to(agent.getUser().getEmail())
@@ -139,9 +140,9 @@ public class NotificationService implements NotificationPort {
     }
 
     @Async
-    public void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders) {
+    public void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
-            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders, unescapedKeys);
             if (!emailBody.isEmpty() && user.getEmail() != null) {
                 EmailRequest emailReq = EmailRequest.builder()
                         .to(user.getEmail())
@@ -219,7 +220,7 @@ public class NotificationService implements NotificationPort {
     }
 
     @Async
-    public void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders) {
+    public void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
             String smsBody = templateService.resolve(templateName, NotificationChannel.SMS, placeholders);
             if (!smsBody.isEmpty() && customer.getPhoneNumber() != null) {
@@ -234,7 +235,7 @@ public class NotificationService implements NotificationPort {
         }
 
         try {
-            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders, unescapedKeys);
             if (!emailBody.isEmpty() && customer.getEmail() != null) {
                 EmailRequest emailReq = EmailRequest.builder()
                         .to(customer.getEmail())

@@ -1,0 +1,1 @@
+Dear {{agentName}}, commission LKR {{commissionAmount}} calculated for order {{orderNumber}} at {{commissionRate}}% rate. Order total: LKR {{totalAmount}}. {{savingsContextTxt}}The commission will be processed once approved.

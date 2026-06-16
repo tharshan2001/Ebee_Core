@@ -18,6 +18,41 @@ public final class OrderItemSummaryBuilder {
     }
 
     /**
+     * Returns an HTML table-row fragment for each item, suitable for embedding
+     * in an email template. Includes product name, quantity, unit price with
+     * discount annotation, and line total. Example output:
+     * <pre>
+     * &lt;tr&gt;&lt;td&gt;iPhone 14&lt;/td&gt;&lt;td&gt;2&lt;/td&gt;&lt;td&gt;LKR 19000 (5% off)&lt;/td&gt;&lt;td&gt;LKR 38000&lt;/td&gt;&lt;/tr&gt;
+     * </pre>
+     */
+    public static String buildItemSummaryHtml(Order order) {
+        return order.getItems().stream()
+                .map(item -> {
+                    String name = item.getProduct().getName();
+                    int qty = item.getQuantity();
+                    BigDecimal unitPrice = item.getUnitPrice();
+                    BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
+                    String discountInfo = "";
+                    if (item.getDiscountType() != null
+                            && item.getDiscountValue() != null
+                            && item.getDiscountValue().compareTo(BigDecimal.ZERO) > 0) {
+                        String pct = "PERCENTAGE".equalsIgnoreCase(item.getDiscountType())
+                                ? item.getDiscountValue().toPlainString() + "% off"
+                                : "LKR " + item.getDiscountValue().toPlainString() + " off";
+                        discountInfo = " <span style=\"color:#059669;\">(" + pct + ")</span>";
+                    }
+                    return "<tr style=\"border-bottom:1px solid #e5e7eb;\">"
+                            + "<td style=\"padding:8px 12px;\">" + name + "</td>"
+                            + "<td style=\"padding:8px 12px;text-align:center;\">" + qty + "</td>"
+                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + unitPrice.toPlainString()
+                            + discountInfo + "</td>"
+                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + lineTotal.toPlainString()
+                            + "</td></tr>";
+                })
+                .collect(Collectors.joining("\n"));
+    }
+
+    /**
      * Like {@link #buildItemSummary(Order)} but appends the per-item discount
      * description and line-level savings when the order item has a discount.
      * Example: "iPhone 14 (x2) — 5% off (saves LKR 1,000.00)"

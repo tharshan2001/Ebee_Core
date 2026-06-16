@@ -8,6 +8,7 @@ import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.entity.User;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public interface NotificationPort {
@@ -18,17 +19,17 @@ public interface NotificationPort {
 
     void notifyAgent(Agent agent, String subject, String message);
 
-    void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders);
+    void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys);
 
     void notifyUser(User user, String subject, String message);
 
-    void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders);
+    void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys);
 
     void sendHtmlEmail(String to, String subject, String template, Map<String, String> placeholders);
 
     void notifyCustomer(Customer customer, String subject, String message);
 
-    void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders);
+    void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys);
 
     void createInternalAlert(User recipient, String title, String message,
                              AlertType alertType, UUID referenceId, String referenceType);

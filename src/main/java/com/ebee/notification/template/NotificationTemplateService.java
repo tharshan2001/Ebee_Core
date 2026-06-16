@@ -34,7 +34,7 @@ public class NotificationTemplateService {
      * (e.g. {@code {{rawKey}}}) which this resolver does not provide.
      */
     public String resolve(String templateName, Map<String, String> placeholders) {
-        String raw = cache.computeIfAbsent(templateName, this::loadTemplate);
+        String raw = loadWithCache(templateName);
         String resolved = raw;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             String safe = HtmlUtils.htmlEscape(entry.getValue());
@@ -43,16 +43,55 @@ public class NotificationTemplateService {
         return resolved;
     }
 
-    private String loadTemplate(String templateName) {
-        Resource resource = resourceLoader.getResource(TEMPLATE_PREFIX + templateName);
+    /**
+     * Resolve a template for a specific {@link NotificationChannel}.
+     * <p>Resolution order:</p>
+     * <ol>
+     *   <li>{@code {templateName}-{channel}.{ext}} (e.g. {@code order-created-customer-email.html})</li>
+     *   <li>{@code {templateName}.html} (generic fallback, backward compat)</li>
+     * </ol>
+     * <p>Placeholder values are HTML-escaped for {@code EMAIL} channel;
+     * {@code SMS} values are substituted as-is (plain text).</p>
+     */
+    public String resolve(String templateName, NotificationChannel channel, Map<String, String> placeholders) {
+        String channelSuffix = "-" + channel.name().toLowerCase();
+        String ext = channel == NotificationChannel.EMAIL ? ".html" : ".txt";
+        String channelFile = templateName + channelSuffix + ext;
+
+        String content = loadWithCache(channelFile);
+        if (content.isEmpty()) {
+            String fallback = templateName + ".html";
+            content = loadWithCache(fallback);
+            if (content.isEmpty()) {
+                log.warn("No template found for {} / channel={} (tried {} and {})",
+                        templateName, channel, channelFile, fallback);
+                return "";
+            }
+        }
+
+        String resolved = content;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            String value = channel == NotificationChannel.EMAIL
+                    ? HtmlUtils.htmlEscape(entry.getValue())
+                    : entry.getValue();
+            resolved = resolved.replace("{{" + entry.getKey() + "}}", value);
+        }
+        return resolved;
+    }
+
+    private String loadWithCache(String fileName) {
+        return cache.computeIfAbsent(fileName, this::loadTemplate);
+    }
+
+    private String loadTemplate(String fileName) {
+        Resource resource = resourceLoader.getResource(TEMPLATE_PREFIX + fileName);
         if (!resource.exists()) {
-            log.warn("Notification template not found: {}", templateName);
             return "";
         }
         try {
             return resource.getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {
-            log.error("Failed to load notification template: {}", templateName, e);
+            log.error("Failed to load notification template: {}", fileName, e);
             return "";
         }
     }

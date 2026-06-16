@@ -9,6 +9,7 @@ import com.ebee.notification.model.EmailRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.notification.sender.EmailSender;
 import com.ebee.notification.sender.SmsSender;
+import com.ebee.notification.template.NotificationChannel;
 import com.ebee.notification.template.NotificationTemplateService;
 import com.ebee.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -78,6 +79,37 @@ public class NotificationService implements NotificationPort {
     }
 
     @Async
+    public void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders) {
+        try {
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            if (!emailBody.isEmpty() && agent.getUser() != null && agent.getUser().getEmail() != null) {
+                EmailRequest emailReq = EmailRequest.builder()
+                        .to(agent.getUser().getEmail())
+                        .subject(subject)
+                        .body(emailBody)
+                        .html(true)
+                        .build();
+                emailSender.send(emailReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-email agent {}: {}", agent.getAgentCode(), e.getMessage());
+        }
+
+        try {
+            String smsBody = templateService.resolve(templateName, NotificationChannel.SMS, placeholders);
+            if (!smsBody.isEmpty() && agent.getPhoneNumber() != null) {
+                SmsRequest smsReq = SmsRequest.builder()
+                        .phoneNumbers(List.of(agent.getPhoneNumber()))
+                        .message(smsBody)
+                        .build();
+                smsSender.send(smsReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-SMS agent {}: {}", agent.getAgentCode(), e.getMessage());
+        }
+    }
+
+    @Async
     public void notifyUser(User user, String subject, String message) {
         try {
             if (user.getEmail() != null) {
@@ -103,6 +135,37 @@ public class NotificationService implements NotificationPort {
             }
         } catch (Exception e) {
             log.warn("Failed to SMS user {}: {}", user.getPhoneNumber(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders) {
+        try {
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            if (!emailBody.isEmpty() && user.getEmail() != null) {
+                EmailRequest emailReq = EmailRequest.builder()
+                        .to(user.getEmail())
+                        .subject(subject)
+                        .body(emailBody)
+                        .html(true)
+                        .build();
+                emailSender.send(emailReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-email user {}: {}", user.getEmail(), e.getMessage());
+        }
+
+        try {
+            String smsBody = templateService.resolve(templateName, NotificationChannel.SMS, placeholders);
+            if (!smsBody.isEmpty() && user.getPhoneNumber() != null) {
+                SmsRequest smsReq = SmsRequest.builder()
+                        .phoneNumbers(List.of(user.getPhoneNumber()))
+                        .message(smsBody)
+                        .build();
+                smsSender.send(smsReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-SMS user {}: {}", user.getPhoneNumber(), e.getMessage());
         }
     }
 
@@ -152,6 +215,37 @@ public class NotificationService implements NotificationPort {
             }
         } catch (Exception e) {
             log.warn("Failed to email customer {}: {}", customer.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders) {
+        try {
+            String smsBody = templateService.resolve(templateName, NotificationChannel.SMS, placeholders);
+            if (!smsBody.isEmpty() && customer.getPhoneNumber() != null) {
+                SmsRequest smsReq = SmsRequest.builder()
+                        .phoneNumbers(List.of(customer.getPhoneNumber()))
+                        .message(smsBody)
+                        .build();
+                smsSender.send(smsReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-SMS customer {}: {}", customer.getPhoneNumber(), e.getMessage());
+        }
+
+        try {
+            String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders);
+            if (!emailBody.isEmpty() && customer.getEmail() != null) {
+                EmailRequest emailReq = EmailRequest.builder()
+                        .to(customer.getEmail())
+                        .subject(subject)
+                        .body(emailBody)
+                        .html(true)
+                        .build();
+                emailSender.send(emailReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to template-email customer {}: {}", customer.getEmail(), e.getMessage());
         }
     }
 

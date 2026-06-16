@@ -292,6 +292,29 @@ class OrderServiceTest {
     }
 
     @Test
+    void createOrder_customerWithoutAddress_throwsIllegalArgument() {
+        // Customer with no address on file -> reject with a clear message
+        // rather than letting customer.getAddress().getDistrict() NPE.
+        Customer customerNoAddress = Customer.builder()
+                .id(customer.getId())
+                .firstName(customer.getFirstName())
+                .lastName(customer.getLastName())
+                .phoneNumber(customer.getPhoneNumber())
+                .address(null)
+                .build();
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customerNoAddress);
+
+        assertThatThrownBy(() -> orderService.createOrder(orderRequest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no district on file");
+    }
+
+    @Test
     void getOrderById_success() {
         UUID orderId = order.getId();
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));

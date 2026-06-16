@@ -93,7 +93,12 @@ public class OrderService {
         Customer customer = customerService.findByPhone(request.getCustomerPhoneNumber());
 
         OrderSource orderSource = agent != null ? OrderSource.AGENT : OrderSource.DIRECT;
-        District district = customer.getAddress().getDistrict();
+        District district = (customer.getAddress() != null) ? customer.getAddress().getDistrict() : null;
+        if (district == null) {
+            throw new IllegalArgumentException(
+                    "Customer '" + customer.getPhoneNumber() + "' has no district on file; "
+                            + "update the customer profile before placing an order");
+        }
         String orderNumber = orderNumberService.generateOrderNumber(district, orderSource);
 
         Order order = Order.builder()

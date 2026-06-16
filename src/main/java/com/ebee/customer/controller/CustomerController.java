@@ -3,6 +3,7 @@ package com.ebee.customer.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortableFields;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.service.CustomerService;
@@ -73,8 +74,9 @@ public class CustomerController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) String search) {
 
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.CUSTOMER);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),

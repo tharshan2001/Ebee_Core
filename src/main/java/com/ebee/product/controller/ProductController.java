@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortableFields;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -93,8 +94,9 @@ public class ProductController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) String search) {
 
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
@@ -129,8 +131,9 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
 
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),

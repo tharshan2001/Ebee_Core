@@ -4,6 +4,7 @@ import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortableFields;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.service.AgentService;
@@ -122,8 +123,9 @@ public class AgentController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) String search) {
 
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.AGENT);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),

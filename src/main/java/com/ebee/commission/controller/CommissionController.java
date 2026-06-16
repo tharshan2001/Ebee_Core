@@ -2,6 +2,7 @@ package com.ebee.commission.controller;
 
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortableFields;
 import com.ebee.commission.dto.BatchPaymentRequest;
 import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionCalculateRequest;
@@ -84,8 +85,9 @@ public class CommissionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "calculatedAt,desc") String sort) {
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.COMMISSION);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),

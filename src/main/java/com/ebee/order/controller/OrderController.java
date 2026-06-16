@@ -3,6 +3,7 @@ package com.ebee.order.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortableFields;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.enums.OrderStatus;
@@ -79,8 +80,9 @@ public class OrderController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) OrderStatus status) {
 
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
+        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.ORDER);
+        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),

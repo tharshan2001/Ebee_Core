@@ -14,6 +14,7 @@ public class OrderItemResponse {
     private String productItemCode;
     private Integer quantity;
     private BigDecimal unitPrice;
+    private BigDecimal originalUnitPrice;
     private BigDecimal subtotal;
     private String discountType;
     private BigDecimal discountValue;

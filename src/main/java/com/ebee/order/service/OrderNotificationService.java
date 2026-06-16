@@ -15,7 +15,14 @@ public class OrderNotificationService {
     private final NotificationPort notificationPort;
 
     public void sendOrderCreated(Order order, Commission commission) {
-        String itemSummary = OrderItemSummaryBuilder.buildItemSummary(order);
+        String itemSummary = OrderItemSummaryBuilder.buildItemSummaryWithDiscount(order);
+        java.math.BigDecimal totalSavings = OrderItemSummaryBuilder.totalSavings(order);
+        boolean hasSavings = totalSavings.compareTo(java.math.BigDecimal.ZERO) > 0;
+        java.math.BigDecimal originalAmount = OrderItemSummaryBuilder.totalOriginalAmount(order);
+        String savingsBlock = hasSavings
+                ? "Subtotal: LKR %.2f\nDiscount: −LKR %.2f\nTotal: LKR %.2f".formatted(
+                        originalAmount, totalSavings, order.getTotalAmount())
+                : "Total: LKR %.2f".formatted(order.getTotalAmount());
 
         if (order.getCustomer() != null) {
             String customerSubject = "Order Placed – " + order.getOrderNumber();
@@ -24,8 +31,9 @@ public class OrderNotificationService {
 
                     Your order %s has been placed successfully.
 
-                    Items: %s
-                    Total: LKR %.2f
+                    Items:
+                    %s
+                    %s
 
                     We will notify you once it's confirmed.
                     Thank you for choosing Ebee!
@@ -33,7 +41,7 @@ public class OrderNotificationService {
                     OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()),
                     order.getOrderNumber(),
                     itemSummary,
-                    order.getTotalAmount()
+                    savingsBlock
             );
             notificationPort.notifyCustomer(order.getCustomer(), customerSubject, customerMessage);
         }
@@ -53,8 +61,9 @@ public class OrderNotificationService {
                     A new order %s has been assigned to you.
 
                     %s
-                    Items: %s
-                    Total: LKR %.2f
+                    Items:
+                    %s
+                    %s
                     %s
 
                     Please process the order at your earliest convenience.
@@ -63,7 +72,7 @@ public class OrderNotificationService {
                     order.getOrderNumber(),
                     customerInfo,
                     itemSummary,
-                    order.getTotalAmount(),
+                    savingsBlock,
                     commissionInfo
             );
             notificationPort.notifyAgent(order.getAgent(), agentSubject, agentMessage);
@@ -72,12 +81,16 @@ public class OrderNotificationService {
 
             if (commission != null) {
                 String commissionSubject = "Commission Calculated – Order " + order.getOrderNumber();
+                String amountContext = hasSavings
+                        ? "Order Amount (after discount): LKR %.2f\nSubtotal (before discount): LKR %.2f\nCustomer Savings: LKR %.2f".formatted(
+                                order.getTotalAmount(), originalAmount, totalSavings)
+                        : "Order Amount: LKR %.2f".formatted(order.getTotalAmount());
                 String commissionMsg = """
                         Dear %s,
 
                         A commission of LKR %.2f has been calculated for order %s.
 
-                        Order Amount: LKR %.2f
+                        %s
                         Rate: %.2f%%
                         Commission: LKR %.2f
 
@@ -86,7 +99,7 @@ public class OrderNotificationService {
                         order.getAgent().getUser().getFirstName(),
                         commission.getCommissionAmount(),
                         order.getOrderNumber(),
-                        order.getTotalAmount(),
+                        amountContext,
                         commission.getCommissionRate(),
                         commission.getCommissionAmount()
                 );

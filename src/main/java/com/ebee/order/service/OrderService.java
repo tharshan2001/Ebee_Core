@@ -137,6 +137,7 @@ public class OrderService {
             // by the product's maxDiscount (set at product creation/update).
             // getPriceWithDiscount() throws IllegalArgumentException if the
             // discount exceeds the cap, so we let it bubble up to a 400.
+            BigDecimal originalUnitPrice = product.getPrice();
             BigDecimal unitPrice = product.getPriceWithDiscount(
                     itemRequest.getDiscountType(),
                     itemRequest.getDiscountValue());
@@ -147,6 +148,7 @@ public class OrderService {
                     .product(product)
                     .quantity(itemRequest.getQuantity())
                     .unitPrice(unitPrice)
+                    .originalUnitPrice(originalUnitPrice)
                     .subtotal(subtotal)
                     .discountType(itemRequest.getDiscountType())
                     .discountValue(itemRequest.getDiscountValue())

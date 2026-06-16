@@ -27,7 +27,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -75,22 +78,14 @@ public class DriverService {
 
         log.info("Driver created: {}", savedUser.getEmail());
         String subject = "Welcome to Ebee – Driver Account Created";
-        String message = """
-                Dear %s,
-                
-                Your driver account has been created.
-                
-                Login Credentials:
-                Email    : %s
-                Password : %s
-                
-                For security reasons, please change your password after logging in.
-                """.formatted(savedUser.getFirstName(), savedUser.getEmail(), generatedPassword);
+        Map<String, String> p = new HashMap<>();
+        p.put("firstName", savedUser.getFirstName());
+        p.put("email", savedUser.getEmail());
+        p.put("password", generatedPassword);
+        notificationPort.notifyUser(savedUser, subject, "driver-welcome", p, Set.of());
         auditLogService.record(AuditAction.DRIVER_CREATE, "Driver", savedDriver.getId(),
                 "Driver " + savedUser.getFirstName() + " " + savedUser.getLastName()
                 + " (" + savedUser.getEmail() + ") created");
-
-        notificationPort.notifyUser(savedUser, subject, message);
 
         return DriverWithCredentialsResponse.builder()
                 .id(savedDriver.getId())

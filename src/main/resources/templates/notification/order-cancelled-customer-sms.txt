@@ -1,1 +1,5 @@
-Dear {{firstName}}, your order {{orderNumber}} has been cancelled. If you need assistance, please contact support@ebee.com or call +94 11 234 5678.
+Dear {{firstName}},
+
+Your order {{orderNumber}} has been cancelled.
+
+If you need assistance, contact support@ebee.com or call +94 11 234 5678.

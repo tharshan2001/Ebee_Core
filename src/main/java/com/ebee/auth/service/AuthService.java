@@ -15,8 +15,6 @@ import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.notification.NotificationPort;
-import com.ebee.notification.model.EmailRequest;
-import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
 import com.ebee.user.entity.User;
@@ -42,6 +40,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -129,16 +128,9 @@ public class AuthService {
         try {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - New Login Detected";
-
-            notificationPort.sendHtmlEmail(user.getEmail(), subject, "login-alert.html",
-                    Map.of("firstName", user.getFirstName(), "loginTime", time, "email", user.getEmail()));
-
-            if (user.getPhoneNumber() != null) {
-                notificationPort.sendSms(SmsRequest.builder()
-                        .phoneNumbers(List.of(user.getPhoneNumber()))
-                        .message("Ebee: New login detected on your account at " + time)
-                        .build());
-            }
+            notificationPort.notifyUser(user, subject, "login-alert",
+                    Map.of("firstName", user.getFirstName(), "loginTime", time, "email", user.getEmail()),
+                    Set.of());
         } catch (Exception e) {
             log.warn("Failed to send login alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }
@@ -152,21 +144,9 @@ public class AuthService {
         try {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - Logout Detected";
-
-            notificationPort.sendEmail(EmailRequest.builder()
-                    .to(user.getEmail())
-                    .subject(subject)
-                    .body("You have been logged out of your Ebee account.\n\nTime: " + time
-                            + "\n\nIf this was not you, please change your password immediately.")
-                    .html(false)
-                    .build());
-
-            if (user.getPhoneNumber() != null) {
-                notificationPort.sendSms(SmsRequest.builder()
-                        .phoneNumbers(List.of(user.getPhoneNumber()))
-                        .message("Ebee: You have been logged out of your account at " + time)
-                        .build());
-            }
+            notificationPort.notifyUser(user, subject, "logout-alert",
+                    Map.of("firstName", user.getFirstName(), "logoutTime", time, "email", user.getEmail()),
+                    Set.of());
         } catch (Exception e) {
             log.warn("Failed to send logout alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }
@@ -176,22 +156,9 @@ public class AuthService {
         try {
             String time = LocalDateTime.now().toString();
             String subject = "Ebee - Password Changed";
-
-            notificationPort.sendEmail(EmailRequest.builder()
-                    .to(user.getEmail())
-                    .subject(subject)
-                    .body("Your Ebee account password was changed.\n\nTime: " + time
-                            + "\n\nIf you did not make this change, please contact support immediately.")
-                    .html(false)
-                    .build());
-
-            if (user.getPhoneNumber() != null) {
-                notificationPort.sendSms(SmsRequest.builder()
-                        .phoneNumbers(List.of(user.getPhoneNumber()))
-                        .message("Ebee: Your account password was changed at " + time
-                                + ". If this was not you, contact support.")
-                        .build());
-            }
+            notificationPort.notifyUser(user, subject, "password-changed",
+                    Map.of("firstName", user.getFirstName(), "changeTime", time, "email", user.getEmail()),
+                    Set.of());
         } catch (Exception e) {
             log.error("Failed to send password changed alert to {}: {}", user.getEmail(), e.getMessage(), e);
         }

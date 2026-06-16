@@ -58,13 +58,8 @@ public class CommissionPaymentService {
         agent.setTotalSales(agent.getTotalSales() + commission.getOrderAmount().doubleValue());
 
         commissionNotificationService.sendCommissionNotification(commission, "Paid",
-                """
-                        Your commission of LKR %.2f for order %s has been paid.
-                        
-                        Total earnings to date: LKR %.2f
-                        """.formatted(
-                        commission.getCommissionAmount(), commission.getOrder().getOrderNumber(),
-                        agent.getTotalCommission()));
+                "It has been paid. Total earnings to date: LKR "
+                + String.format("%.2f", agent.getTotalCommission()) + ".");
 
         return mapper.toResponse(commission);
     }
@@ -81,8 +76,7 @@ public class CommissionPaymentService {
                 c.setStatus(CommissionStatus.PROCESSING);
                 commissionRepository.save(c);
                 commissionNotificationService.sendCommissionNotification(c, "Processing",
-                        "Your commission of LKR %.2f for order %s has been automatically moved to processing after the 10-day holding period."
-                                .formatted(c.getCommissionAmount(), c.getOrder().getOrderNumber()));
+                        "It has been automatically moved to processing after the 10-day holding period.");
                 count++;
             } catch (Exception e) {
                 log.error("Failed to auto-process commission {} for order {}: {}",
@@ -117,13 +111,8 @@ public class CommissionPaymentService {
                     "Commission LKR " + c.getCommissionAmount() + " for order "
                     + c.getOrder().getOrderNumber() + " paid via batch payment");
             commissionNotificationService.sendCommissionNotification(c, "Paid",
-                    """
-                            Your commission of LKR %.2f for order %s has been paid.
-                            
-                            Total earnings to date: LKR %.2f
-                            """.formatted(
-                            c.getCommissionAmount(), c.getOrder().getOrderNumber(),
-                            agent.getTotalCommission()));
+                    "It has been paid. Total earnings to date: LKR "
+                    + String.format("%.2f", agent.getTotalCommission()) + ".");
 
             totalPaid = totalPaid.add(c.getCommissionAmount());
             count++;

@@ -45,8 +45,7 @@ public class CommissionLifecycleService {
                 "Commission LKR " + commission.getCommissionAmount() + " for order "
                 + commission.getOrder().getOrderNumber() + " approved");
         commissionNotificationService.sendCommissionNotification(commission, "Approved",
-                "Your commission of LKR %.2f for order %s has been approved and is pending processing.".formatted(
-                        commission.getCommissionAmount(), commission.getOrder().getOrderNumber()));
+                "It has been approved and is pending processing.");
         return mapper.toResponse(commission);
     }
 
@@ -72,8 +71,7 @@ public class CommissionLifecycleService {
                 "Commission LKR " + commission.getCommissionAmount() + " for order "
                 + commission.getOrder().getOrderNumber() + " moved to processing");
         commissionNotificationService.sendCommissionNotification(commission, "Processing",
-                "Your commission of LKR %.2f for order %s is now being processed for payment.".formatted(
-                        commission.getCommissionAmount(), commission.getOrder().getOrderNumber()));
+                "It is now being processed for payment.");
         return mapper.toResponse(commission);
     }
 
@@ -100,8 +98,7 @@ public class CommissionLifecycleService {
                 "Commission LKR " + commission.getCommissionAmount() + " for order "
                 + commission.getOrder().getOrderNumber() + " rejected: " + reason);
         commissionNotificationService.sendCommissionNotification(commission, "Rejected",
-                "Your commission for order %s has been rejected.\n\nReason: %s\n\nPlease contact support for more information."
-                        .formatted(commission.getOrder().getOrderNumber(), reason));
+                "Reason: " + reason + ". Please contact support for more information.");
         return mapper.toResponse(commission);
     }
 
@@ -129,8 +126,7 @@ public class CommissionLifecycleService {
                     + commission.getOrder().getOrderNumber() + " cancelled");
 
             commissionNotificationService.sendCommissionNotification(commission, "Cancelled",
-                    "Your commission for order %s has been cancelled as the order was cancelled.".formatted(
-                            commission.getOrder().getOrderNumber()));
+                    "It has been cancelled as the order was cancelled.");
         });
     }
 

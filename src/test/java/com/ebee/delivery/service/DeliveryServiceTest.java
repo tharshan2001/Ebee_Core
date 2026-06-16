@@ -153,9 +153,9 @@ class DeliveryServiceTest {
         assertThat(order.getDeliveryAssignedTo()).isEqualTo(driverUser);
         assertThat(driverProfile.getAvailability()).isEqualTo(DriverAvailability.ON_TRIP);
         verify(driverRepository).save(driverProfile);
-        verify(notificationPort).notifyUser(eq(driverUser), anyString(), anyString());
+        verify(notificationPort).notifyUser(eq(driverUser), anyString(), eq("delivery-assigned-driver"), anyMap(), anySet());
         verify(notificationPort).createInternalAlert(eq(driverUser), anyString(), anyString(), any(), eq(orderId), eq("order"));
-        verify(notificationPort).notifyCustomer(eq(customer), anyString(), anyString());
+        verify(notificationPort).notifyCustomer(eq(customer), anyString(), eq("delivery-assigned-customer"), anyMap(), anySet());
         verify(auditLogService).record(eq(AuditAction.DELIVERY_ASSIGN), eq("Order"), eq(orderId), anyString());
     }
 

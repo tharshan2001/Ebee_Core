@@ -27,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -86,17 +89,24 @@ public class DeliveryService {
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
         Order savedOrder = orderRepository.save(order);
 
+        Map<String, String> driverP = new HashMap<>();
+        driverP.put("driverName", driver.getFirstName());
+        driverP.put("orderNumber", savedOrder.getOrderNumber());
+        driverP.put("district", savedOrder.getDistrict() != null ? savedOrder.getDistrict() : "");
         String subject = "Delivery Assigned – " + savedOrder.getOrderNumber();
-        String driverMsg = "Dear %s,\n\nYou have been assigned to deliver order %s in %s.".formatted(
-                driver.getFirstName(), savedOrder.getOrderNumber(), savedOrder.getDistrict());
-        notificationPort.notifyUser(driver, subject, driverMsg);
-        notificationPort.createInternalAlert(driver, subject, driverMsg,
+        notificationPort.notifyUser(driver, subject, "delivery-assigned-driver", driverP, Set.of());
+
+        notificationPort.createInternalAlert(driver, subject, driverP.get("driverName")
+                + ", you have been assigned to deliver order " + savedOrder.getOrderNumber()
+                + " in " + savedOrder.getDistrict() + ".",
                 AlertType.DELIVERY_ASSIGNED, savedOrder.getId(), "order");
 
         if (savedOrder.getCustomer() != null) {
-            String customerMsg = "Dear %s,\n\nYour order %s has been assigned to a driver for delivery.".formatted(
-                    savedOrder.getCustomer().getFirstName(), savedOrder.getOrderNumber());
-            notificationPort.notifyCustomer(savedOrder.getCustomer(), subject, customerMsg);
+            Map<String, String> customerP = new HashMap<>();
+            customerP.put("firstName", savedOrder.getCustomer().getFirstName());
+            customerP.put("orderNumber", savedOrder.getOrderNumber());
+            notificationPort.notifyCustomer(savedOrder.getCustomer(), subject,
+                    "delivery-assigned-customer", customerP, Set.of());
         }
 
         auditLogService.record(AuditAction.DELIVERY_ASSIGN, "Order", savedOrder.getId(),
@@ -220,29 +230,50 @@ public class DeliveryService {
 
     private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
         if (order.getCustomer() != null) {
-            String customerName = order.getCustomer().getFirstName();
-            String customerMsg = switch (newStatus) {
-                case PICKED_UP -> "Dear %s,\n\nYour order %s has been picked up by the driver.".formatted(
-                        customerName, order.getOrderNumber());
-                case IN_TRANSIT -> "Dear %s,\n\nYour order %s is on its way for delivery!".formatted(
-                        customerName, order.getOrderNumber());
-                case FAILED -> {
-                    String reason = order.getDeliveryFailureReason();
-                    String base = "Dear %s,\n\nUnfortunately, delivery of your order %s has failed.".formatted(
-                            customerName, order.getOrderNumber());
-                    yield reason != null ? base + "\nReason: " + reason : base;
-                }
-                case FAILED_PERMANENT -> {
-                    String reason = order.getDeliveryFailureReason();
-                    String base = "Dear %s,\n\nDelivery of your order %s has been permanently failed.".formatted(
-                            customerName, order.getOrderNumber());
-                    yield reason != null ? base + "\nReason: " + reason : base;
-                }
+            String statusLabel = switch (newStatus) {
+                case PICKED_UP -> "Picked Up";
+                case IN_TRANSIT -> "In Transit";
+                case FAILED -> "Failed";
+                case FAILED_PERMANENT -> "Failed Permanently";
                 default -> null;
             };
-            if (customerMsg != null) {
-                String subject = "Delivery " + newStatus.name() + " – " + order.getOrderNumber();
-                notificationPort.notifyCustomer(order.getCustomer(), subject, customerMsg);
+
+            if (statusLabel != null) {
+                String reason = order.getDeliveryFailureReason();
+                String messageHtml = switch (newStatus) {
+                    case PICKED_UP -> "<p>Your order <strong>" + order.getOrderNumber()
+                            + "</strong> has been picked up by the driver.</p>";
+                    case IN_TRANSIT -> "<p>Your order <strong>" + order.getOrderNumber()
+                            + "</strong> is on its way for delivery!</p>";
+                    case FAILED -> "<p>Unfortunately, delivery of your order <strong>"
+                            + order.getOrderNumber() + "</strong> has failed."
+                            + (reason != null ? "</p><p>Reason: " + reason : "") + "</p>";
+                    case FAILED_PERMANENT -> "<p>Delivery of your order <strong>"
+                            + order.getOrderNumber() + "</strong> has been permanently failed."
+                            + (reason != null ? "</p><p>Reason: " + reason : "") + "</p>";
+                    default -> "";
+                };
+                String messageTxt = switch (newStatus) {
+                    case PICKED_UP -> "Your order " + order.getOrderNumber()
+                            + " has been picked up by the driver.";
+                    case IN_TRANSIT -> "Your order " + order.getOrderNumber()
+                            + " is on its way for delivery!";
+                    case FAILED -> "Unfortunately, delivery of your order " + order.getOrderNumber()
+                            + " has failed." + (reason != null ? " Reason: " + reason : "");
+                    case FAILED_PERMANENT -> "Delivery of your order " + order.getOrderNumber()
+                            + " has been permanently failed." + (reason != null ? " Reason: " + reason : "");
+                    default -> "";
+                };
+
+                Map<String, String> p = new HashMap<>();
+                p.put("firstName", order.getCustomer().getFirstName());
+                p.put("orderNumber", order.getOrderNumber());
+                p.put("statusLabel", statusLabel);
+                p.put("messageBlock", messageHtml);
+                p.put("messageBlockTxt", messageTxt);
+                String subject = "Delivery " + statusLabel + " – " + order.getOrderNumber();
+                notificationPort.notifyCustomer(order.getCustomer(), subject,
+                        "delivery-status-customer", p, Set.of("messageBlock"));
             }
         }
 

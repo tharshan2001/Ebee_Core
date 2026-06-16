@@ -8,9 +8,6 @@ import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
-import com.ebee.notification.model.EmailRequest;
-import com.ebee.notification.sender.EmailSender;
-import com.ebee.notification.template.NotificationTemplateService;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,8 +26,6 @@ import java.util.UUID;
 public class AgentApplicationService {
 
     private final AgentApplicationRepository repository;
-    private final EmailSender emailSender;
-    private final NotificationTemplateService templateService;
     private final UserRepository userRepository;
     private final NotificationPort notificationPort;
 
@@ -58,21 +54,18 @@ public class AgentApplicationService {
 
     private void sendConfirmationEmail(AgentApplicationRequest request) {
         try {
-            String html = templateService.resolve("agent-application-confirmation.html", Map.of(
-                    "firstName", request.getFirstName(),
-                    "lastName", request.getLastName(),
-                    "email", request.getEmail(),
-                    "phoneNumber", request.getPhoneNumber()
-            ));
+            Map<String, String> placeholders = new HashMap<>();
+            placeholders.put("firstName", request.getFirstName());
+            placeholders.put("lastName", request.getLastName());
+            placeholders.put("email", request.getEmail());
+            placeholders.put("phoneNumber", request.getPhoneNumber());
 
-            EmailRequest emailReq = EmailRequest.builder()
-                    .to(request.getEmail())
-                    .subject("Application Received – Ebee Agent Registration")
-                    .body(html)
-                    .html(true)
-                    .build();
-
-            emailSender.send(emailReq);
+            notificationPort.sendHtmlEmail(
+                    request.getEmail(),
+                    "Application Received – Ebee Agent Registration",
+                    "agent-application-confirmation-email.html",
+                    placeholders
+            );
             log.info("Confirmation email sent to: {}", request.getEmail());
         } catch (Exception e) {
             log.warn("Failed to send confirmation email to {}: {}", request.getEmail(), e.getMessage());

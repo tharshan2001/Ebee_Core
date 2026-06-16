@@ -1,0 +1,8 @@
+Dear {{firstName}},
+
+Welcome to Ebee! Your account has been created.
+
+Email: {{email}}
+Password: {{password}}
+
+Please change your password after logging in.

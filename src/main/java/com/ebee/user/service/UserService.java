@@ -4,7 +4,6 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
-import com.ebee.notification.model.EmailRequest;
 import com.ebee.user.dto.UserProfileResponse;
 import com.ebee.user.dto.UserRequest;
 import com.ebee.user.dto.UserResponse;
@@ -20,7 +19,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -63,26 +65,11 @@ public class UserService {
     private void sendWelcomeNotification(User user, String rawPassword) {
         try {
             String subject = "Welcome to Ebee — Account Created";
-            String message = """
-                    Dear %s,
-                    
-                    Welcome to Ebee! Your account has been created successfully.
-                    
-                    Login Credentials:
-                    Email    : %s
-                    Password : %s
-                    
-                    For security reasons, please change your password after logging in.
-                    
-                    Best regards,
-                    Ebee Team
-                    """.formatted(user.getFirstName(), user.getEmail(), rawPassword);
-            notificationPort.sendEmail(EmailRequest.builder()
-                    .to(user.getEmail())
-                    .subject(subject)
-                    .body(message)
-                    .html(false)
-                    .build());
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", user.getFirstName());
+            p.put("email", user.getEmail());
+            p.put("password", rawPassword);
+            notificationPort.notifyUser(user, subject, "user-welcome", p, Set.of());
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to {}: {}", user.getEmail(), e.getMessage());
         }

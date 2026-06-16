@@ -1,0 +1,7 @@
+Ebee: One-Time Password
+
+Your OTP for {{purpose}} is:
+
+{{otp}}
+
+Expires in 5 minutes.

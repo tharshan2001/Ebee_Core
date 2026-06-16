@@ -18,7 +18,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -185,23 +188,15 @@ public class CustomerService {
     private void sendWelcomeNotification(Customer customer) {
         try {
             String subject = "Welcome to Ebee — Customer Registration Successful";
-            String message = """
-                    Dear %s %s,
-                    
-                    Welcome to Ebee! Your customer account has been successfully registered.
-                    
-                    We look forward to serving you.
-                    
-                    %s
-                    
-                    Best regards,
-                    Ebee Team
-                    """.formatted(
-                    customer.getFirstName(),
-                    customer.getLastName(),
-                    customer.getAddress() != null ? "Address: " + customer.getAddress().getStreet() + ", " + customer.getAddress().getCity() : "No address provided"
-            );
-            notificationPort.notifyCustomer(customer, subject, message);
+            String addr = customer.getAddress() != null
+                    ? customer.getAddress().getStreet() + ", " + customer.getAddress().getCity()
+                    : "";
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", customer.getFirstName());
+            p.put("lastName", customer.getLastName());
+            p.put("addressBlock", addr.isEmpty() ? "" : "<p>Address: " + addr + "</p>");
+            p.put("addressBlockTxt", addr.isEmpty() ? "" : "Address: " + addr);
+            notificationPort.notifyCustomer(customer, subject, "customer-welcome", p, Set.of("addressBlock"));
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to customer {}: {}", customer.getPhoneNumber(), e.getMessage());
         }

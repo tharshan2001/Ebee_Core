@@ -2,6 +2,7 @@ package com.ebee.order.service;
 
 import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.entity.Commission;
+import com.ebee.common.util.NumberUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.util.OrderItemSummaryBuilder;
@@ -30,14 +31,14 @@ public class OrderNotificationService {
         BigDecimal totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
 
         String itemSummaryHtml = OrderItemSummaryBuilder.buildItemSummaryHtml(order);
-        String itemSummaryTxt = OrderItemSummaryBuilder.buildItemSummaryWithDiscount(order);
+        String itemSummaryBullet = OrderItemSummaryBuilder.buildItemSummaryBullet(order);
 
         String savingsBlockHtml = hasSavings
                 ? "<div class=\"discount-breakdown\"><p><strong>You saved LKR "
-                + totalSavings.toPlainString() + " on this order!</strong></p></div>"
+                + NumberUtils.formatAmount(totalSavings) + " on this order!</strong></p></div>"
                 : "";
         String savingsBlockTxt = hasSavings
-                ? "You saved LKR " + totalSavings.toPlainString() + " on this order! "
+                ? "You saved LKR " + NumberUtils.formatAmount(totalSavings) + " on this order."
                 : "";
 
         if (order.getCustomer() != null) {
@@ -45,10 +46,10 @@ public class OrderNotificationService {
             p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
             p.put("orderNumber", order.getOrderNumber());
             p.put("itemSummaryHtml", itemSummaryHtml);
-            p.put("itemSummary", itemSummaryTxt);
-            p.put("subtotal", originalAmount.toPlainString());
-            p.put("discount", totalSavings.toPlainString());
-            p.put("totalAmount", totalAmount.toPlainString());
+            p.put("itemSummary", itemSummaryBullet);
+            p.put("subtotal", NumberUtils.formatAmount(originalAmount));
+            p.put("discount", NumberUtils.formatAmount(totalSavings));
+            p.put("totalAmount", NumberUtils.formatAmount(totalAmount));
             p.put("savingsBlock", savingsBlockHtml);
             p.put("savingsBlockTxt", savingsBlockTxt);
             notificationPort.notifyCustomer(order.getCustomer(),
@@ -64,12 +65,12 @@ public class OrderNotificationService {
 
             String commissionBlockHtml = commission != null
                     ? "<div class=\"commission-box\"><p><strong>Commission:</strong> LKR "
-                    + commission.getCommissionAmount().toPlainString()
+                    + NumberUtils.formatAmount(commission.getCommissionAmount())
                     + " (" + commission.getCommissionRate().toPlainString() + "% rate)</p></div>"
                     : "";
             String commissionBlockTxt = commission != null
-                    ? "Commission: LKR " + commission.getCommissionAmount().toPlainString()
-                    + " (" + commission.getCommissionRate().toPlainString() + "% rate). "
+                    ? "Commission: LKR " + NumberUtils.formatAmount(commission.getCommissionAmount())
+                    + " (" + commission.getCommissionRate().toPlainString() + "% rate)."
                     : "";
 
             Map<String, String> p = new HashMap<>();
@@ -77,10 +78,10 @@ public class OrderNotificationService {
             p.put("customerName", customerName);
             p.put("orderNumber", order.getOrderNumber());
             p.put("itemSummaryHtml", itemSummaryHtml);
-            p.put("itemSummary", itemSummaryTxt);
-            p.put("subtotal", originalAmount.toPlainString());
-            p.put("discount", totalSavings.toPlainString());
-            p.put("totalAmount", totalAmount.toPlainString());
+            p.put("itemSummary", itemSummaryBullet);
+            p.put("subtotal", NumberUtils.formatAmount(originalAmount));
+            p.put("discount", NumberUtils.formatAmount(totalSavings));
+            p.put("totalAmount", NumberUtils.formatAmount(totalAmount));
             p.put("savingsBlock", savingsBlockHtml);
             p.put("savingsBlockTxt", savingsBlockTxt);
             p.put("commissionBlock", commissionBlockHtml);
@@ -90,7 +91,7 @@ public class OrderNotificationService {
                     "order-created-agent", p, HTML_KEYS);
 
             String alertMsg = "Order " + order.getOrderNumber() + " assigned for " + customerName
-                    + ". Total: LKR " + totalAmount.toPlainString();
+                    + ". Total: LKR " + NumberUtils.formatAmount(totalAmount);
             notificationPort.createInternalAlert(order.getAgent().getUser(),
                     "New Order Assigned – " + order.getOrderNumber(), alertMsg,
                     AlertType.ORDER_CREATED, order.getId(), "order");
@@ -98,30 +99,30 @@ public class OrderNotificationService {
             if (commission != null) {
                 String savingsContextHtml = hasSavings
                         ? "<p><strong>Subtotal (before discount):</strong> LKR "
-                        + originalAmount.toPlainString() + "</p>\n"
+                        + NumberUtils.formatAmount(originalAmount) + "</p>\n"
                         + "<p class=\"savings\"><strong>Customer Savings:</strong> LKR "
-                        + totalSavings.toPlainString() + "</p>"
+                        + NumberUtils.formatAmount(totalSavings) + "</p>"
                         : "";
                 String savingsContextTxt = hasSavings
-                        ? "Subtotal: LKR " + originalAmount.toPlainString()
-                        + ", Customer Savings: LKR " + totalSavings.toPlainString() + ". "
+                        ? "Subtotal: LKR " + NumberUtils.formatAmount(originalAmount)
+                        + ", Customer Savings: LKR " + NumberUtils.formatAmount(totalSavings) + "."
                         : "";
 
                 Map<String, String> cp = new HashMap<>();
                 cp.put("agentName", agentName);
                 cp.put("orderNumber", order.getOrderNumber());
-                cp.put("totalAmount", totalAmount.toPlainString());
-                cp.put("commissionAmount", commission.getCommissionAmount().toPlainString());
+                cp.put("totalAmount", NumberUtils.formatAmount(totalAmount));
+                cp.put("commissionAmount", NumberUtils.formatAmount(commission.getCommissionAmount()));
                 cp.put("commissionRate", commission.getCommissionRate().toPlainString());
                 cp.put("savingsContext", savingsContextHtml);
                 cp.put("savingsContextTxt", savingsContextTxt);
-                cp.put("originalAmount", originalAmount.toPlainString());
-                cp.put("totalSavings", totalSavings.toPlainString());
+                cp.put("originalAmount", NumberUtils.formatAmount(originalAmount));
+                cp.put("totalSavings", NumberUtils.formatAmount(totalSavings));
                 notificationPort.notifyAgent(order.getAgent(),
                         "Commission Calculated – Order " + order.getOrderNumber(),
                         "order-commission-calculated", cp, HTML_KEYS);
 
-                String commissionAlert = "Commission LKR " + commission.getCommissionAmount().toPlainString()
+                String commissionAlert = "Commission LKR " + NumberUtils.formatAmount(commission.getCommissionAmount())
                         + " at " + commission.getCommissionRate().toPlainString()
                         + "% for order " + order.getOrderNumber() + ".";
                 notificationPort.createInternalAlert(order.getAgent().getUser(),

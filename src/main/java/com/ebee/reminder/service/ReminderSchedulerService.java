@@ -2,8 +2,6 @@ package com.ebee.reminder.service;
 
 import com.ebee.alert.enums.AlertType;
 import com.ebee.notification.NotificationPort;
-import com.ebee.notification.model.EmailRequest;
-import com.ebee.notification.model.SmsRequest;
 import com.ebee.reminder.entity.Reminder;
 import com.ebee.reminder.repository.ReminderRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -44,18 +44,19 @@ public class ReminderSchedulerService {
         for (Reminder reminder : reminders) {
             try {
                 String subject = "Reminder: " + reminder.getTitle();
-                String message = "Your reminder \"" + reminder.getTitle() + "\" is due now."
+                Map<String, String> p = new HashMap<>();
+                p.put("title", reminder.getTitle());
+                p.put("description", reminder.getDescription() != null ? reminder.getDescription() : "");
+                p.put("priority", reminder.getPriority() != null ? reminder.getPriority().name() : "");
+
+                if (Boolean.TRUE.equals(reminder.getSendEmail()) || Boolean.TRUE.equals(reminder.getSendSms())) {
+                    notificationPort.notifyUser(reminder.getUser(), subject, "reminder-due", p, Set.of());
+                }
+
+                notificationPort.createInternalAlert(reminder.getUser(), subject,
+                        "Your reminder \"" + reminder.getTitle() + "\" is due now."
                         + (reminder.getDescription() != null ? "\n\n" + reminder.getDescription() : "")
-                        + "\n\nPriority: " + reminder.getPriority();
-
-                if (Boolean.TRUE.equals(reminder.getSendEmail())) {
-                    sendEmail(reminder, subject, message);
-                }
-                if (Boolean.TRUE.equals(reminder.getSendSms())) {
-                    sendSms(reminder, message);
-                }
-
-                notificationPort.createInternalAlert(reminder.getUser(), subject, message,
+                        + "\n\nPriority: " + reminder.getPriority(),
                         AlertType.REMINDER_DUE, reminder.getId(), "reminder");
 
                 reminder.setAlertSent(true);
@@ -76,20 +77,23 @@ public class ReminderSchedulerService {
         for (Reminder reminder : reminders) {
             try {
                 String subject = "Upcoming Reminder: " + reminder.getTitle() + " in 5 minutes";
-                String message = "Reminder \"" + reminder.getTitle() + "\" is coming up in 5 minutes."
+                String timeStr = reminder.getReminderTime() != null ? reminder.getReminderTime().toString() : "";
+                Map<String, String> p = new HashMap<>();
+                p.put("title", reminder.getTitle());
+                p.put("description", reminder.getDescription() != null ? reminder.getDescription() : "");
+                p.put("reminderTime", timeStr);
+                p.put("reminderTimeSuffix", timeStr.isEmpty() ? "" : " at " + timeStr);
+                p.put("priority", reminder.getPriority() != null ? reminder.getPriority().name() : "");
+
+                if (Boolean.TRUE.equals(reminder.getSendEmail()) || Boolean.TRUE.equals(reminder.getSendSms())) {
+                    notificationPort.notifyUser(reminder.getUser(), subject, "reminder-early", p, Set.of());
+                }
+
+                notificationPort.createInternalAlert(reminder.getUser(), subject,
+                        "Reminder \"" + reminder.getTitle() + "\" is coming up in 5 minutes."
                         + (reminder.getDescription() != null ? "\n\n" + reminder.getDescription() : "")
-                        + "\n\nTime: " + reminder.getReminderTime()
-                        + "\nPriority: " + reminder.getPriority();
-
-                if (Boolean.TRUE.equals(reminder.getSendEmail())) {
-                    sendEmail(reminder, subject, message);
-                }
-                if (Boolean.TRUE.equals(reminder.getSendSms())) {
-                    sendSms(reminder, "Ebee: \"" + reminder.getTitle() + "\" in 5 minutes"
-                            + (reminder.getReminderTime() != null ? " at " + reminder.getReminderTime() : ""));
-                }
-
-                notificationPort.createInternalAlert(reminder.getUser(), subject, message,
+                        + "\n\nTime: " + timeStr
+                        + "\nPriority: " + reminder.getPriority(),
                         AlertType.REMINDER_DUE, reminder.getId(), "reminder");
 
                 reminder.setEarlyAlertSent(true);
@@ -102,21 +106,4 @@ public class ReminderSchedulerService {
         }
     }
 
-    private void sendEmail(Reminder reminder, String subject, String message) {
-        notificationPort.sendEmail(EmailRequest.builder()
-                .to(reminder.getUser().getEmail())
-                .subject(subject)
-                .body(message)
-                .html(false)
-                .build());
-    }
-
-    private void sendSms(Reminder reminder, String message) {
-        if (reminder.getUser().getPhoneNumber() != null) {
-            notificationPort.sendSms(SmsRequest.builder()
-                    .phoneNumbers(List.of(reminder.getUser().getPhoneNumber()))
-                    .message(message)
-                    .build());
-        }
-    }
 }

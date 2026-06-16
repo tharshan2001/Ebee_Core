@@ -1,0 +1,8 @@
+Dear {{firstName}},
+
+Your driver account has been created.
+
+Email: {{email}}
+Password: {{password}}
+
+Please change your password after logging in.

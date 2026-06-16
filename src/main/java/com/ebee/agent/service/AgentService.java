@@ -10,6 +10,8 @@ import com.ebee.agent.mapper.AgentMapper;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
+import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.agent.entity.AgentCodeSequence;
@@ -19,7 +21,6 @@ import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.alert.enums.AlertType;
-import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.notification.NotificationPort;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
@@ -28,12 +29,16 @@ import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -50,6 +55,7 @@ public class AgentService {
     private final CommissionConfigRepository commissionConfigRepository;
     private final AuditLogService auditLogService;
     private final AgentCodeSequenceRepository agentCodeSequenceRepository;
+    private final SecurityService securityService;
 
 
     @Transactional
@@ -224,35 +230,77 @@ public class AgentService {
 
     @Transactional(readOnly = true)
     public AgentResponse getAgentById(UUID id) {
-        Agent agent = agentRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+        assertCanAccessAgent(id);
+        Agent agent = findAgentById(id);
         return agentMapper.toResponse(agent);
     }
 
     public AgentResponse getAgentByUserId(UUID userId) {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            if (!currentUserId.equals(userId)) {
+                throw new IllegalArgumentException("Access denied: you can only access your own agent record");
+            }
+        }
         Agent agent = agentRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
         return agentMapper.toResponse(agent);
     }
 
     public List<AgentResponse> getAllAgents() {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            return agentRepository.findByUserId(currentUserId)
+                    .map(agent -> List.of(agentMapper.toResponse(agent)))
+                    .orElse(List.of());
+        }
         return agentRepository.findAllWithUser().stream()
                 .map(agentMapper::toResponse)
                 .toList();
     }
 
     public Page<AgentResponse> getAllAgentsPaginated(Pageable pageable) {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            Agent agent = agentRepository.findByUserId(currentUserId).orElse(null);
+            if (agent == null) {
+                return Page.empty();
+            }
+            return new PageImpl<>(List.of(agentMapper.toResponse(agent)), pageable, 1);
+        }
         Page<Agent> agents = agentRepository.findAllWithUser(pageable);
         return agents.map(agentMapper::toResponse);
     }
 
     public Page<AgentResponse> searchAgentsPaginated(String search, Pageable pageable) {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            Agent agent = agentRepository.findByUserId(currentUserId).orElse(null);
+            if (agent == null) {
+                return Page.empty();
+            }
+            boolean matches = agent.getAgentCode().toLowerCase().contains(search.toLowerCase())
+                    || agent.getUser().getFirstName().toLowerCase().contains(search.toLowerCase())
+                    || agent.getUser().getLastName().toLowerCase().contains(search.toLowerCase());
+            return matches ? new PageImpl<>(List.of(agentMapper.toResponse(agent)), pageable, 1) : Page.empty();
+        }
         Page<Agent> agents = agentRepository.findBySearchTerm(search, pageable);
         return agents.map(agentMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
     public List<AgentResponse> searchAgents(String search) {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            Agent agent = agentRepository.findByUserId(currentUserId).orElse(null);
+            if (agent == null) {
+                return List.of();
+            }
+            boolean matches = agent.getAgentCode().toLowerCase().contains(search.toLowerCase())
+                    || agent.getUser().getFirstName().toLowerCase().contains(search.toLowerCase())
+                    || agent.getUser().getLastName().toLowerCase().contains(search.toLowerCase());
+            return matches ? List.of(agentMapper.toResponse(agent)) : List.of();
+        }
         List<Agent> agents = agentRepository.findBySearchTerm(search);
         return agents.stream().map(agentMapper::toResponse).toList();
     }
@@ -304,6 +352,12 @@ public class AgentService {
     public AgentResponse getAgentByAgentCode(String agentCode) {
         Agent agent = agentRepository.findByAgentCode(agentCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", agentCode));
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            if (!agent.getUser().getId().equals(currentUserId)) {
+                throw new IllegalArgumentException("Access denied: you can only access your own agent record");
+            }
+        }
         return agentMapper.toResponse(agent);
     }
 
@@ -352,7 +406,11 @@ public class AgentService {
     private void sendAgentStatusNotification(Agent agent, String statusLabel, String message, boolean includeSms) {
         String subject = "Agent Account " + statusLabel + " – Ebee";
         try {
-            notificationPort.notifyAgent(agent, subject, message);
+            Map<String, String> p = new HashMap<>();
+            p.put("agentName", agent.getUser().getFirstName());
+            p.put("statusLabel", statusLabel.toLowerCase());
+            p.put("statusMessage", message);
+            notificationPort.notifyAgent(agent, subject, "agent-status-changed", p, Set.of());
         } catch (Exception e) {
             log.warn("Failed to send {} notification to agent {}: {}", statusLabel.toLowerCase(),
                     agent.getAgentCode(), e.getMessage());
@@ -374,23 +432,16 @@ public class AgentService {
                                           Agent agent, String rawPassword) {
         try {
             String subject = "Welcome to Ebee — Agent Registration Successful";
-            String message = """
-                    Dear %s %s,
-                    
-                    Congratulations! Your agent account has been successfully created.
-                    
-                    Login Credentials:
-                    Agent Code : %s
-                    Email      : %s
-                    Password   : %s
-                    
-                    For security reasons, please change your password after logging in.
-                    
-                    Best regards,
-                    Ebee Team
-                    """.formatted(firstName, lastName, agentCode, agent.getUser().getEmail(), rawPassword);
-            notificationPort.notifyAgent(agent, subject, message);
-            notificationPort.createInternalAlert(agent.getUser(), subject, message, AlertType.AGENT_APPROVED, agent.getId(), "agent");
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", firstName);
+            p.put("lastName", lastName);
+            p.put("agentCode", agentCode);
+            p.put("email", agent.getUser().getEmail());
+            p.put("password", rawPassword);
+            notificationPort.notifyAgent(agent, subject, "agent-welcome", p, Set.of());
+            String alertMsg = "Dear %s %s, welcome to Ebee! Agent code: %s".formatted(firstName, lastName, agentCode);
+            notificationPort.createInternalAlert(agent.getUser(), subject, alertMsg,
+                    AlertType.AGENT_APPROVED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
         }
@@ -399,25 +450,33 @@ public class AgentService {
     private void sendPasswordResetNotification(Agent agent) {
         try {
             String subject = "Password Reset – Ebee";
-            String message = """
-                    Dear %s %s,
-                    
-                    Your password has been reset by an administrator.
-                    
-                    Email: %s
-                    
-                    Please log in and use the "Forgot Password" option to set a new password.
-                    
-                    Best regards,
-                    Ebee Team
-                    """.formatted(agent.getUser().getFirstName(), agent.getUser().getLastName(),
-                    agent.getUser().getEmail());
-            notificationPort.notifyAgent(agent, subject, message);
-            notificationPort.createInternalAlert(agent.getUser(), subject, message,
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", agent.getUser().getFirstName());
+            p.put("lastName", agent.getUser().getLastName());
+            p.put("email", agent.getUser().getEmail());
+            notificationPort.notifyAgent(agent, subject, "agent-password-reset", p, Set.of());
+            notificationPort.createInternalAlert(agent.getUser(), subject,
+                    "Password reset for agent " + agent.getAgentCode(),
                     AlertType.AGENT_ACTIVATED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send password reset notification to agent {}: {}", agent.getAgentCode(), e.getMessage());
         }
+    }
+
+    private void assertCanAccessAgent(UUID agentId) {
+        if (!securityService.isAdmin()) {
+            UUID currentUserId = securityService.getCurrentUserId();
+            Agent agent = agentRepository.findByIdWithUser(agentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", agentId));
+            if (!agent.getUser().getId().equals(currentUserId)) {
+                throw new IllegalArgumentException("Access denied: you can only access your own agent record");
+            }
+        }
+    }
+
+    private Agent findAgentById(UUID id) {
+        return agentRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
     }
 
     private String generateAgentCode(District district) {

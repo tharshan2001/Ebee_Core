@@ -1,5 +1,6 @@
 package com.ebee.order.util;
 
+import com.ebee.common.util.NumberUtils;
 import com.ebee.customer.entity.Customer;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
@@ -44,9 +45,9 @@ public final class OrderItemSummaryBuilder {
                     return "<tr style=\"border-bottom:1px solid #e5e7eb;\">"
                             + "<td style=\"padding:8px 12px;\">" + name + "</td>"
                             + "<td style=\"padding:8px 12px;text-align:center;\">" + qty + "</td>"
-                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + unitPrice.toPlainString()
+                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + NumberUtils.formatAmount(unitPrice)
                             + discountInfo + "</td>"
-                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + lineTotal.toPlainString()
+                            + "<td style=\"padding:8px 12px;text-align:right;\">LKR " + NumberUtils.formatAmount(lineTotal)
                             + "</td></tr>";
                 })
                 .collect(Collectors.joining("\n"));
@@ -72,9 +73,39 @@ public final class OrderItemSummaryBuilder {
                         String pct = "PERCENTAGE".equalsIgnoreCase(item.getDiscountType())
                                 ? discountValue.toPlainString() + "% off"
                                 : "LKR " + discountValue.toPlainString() + " off";
-                        base += " — " + pct + " (saves LKR " + lineSavings.toPlainString() + ")";
+                        base += " — " + pct + " (saves LKR " + NumberUtils.formatAmount(lineSavings) + ")";
                     }
                     return base;
+                })
+                .collect(Collectors.joining("\n"));
+    }
+
+    /**
+     * Bullet-point item summary for SMS, with discount info per item.
+     * Example:
+     * <pre>
+     * \u2022 iPhone 14 (x2) \u2014 5% off (saves LKR 1,000.00)
+     * \u2022 USB Cable (x1) \u2014 LKR 500.00 off (saves LKR 500.00)
+     * </pre>
+     */
+    public static String buildItemSummaryBullet(Order order) {
+        return order.getItems().stream()
+                .map(item -> {
+                    String base = item.getProduct().getName() + " (x" + item.getQuantity() + ")";
+                    BigDecimal discountValue = item.getDiscountValue();
+                    if (item.getDiscountType() != null
+                            && discountValue != null
+                            && discountValue.compareTo(BigDecimal.ZERO) > 0
+                            && item.getOriginalUnitPrice() != null) {
+                        BigDecimal lineSavings = item.getOriginalUnitPrice()
+                                .subtract(item.getUnitPrice())
+                                .multiply(BigDecimal.valueOf(item.getQuantity()));
+                        String pct = "PERCENTAGE".equalsIgnoreCase(item.getDiscountType())
+                                ? discountValue.toPlainString() + "% off"
+                                : "LKR " + discountValue.toPlainString() + " off";
+                        base += " — " + pct + " (saves LKR " + NumberUtils.formatAmount(lineSavings) + ")";
+                    }
+                    return "\u2022 " + base;
                 })
                 .collect(Collectors.joining("\n"));
     }

@@ -1,0 +1,7 @@
+Dear {{driverName}},
+
+You have been assigned to deliver order {{orderNumber}}.
+
+District: {{district}}
+
+Please check the app for details.

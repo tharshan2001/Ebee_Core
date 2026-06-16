@@ -1,0 +1,7 @@
+Dear {{firstName}},
+
+Your order {{orderNumber}} has been assigned to a driver for delivery.
+
+We will keep you updated.
+
+Thank you for choosing Ebee!

@@ -12,8 +12,9 @@ import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionConfigRepository;
 import com.ebee.commission.repository.CommissionRepository;
-import com.ebee.notification.NotificationPort;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.util.NumberUtils;
+import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -46,27 +50,32 @@ public class CommissionCalculationService {
         Commission commission = calculateCommissionForOrder(order);
 
         Agent agent = commission.getAgent();
-        String subject = "Commission Calculated – Order " + order.getOrderNumber();
-        String message = """
-                Dear %s,
-                
-                A commission of LKR %.2f has been calculated for order %s.
-                
-                Order Amount: LKR %.2f
-                Rate: %.2f%%
-                Commission: LKR %.2f
-                
-                The commission will be processed once approved.
-                """.formatted(
-                agent.getUser().getFirstName(),
-                commission.getCommissionAmount(),
-                order.getOrderNumber(),
-                order.getTotalAmount(),
-                commission.getCommissionRate(),
-                commission.getCommissionAmount()
-        );
-        notificationPort.notifyAgent(agent, subject, message);
-        notificationPort.createInternalAlert(agent.getUser(), subject, message,
+        Map<String, String> placeholders = new HashMap<>();
+        placeholders.put("agentName", agent.getUser().getFirstName());
+        placeholders.put("orderNumber", order.getOrderNumber());
+        placeholders.put("totalAmount", NumberUtils.formatAmount(order.getTotalAmount()));
+        placeholders.put("commissionAmount", NumberUtils.formatAmount(commission.getCommissionAmount()));
+        placeholders.put("commissionRate", commission.getCommissionRate().toPlainString());
+        placeholders.put("savingsContext", "");
+        placeholders.put("savingsContextTxt", "");
+        Set<String> unescaped = Set.of("savingsContext");
+        notificationPort.notifyAgent(agent, "Commission Calculated – Order " + order.getOrderNumber(),
+                "order-commission-calculated", placeholders, unescaped);
+        notificationPort.createInternalAlert(agent.getUser(),
+                "Commission Calculated – Order " + order.getOrderNumber(),
+                """
+                        A commission of LKR %s has been calculated for order %s.
+                        
+                        Order Amount: LKR %s
+                        Rate: %s%%
+                        Commission: LKR %s
+                        """.formatted(
+                        NumberUtils.formatAmount(commission.getCommissionAmount()),
+                        order.getOrderNumber(),
+                        NumberUtils.formatAmount(order.getTotalAmount()),
+                        commission.getCommissionRate().toPlainString(),
+                        NumberUtils.formatAmount(commission.getCommissionAmount())
+                ),
                 AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
 
         return mapper.toResponse(commission);

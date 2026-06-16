@@ -1,0 +1,5 @@
+Reminder: {{title}}
+
+{{title}} is due now.
+{{description}}
+Priority: {{priority}}

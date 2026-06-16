@@ -1,1 +1,3 @@
-Dear {{agentName}}, order {{orderNumber}} for {{customerName}} is now {{statusLabel}}.
+Dear {{agentName}},
+
+Order {{orderNumber}} for {{customerName}} is now {{statusLabel}}.

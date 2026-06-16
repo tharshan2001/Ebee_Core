@@ -31,7 +31,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -214,7 +214,7 @@ class CommissionCalculationServiceTest {
 
         commissionCalculationService.calculateCommission(request);
 
-        verify(notificationPort).notifyAgent(eq(agent), anyString(), anyString());
+        verify(notificationPort).notifyAgent(eq(agent), anyString(), eq("order-commission-calculated"), anyMap(), anySet());
         verify(notificationPort).createInternalAlert(any(), anyString(), anyString(), any(), any(), anyString());
     }
 

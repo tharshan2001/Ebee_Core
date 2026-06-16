@@ -1,0 +1,9 @@
+Dear {{firstName}} {{lastName}},
+
+Welcome to Ebee! Your agent account has been created.
+
+Agent Code: {{agentCode}}
+Email: {{email}}
+Password: {{password}}
+
+Please change your password after logging in.

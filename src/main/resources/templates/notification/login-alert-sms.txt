@@ -1,0 +1,7 @@
+Ebee: New Login Detected
+
+A new login was detected on your account.
+
+Time: {{loginTime}}
+
+If this was not you, please change your password immediately.

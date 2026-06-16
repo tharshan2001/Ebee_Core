@@ -9,7 +9,10 @@ import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -27,12 +30,16 @@ public class InventoryAlertService {
         }
         String productName = inventory.getProduct().getName();
         String subject = "Low Stock Alert – " + productName;
-        String message = "Stock for %s is below reorder level. Current: %d, Reorder Level: %d".formatted(
-                productName, inventory.getQuantity(), inventory.getReorderLevel());
+        Map<String, String> p = new HashMap<>();
+        p.put("productName", productName);
+        p.put("currentQty", String.valueOf(inventory.getQuantity()));
+        p.put("reorderLevel", String.valueOf(inventory.getReorderLevel()));
         List<User> admins = userRepository.findByRole(RoleType.ADMIN);
         for (User admin : admins) {
-            notificationPort.notifyUser(admin, subject, message);
-            notificationPort.createInternalAlert(admin, subject, message,
+            notificationPort.notifyUser(admin, subject, "low-stock-alert", p, Set.of());
+            notificationPort.createInternalAlert(admin, subject,
+                    "Stock for %s is below reorder level. Current: %d, Reorder Level: %d".formatted(
+                            productName, inventory.getQuantity(), inventory.getReorderLevel()),
                     AlertType.LOW_STOCK, inventory.getId(), "inventory");
         }
     }

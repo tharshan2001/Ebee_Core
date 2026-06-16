@@ -250,6 +250,7 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Async
     public void createInternalAlert(User recipient, String title, String message,
                                      AlertType alertType, UUID referenceId, String referenceType) {
         try {

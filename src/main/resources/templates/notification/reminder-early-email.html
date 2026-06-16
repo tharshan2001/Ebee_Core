@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+  .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .header { background: #7c3aed; padding: 32px 40px; text-align: center; }
+  .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+  .body { padding: 32px 40px; color: #333333; line-height: 1.6; }
+  .body p { margin: 8px 0; }
+  .reminder-box { background: #f5f3ff; border-left: 4px solid #7c3aed; padding: 16px 20px; margin: 16px 0; border-radius: 4px; }
+  .reminder-box p { margin: 4px 0; }
+  .footer { padding: 24px 40px; text-align: center; color: #888888; font-size: 13px; border-top: 1px solid #e0e0e0; }
+  .footer p { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header"><h1>Upcoming Reminder</h1></div>
+  <div class="body">
+    <p>Hello,</p>
+    <p>Reminder <strong>{{title}}</strong> is coming up in 5 minutes.</p>
+    <div class="reminder-box">
+      <p><strong>{{title}}</strong></p>
+      <p>{{description}}</p>
+      <p><strong>Time:</strong> {{reminderTime}}</p>
+      <p><strong>Priority:</strong> {{priority}}</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>&copy; 2026 Ebee. All rights reserved.</p>
+  </div>
+</div>
+</body>
+</html>

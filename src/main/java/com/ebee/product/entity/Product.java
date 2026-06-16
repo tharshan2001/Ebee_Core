@@ -150,10 +150,20 @@ public class Product {
         // Apply per-order discount on top of the product's own (catalog) discount
         BigDecimal basePrice = getEffectivePrice();
         return switch (customType) {
-            case "PERCENTAGE" -> basePrice.multiply(BigDecimal.ONE.subtract(
-                            customValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
-                    .setScale(2, RoundingMode.HALF_UP)
-                    .max(BigDecimal.ZERO);
+            case "PERCENTAGE" -> {
+                // Guard against 100%+ discount: that would make the product free
+                // and effectively subsidize the buyer beyond the cap. The cap check
+                // above only catches this when maxDiscountValue <= 100.
+                if (customValue.compareTo(BigDecimal.valueOf(100)) > 0) {
+                    throw new IllegalArgumentException(
+                            "PERCENTAGE discount " + customValue + " exceeds 100% for product '"
+                                    + (name != null ? name : itemCode) + "'");
+                }
+                yield basePrice.multiply(BigDecimal.ONE.subtract(
+                                customValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
+                        .setScale(2, RoundingMode.HALF_UP)
+                        .max(BigDecimal.ZERO);
+            }
             case "FIXED" -> {
                 // A FIXED discount that exceeds the base price would floor at zero
                 // and let admin order the product for free. Reject instead.

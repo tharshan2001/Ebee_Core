@@ -146,6 +146,38 @@ class ProductMaxDiscountTest {
     }
 
     @Test
+    void getPriceWithDiscount_percentage100_makesUnitPriceZero() {
+        // Cap is 100% PERCENTAGE, admin applies exactly 100% -> unit price 0
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("100"))
+                .build();
+
+        assertThat(product.getPriceWithDiscount("PERCENTAGE", new BigDecimal("100")))
+                .isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void getPriceWithDiscount_percentageOver100_throws() {
+        // Misconfigured cap (150 PERCENTAGE) with admin trying 120 -> reject
+        // (would otherwise yield a negative multiplier and floor at 0 = free product)
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("150"))
+                .build();
+
+        assertThatThrownBy(() -> product.getPriceWithDiscount("PERCENTAGE", new BigDecimal("120")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceeds 100%");
+    }
+
+    @Test
     void getPriceWithDiscount_negativeDiscount_throws() {
         Product product = Product.builder()
                 .name("Test Product")

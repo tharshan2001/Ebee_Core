@@ -278,6 +278,44 @@ class ProductMaxDiscountTest {
     }
 
     @Test
+    void getPriceWithDiscount_mixedTypeCatalogFixedPerOrderPercentage_throws() {
+        // Product: catalog FIXED 100, cap PERCENTAGE 10
+        // Admin tries PERCENTAGE per-order -> reject (type mismatch)
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .discountType("FIXED")
+                .discountValue(new BigDecimal("100"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("10"))
+                .build();
+
+        assertThatThrownBy(() -> product.getPriceWithDiscount("PERCENTAGE", new BigDecimal("5")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not match product's catalog discount type");
+    }
+
+    @Test
+    void getPriceWithDiscount_mixedTypeCatalogPercentagePerOrderFixed_throws() {
+        // Product: catalog PERCENTAGE 10, cap FIXED 100
+        // Admin tries FIXED per-order -> reject (type mismatch)
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .discountType("PERCENTAGE")
+                .discountValue(new BigDecimal("10"))
+                .maxDiscountType("FIXED")
+                .maxDiscountValue(new BigDecimal("100"))
+                .build();
+
+        assertThatThrownBy(() -> product.getPriceWithDiscount("FIXED", new BigDecimal("50")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not match product's catalog discount type");
+    }
+
+    @Test
     void getPriceWithDiscount_noPerOrderDiscount_returnsEffectivePrice() {
         // Product has its own 10% PERCENTAGE discount (effective 900)
         // No per-order discount requested -> return effective price

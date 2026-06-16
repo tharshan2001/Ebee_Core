@@ -138,6 +138,16 @@ public class Product {
                     "discountType '" + customType + "' does not match product maxDiscountType '"
                             + maxDiscountType + "'");
         }
+        // Reject mixed catalog + per-order discount types. If the product has its
+        // own catalog discount (e.g. FIXED 300) the per-order discount must use
+        // the same type; mixing types is ambiguous (does the per-order apply to
+        // the original price or the post-catalog price?) and the frontend's
+        // "Type mismatch" warning has been showing without any backend guard.
+        if (discountType != null && !discountType.equals(customType)) {
+            throw new IllegalArgumentException(
+                    "Per-order discount type '" + customType + "' does not match product's catalog discount type '"
+                            + discountType + "' for product '" + (name != null ? name : itemCode) + "'");
+        }
         if (customValue.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("discountValue must not be negative");
         }

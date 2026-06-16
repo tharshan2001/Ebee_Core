@@ -3,6 +3,7 @@ package com.ebee.agent.controller;
 import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
 import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.agent.service.AgentService;
@@ -123,7 +124,10 @@ public class AgentController {
 
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
 
         Page<AgentResponse> agentsPage = search != null && !search.trim().isEmpty()
                 ? agentService.searchAgentsPaginated(search.trim(), pageable)

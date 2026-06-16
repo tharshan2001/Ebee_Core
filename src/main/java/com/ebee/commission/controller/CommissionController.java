@@ -1,6 +1,7 @@
 package com.ebee.commission.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.commission.dto.BatchPaymentRequest;
 import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionCalculateRequest;
@@ -85,7 +86,10 @@ public class CommissionController {
             @RequestParam(defaultValue = "calculatedAt,desc") String sort) {
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
         Page<CommissionResponse> response = queryService.getAllCommissions(pageable);
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
     }

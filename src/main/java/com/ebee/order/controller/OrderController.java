@@ -2,6 +2,7 @@ package com.ebee.order.controller;
 
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.enums.OrderStatus;
@@ -80,7 +81,10 @@ public class OrderController {
 
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
 
         Page<OrderResponse> ordersPage = status != null
                 ? orderService.getOrdersByStatusPaginated(status, pageable)

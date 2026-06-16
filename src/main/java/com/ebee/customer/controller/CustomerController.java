@@ -2,6 +2,7 @@ package com.ebee.customer.controller;
 
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.service.CustomerService;
@@ -74,7 +75,10 @@ public class CustomerController {
 
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
 
         Page<CustomerResponse> customersPage = search != null && !search.trim().isEmpty()
                 ? customerService.searchCustomersPaginated(search.trim(), pageable)

@@ -17,6 +17,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.ebee.common.util.PaginationUtils;
+
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -93,7 +95,10 @@ public class ProductController {
 
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
 
         Page<ProductResponse> productsPage = search != null && !search.trim().isEmpty()
                 ? productService.searchProducts(search.trim(), pageable)
@@ -126,7 +131,10 @@ public class ProductController {
 
         Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                Sort.by(direction, sortField));
 
         Page<ProductResponse> productsPage = productService.getActiveProductsPaginated(pageable);
 

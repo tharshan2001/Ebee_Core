@@ -150,6 +150,7 @@ public class InventoryService {
         return stockMapper.toResponse(stock);
     }
 
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public List<StockResponse> recordOrderStocks(List<UUID> productIds, List<Integer> quantities,
                                                   StockMovementType movementType, List<String> notes) {

@@ -154,7 +154,16 @@ public class Product {
                             customValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
                     .setScale(2, RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO);
-            case "FIXED" -> basePrice.subtract(customValue).max(BigDecimal.ZERO);
+            case "FIXED" -> {
+                // A FIXED discount that exceeds the base price would floor at zero
+                // and let admin order the product for free. Reject instead.
+                if (customValue.compareTo(basePrice) > 0) {
+                    throw new IllegalArgumentException(
+                            "FIXED discount " + customValue + " exceeds the (effective) price "
+                                    + basePrice + " for product '" + (name != null ? name : itemCode) + "'");
+                }
+                yield basePrice.subtract(customValue).setScale(2, RoundingMode.HALF_UP);
+            }
             default -> basePrice;
         };
     }

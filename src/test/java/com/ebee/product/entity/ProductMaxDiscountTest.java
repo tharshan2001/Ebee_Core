@@ -176,8 +176,9 @@ class ProductMaxDiscountTest {
     }
 
     @Test
-    void getPriceWithDiscount_fixedDiscountLargerThanPrice_floorsAtZero() {
-        // Cap is 500 FIXED, admin applies 500 on a 400 product -> 0 (floored)
+    void getPriceWithDiscount_fixedDiscountLargerThanPrice_throws() {
+        // Cap is 500 FIXED, admin applies 500 on a 400 product -> reject
+        // (would otherwise floor at 0 and let admin order for free).
         Product product = Product.builder()
                 .name("Test Product")
                 .itemCode("TEST-001")
@@ -186,7 +187,23 @@ class ProductMaxDiscountTest {
                 .maxDiscountValue(new BigDecimal("500"))
                 .build();
 
-        assertThat(product.getPriceWithDiscount("FIXED", new BigDecimal("500")))
+        assertThatThrownBy(() -> product.getPriceWithDiscount("FIXED", new BigDecimal("500")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceeds the (effective) price");
+    }
+
+    @Test
+    void getPriceWithDiscount_fixedDiscountEqualsPrice_returnsZero() {
+        // Cap equals price -> discount is allowed, unit price = 0
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("400.00"))
+                .maxDiscountType("FIXED")
+                .maxDiscountValue(new BigDecimal("400"))
+                .build();
+
+        assertThat(product.getPriceWithDiscount("FIXED", new BigDecimal("400")))
                 .isEqualByComparingTo("0.00");
     }
 

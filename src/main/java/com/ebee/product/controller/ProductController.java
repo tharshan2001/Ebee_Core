@@ -1,5 +1,6 @@
 package com.ebee.product.controller;
 
+import com.ebee.common.enums.DiscountType;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.product.dto.ProductRequest;
@@ -59,9 +60,9 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
-        request.setDiscountType(discountType);
+        request.setDiscountType(DiscountType.fromString(discountType));
         request.setDiscountValue(discountValue);
-        request.setMaxDiscountType(maxDiscountType);
+        request.setMaxDiscountType(DiscountType.fromString(maxDiscountType));
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
@@ -184,9 +185,9 @@ public class ProductController {
         request.setCategory(category);
         request.setPrice(price);
         request.setCostPrice(costPrice);
-        request.setDiscountType(discountType);
+        request.setDiscountType(DiscountType.fromString(discountType));
         request.setDiscountValue(discountValue);
-        request.setMaxDiscountType(maxDiscountType);
+        request.setMaxDiscountType(DiscountType.fromString(maxDiscountType));
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);

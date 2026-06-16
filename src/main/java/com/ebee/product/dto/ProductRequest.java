@@ -1,5 +1,6 @@
 package com.ebee.product.dto;
 
+import com.ebee.common.enums.DiscountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -31,7 +32,7 @@ public class ProductRequest {
 
     private List<String> removeImageUrls;
 
-    private String discountType;
+    private DiscountType discountType;
 
     private BigDecimal discountValue;
 
@@ -41,7 +42,7 @@ public class ProductRequest {
      * When null, per-order discounts are not allowed (product uses its own
      * discountType/discountValue only).
      */
-    private String maxDiscountType;
+    private DiscountType maxDiscountType;
 
     private BigDecimal maxDiscountValue;
 

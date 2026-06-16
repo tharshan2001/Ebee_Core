@@ -535,7 +535,7 @@ class OrderServiceTest {
         OrderItemRequest discountedItem = new OrderItemRequest();
         discountedItem.setProductItemCode("DISC-001");
         discountedItem.setQuantity(3);
-        discountedItem.setDiscountType("PERCENTAGE");
+        discountedItem.setDiscountType(com.ebee.common.enums.DiscountType.PERCENTAGE);
         discountedItem.setDiscountValue(new BigDecimal("20"));
 
         OrderRequest discountedRequest = new OrderRequest();
@@ -595,7 +595,7 @@ class OrderServiceTest {
         OrderItemRequest item = new OrderItemRequest();
         item.setProductItemCode("FIX-001");
         item.setQuantity(2);
-        item.setDiscountType("FIXED");
+        item.setDiscountType(com.ebee.common.enums.DiscountType.FIXED);
         item.setDiscountValue(new BigDecimal("250"));
 
         OrderRequest req = new OrderRequest();
@@ -642,7 +642,7 @@ class OrderServiceTest {
         OrderItemRequest item = new OrderItemRequest();
         item.setProductItemCode("CAP-001");
         item.setQuantity(1);
-        item.setDiscountType("PERCENTAGE");
+        item.setDiscountType(com.ebee.common.enums.DiscountType.PERCENTAGE);
         item.setDiscountValue(new BigDecimal("25")); // exceeds 10% cap
 
         OrderRequest req = new OrderRequest();
@@ -679,7 +679,7 @@ class OrderServiceTest {
         OrderItemRequest item = new OrderItemRequest();
         item.setProductItemCode("UNCAP-001");
         item.setQuantity(1);
-        item.setDiscountType("PERCENTAGE");
+        item.setDiscountType(com.ebee.common.enums.DiscountType.PERCENTAGE);
         item.setDiscountValue(new BigDecimal("10"));
 
         OrderRequest req = new OrderRequest();

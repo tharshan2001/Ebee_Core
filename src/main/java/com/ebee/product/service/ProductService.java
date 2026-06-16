@@ -197,13 +197,13 @@ public class ProductService {
         }
         validateDiscount(request);
         if (request.getDiscountType() != null) {
-            product.setDiscountType(request.getDiscountType());
+            product.setDiscountType(request.getDiscountType().name());
         }
         if (request.getDiscountValue() != null) {
             product.setDiscountValue(request.getDiscountValue());
         }
         if (request.getMaxDiscountType() != null) {
-            product.setMaxDiscountType(request.getMaxDiscountType());
+            product.setMaxDiscountType(request.getMaxDiscountType().name());
         }
         if (request.getMaxDiscountValue() != null) {
             product.setMaxDiscountValue(request.getMaxDiscountValue());
@@ -353,13 +353,10 @@ public class ProductService {
             if (request.getDiscountValue() == null) {
                 throw new IllegalArgumentException("discountValue is required when discountType is set");
             }
-            if (!List.of("PERCENTAGE", "FIXED").contains(request.getDiscountType())) {
-                throw new IllegalArgumentException("discountType must be PERCENTAGE or FIXED");
-            }
             if (request.getDiscountValue().compareTo(BigDecimal.ZERO) < 0) {
                 throw new IllegalArgumentException("discountValue must not be negative");
             }
-            if ("PERCENTAGE".equals(request.getDiscountType())
+            if (request.getDiscountType() == com.ebee.common.enums.DiscountType.PERCENTAGE
                     && request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
                 throw new IllegalArgumentException("PERCENTAGE discountValue must not exceed 100");
             }
@@ -371,18 +368,15 @@ public class ProductService {
             if (request.getMaxDiscountValue() == null) {
                 throw new IllegalArgumentException("maxDiscountValue is required when maxDiscountType is set");
             }
-            if (!List.of("PERCENTAGE", "FIXED").contains(request.getMaxDiscountType())) {
-                throw new IllegalArgumentException("maxDiscountType must be PERCENTAGE or FIXED");
-            }
             if (request.getMaxDiscountValue().compareTo(BigDecimal.ZERO) < 0) {
                 throw new IllegalArgumentException("maxDiscountValue must not be negative");
             }
-            if ("PERCENTAGE".equals(request.getMaxDiscountType())
+            if (request.getMaxDiscountType() == com.ebee.common.enums.DiscountType.PERCENTAGE
                     && request.getMaxDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
                 throw new IllegalArgumentException("PERCENTAGE maxDiscountValue must not exceed 100");
             }
             if (request.getPrice() != null
-                    && "FIXED".equals(request.getMaxDiscountType())
+                    && request.getMaxDiscountType() == com.ebee.common.enums.DiscountType.FIXED
                     && request.getMaxDiscountValue().compareTo(request.getPrice()) > 0) {
                 throw new IllegalArgumentException("FIXED maxDiscountValue must not exceed the product price");
             }

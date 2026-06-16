@@ -143,8 +143,11 @@ public class OrderService {
             // getPriceWithDiscount() throws IllegalArgumentException if the
             // discount exceeds the cap, so we let it bubble up to a 400.
             BigDecimal originalUnitPrice = product.getPrice();
+            String discountType = itemRequest.getDiscountType() != null
+                    ? itemRequest.getDiscountType().name()
+                    : null;
             BigDecimal unitPrice = product.getPriceWithDiscount(
-                    itemRequest.getDiscountType(),
+                    discountType,
                     itemRequest.getDiscountValue());
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
@@ -155,7 +158,7 @@ public class OrderService {
                     .unitPrice(unitPrice)
                     .originalUnitPrice(originalUnitPrice)
                     .subtotal(subtotal)
-                    .discountType(itemRequest.getDiscountType())
+                    .discountType(discountType)
                     .discountValue(itemRequest.getDiscountValue())
                     .build();
 

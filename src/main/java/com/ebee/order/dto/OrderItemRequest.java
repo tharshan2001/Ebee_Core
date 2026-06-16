@@ -1,5 +1,6 @@
 package com.ebee.order.dto;
 
+import com.ebee.common.enums.DiscountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -22,7 +23,7 @@ public class OrderItemRequest {
      * within the product's maxDiscount cap (set at product creation/update).
      * Both fields must be supplied together, or both omitted for no discount.
      */
-    private String discountType;
+    private DiscountType discountType;
 
     private BigDecimal discountValue;
 }

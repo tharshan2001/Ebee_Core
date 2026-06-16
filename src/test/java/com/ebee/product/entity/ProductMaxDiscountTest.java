@@ -189,4 +189,60 @@ class ProductMaxDiscountTest {
         assertThat(product.getPriceWithDiscount("FIXED", new BigDecimal("500")))
                 .isEqualByComparingTo("0.00");
     }
+
+    @Test
+    void getPriceWithDiscount_productHasOwnPercentageDiscount_perOrderLayersOnTop() {
+        // Product: price=1000, own 10% PERCENTAGE (effective 900)
+        // Cap: 20% PERCENTAGE, admin applies 10%
+        // Expected: 900 * 0.9 = 810
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .discountType("PERCENTAGE")
+                .discountValue(new BigDecimal("10"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("20"))
+                .build();
+
+        assertThat(product.getPriceWithDiscount("PERCENTAGE", new BigDecimal("10")))
+                .isEqualByComparingTo("810.00");
+    }
+
+    @Test
+    void getPriceWithDiscount_productHasOwnFixedDiscount_perOrderLayersOnTop() {
+        // Product: price=1000, own 100 FIXED (effective 900)
+        // Cap: 200 FIXED, admin applies 150
+        // Expected: 900 - 150 = 750
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .discountType("FIXED")
+                .discountValue(new BigDecimal("100"))
+                .maxDiscountType("FIXED")
+                .maxDiscountValue(new BigDecimal("200"))
+                .build();
+
+        assertThat(product.getPriceWithDiscount("FIXED", new BigDecimal("150")))
+                .isEqualByComparingTo("750.00");
+    }
+
+    @Test
+    void getPriceWithDiscount_noPerOrderDiscount_returnsEffectivePrice() {
+        // Product has its own 10% PERCENTAGE discount (effective 900)
+        // No per-order discount requested -> return effective price
+        Product product = Product.builder()
+                .name("Test Product")
+                .itemCode("TEST-001")
+                .price(new BigDecimal("1000.00"))
+                .discountType("PERCENTAGE")
+                .discountValue(new BigDecimal("10"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("20"))
+                .build();
+
+        assertThat(product.getPriceWithDiscount(null, null))
+                .isEqualByComparingTo("900.00");
+    }
 }

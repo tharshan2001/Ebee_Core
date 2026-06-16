@@ -110,14 +110,20 @@ public class Product {
      * If {@code maxDiscount} is null, the custom discount is rejected (admin did
      * not authorize any per-order discount for this product).
      *
+     * <p>The product's own {@code discountType}/{@code discountValue} is applied
+     * <em>first</em> (via {@link #getEffectivePrice()}), then the per-order
+     * discount is applied on top of that. This lets a product carry a permanent
+     * catalog discount and still allow admins to layer an order-time discount
+     * on top, both within the admin-set cap.
+     *
      * @param customType   "PERCENTAGE" or "FIXED" (nullable for no discount)
      * @param customValue  the discount value (nullable for no discount)
-     * @return price after applying the custom discount
+     * @return price after applying the product's own discount and the custom discount
      * @throws IllegalArgumentException if custom discount exceeds the cap
      */
     public BigDecimal getPriceWithDiscount(String customType, BigDecimal customValue) {
         if (customType == null || customValue == null) {
-            return price;
+            return getEffectivePrice();
         }
         if (maxDiscountType == null || maxDiscountValue == null) {
             throw new IllegalArgumentException(
@@ -141,13 +147,15 @@ public class Product {
                             + " exceeds the maximum allowed (" + maxDiscountValue + " " + maxDiscountType
                             + ") for product '" + (name != null ? name : itemCode) + "'");
         }
+        // Apply per-order discount on top of the product's own (catalog) discount
+        BigDecimal basePrice = getEffectivePrice();
         return switch (customType) {
-            case "PERCENTAGE" -> price.multiply(BigDecimal.ONE.subtract(
+            case "PERCENTAGE" -> basePrice.multiply(BigDecimal.ONE.subtract(
                             customValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
                     .setScale(2, RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO);
-            case "FIXED" -> price.subtract(customValue).max(BigDecimal.ZERO);
-            default -> price;
+            case "FIXED" -> basePrice.subtract(customValue).max(BigDecimal.ZERO);
+            default -> basePrice;
         };
     }
 }

@@ -498,6 +498,27 @@ class OrderServiceTest {
     }
 
     @Test
+    void cancelOrder_deliveryFailedPermanent_skipsStockRestore() {
+        // If the delivery was already marked FAILED_PERMANENT, DeliveryService
+        // already restored the stock. Cancelling the order must not restore it
+        // a second time (double-restore = customer can inflate inventory).
+        order.setStatus(OrderStatus.PENDING);
+        order.setDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.cancelOrder(order.getId());
+
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // Stock is NOT restored again -- only commission is cancelled.
+        verify(inventoryService, never()).recordOrderStocks(
+                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
+        verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+    }
+
+    @Test
     void createOrder_productWithPercentageDiscount_usesDiscountedPriceInTotal() {
         // Admin places order for a product with 20% discount cap.
         // Order total must reflect the discounted price.

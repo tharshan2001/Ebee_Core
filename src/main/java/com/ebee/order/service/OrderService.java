@@ -295,16 +295,24 @@ public class OrderService {
             throw new IllegalArgumentException("Cannot cancel a " + order.getStatus().name().toLowerCase() + " order");
         }
 
-        List<UUID> stockProductIds = order.getItems().stream()
-                .map(item -> item.getProduct().getId())
-                .toList();
-        List<Integer> stockQuantities = order.getItems().stream()
-                .map(OrderItem::getQuantity)
-                .toList();
-        List<String> stockNotes = order.getItems().stream()
-                .map(item -> "Order " + order.getOrderNumber() + " cancelled - Item restored")
-                .toList();
-        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+        // If the delivery has already been marked FAILED_PERMANENT, stock was
+        // already restored by DeliveryService. Skip the restoration here to
+        // avoid double-adding stock (which would let a customer inflate
+        // inventory by repeatedly cancelling and re-ordering).
+        boolean stockAlreadyRestored = order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT;
+
+        if (!stockAlreadyRestored) {
+            List<UUID> stockProductIds = order.getItems().stream()
+                    .map(item -> item.getProduct().getId())
+                    .toList();
+            List<Integer> stockQuantities = order.getItems().stream()
+                    .map(OrderItem::getQuantity)
+                    .toList();
+            List<String> stockNotes = order.getItems().stream()
+                    .map(item -> "Order " + order.getOrderNumber() + " cancelled - Item restored")
+                    .toList();
+            inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+        }
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 

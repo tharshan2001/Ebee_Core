@@ -48,21 +48,36 @@ src/test/
 │   │   ├── controller/AuthControllerTest.java
 │   │   └── service/
 │   │       ├── AuthServiceTest.java
-│   │       └── JwtServiceTest.java
+│   │       ├── JwtServiceTest.java
+│   │       └── OtpServiceTest.java
 │   ├── commission/service/
 │   │   ├── CommissionCalculationServiceTest.java
 │   │   ├── CommissionLifecycleServiceTest.java
 │   │   └── CommissionLockTest.java
-│   ├── common/util/
-│   │   ├── DateUtilsTest.java
-│   │   ├── PasswordGeneratorTest.java
-│   │   └── PhoneUtilsTest.java
+│   ├── common/
+│   │   ├── enums/DiscountTypeTest.java
+│   │   └── util/
+│   │       ├── DateUtilsTest.java
+│   │       ├── PaginationUtilsTest.java
+│   │       ├── PasswordGeneratorTest.java
+│   │       ├── PhoneUtilsTest.java
+│   │       └── SortableFieldsTest.java
 │   ├── delivery/service/DeliveryServiceTest.java
+│   ├── driver/service/DriverServiceTest.java
 │   ├── expense/
 │   │   ├── controller/ExpenseControllerTest.java
 │   │   └── service/ExpenseServiceTest.java
 │   ├── inventory/service/InventoryServiceTest.java
-│   └── order/service/OrderServiceTest.java
+│   ├── notification/template/
+│   │   └── NotificationTemplateServiceTest.java
+│   ├── order/service/
+│   │   ├── OrderDiscountIntegrationTest.java
+│   │   └── OrderServiceTest.java
+│   └── product/
+│       ├── controller/ProductControllerTest.java
+│       └── entity/
+│           ├── ProductDiscountTest.java
+│           └── ProductMaxDiscountTest.java
 └── resources/
     └── application-test.yml              # Testcontainers + overrides
 ```
@@ -434,26 +449,36 @@ Redis on port 16379 matches the `application-test.yml` Redis config. The Postgre
 
 ---
 
-## Test Count (Current: 151)
+## Test Count (Current: 203)
 
 | Test Class | Count |
 |-----------|-------|
-| AuthServiceTest | 10 |
-| JwtServiceTest | 11 |
-| CommissionCalculationServiceTest | 8 |
+| AuthServiceTest | 15 |
+| JwtServiceTest | 10 |
+| OtpServiceTest | 6 |
+| AuthControllerTest | 4 |
+| CommissionCalculationServiceTest | 10 |
 | CommissionLifecycleServiceTest | 10 |
 | CommissionLockTest | 2 |
 | DateUtilsTest | 4 |
-| PasswordGeneratorTest | 3 |
-| PhoneUtilsTest | 8 |
-| InventoryServiceTest | 11 |
-| OrderServiceTest | 18 |
+| DiscountTypeTest | 5 |
+| PaginationUtilsTest | 7 |
+| PasswordGeneratorTest | 2 |
+| PhoneUtilsTest | 2 |
+| SortableFieldsTest | 7 |
 | DeliveryServiceTest | 13 |
+| DriverServiceTest | 3 |
 | ExpenseServiceTest | 10 |
-| AuthControllerTest | 4 |
 | ExpenseControllerTest | 10 |
+| InventoryServiceTest | 11 |
+| NotificationTemplateServiceTest | 6 |
+| OrderServiceTest | 28 |
+| OrderDiscountIntegrationTest | 5 |
+| ProductControllerTest | 2 |
+| ProductDiscountTest | 11 |
+| ProductMaxDiscountTest | 20 |
 | AbstractIntegrationTest | 0 (base) |
-| **Total** | **151** |
+| **Total** | **203** |
 
 ---
 

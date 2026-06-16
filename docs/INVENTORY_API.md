@@ -9,7 +9,7 @@ All endpoints require JWT:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Role:** Read endpoints are accessible to any authenticated user. Mutation endpoints (`adjust`, `reserve`, `release`, `order-stock`) require `ADMIN`.
+**Role:** Some read endpoints are accessible to ADMIN and AGENT roles. Others (`list all`, `low-stock`) require ADMIN. Mutation endpoints (`adjust`, `reserve`, `release`, `order-stock`) require `ADMIN`.
 
 ---
 
@@ -17,7 +17,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 **GET** `/api/inventory/{id}`
 
-**Access:** Authenticated users
+**Access:** ADMIN, AGENT
 
 **Path Parameters:**
 
@@ -66,7 +66,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 **GET** `/api/inventory/product/{productId}`
 
-**Access:** Authenticated users
+**Access:** ADMIN, AGENT
 
 **Path Parameters:**
 
@@ -82,7 +82,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 **GET** `/api/inventory`
 
-**Access:** Authenticated users
+**Access:** ADMIN only
 
 Returns inventory records for all products.
 
@@ -101,7 +101,7 @@ Returns inventory records for all products.
 
 **GET** `/api/inventory/low-stock`
 
-**Access:** Authenticated users
+**Access:** ADMIN only
 
 Returns all inventory records where `currentStock < reorderLevel`.
 
@@ -194,7 +194,7 @@ Releases previously reserved stock back to available inventory.
 
 **GET** `/api/inventory/product/{productId}/history`
 
-**Access:** Authenticated users
+**Access:** ADMIN, AGENT
 
 Returns stock movement history for a product.
 

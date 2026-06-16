@@ -101,6 +101,8 @@ Admin includes `agentCode` to create an order for a specific agent.
 | items | Array | Yes | At least 1 item |
 | items[].productItemCode | String | Yes | Must match an active product's item code (e.g., `PA-001`) |
 | items[].quantity | Integer | Yes | Positive integer |
+| items[].discountType | String | No (admin only) | `PERCENTAGE` or `FIXED` — per-order discount. Ignored for AGENT-created orders. |
+| items[].discountValue | BigDecimal | No | Required if `discountType` is set. Capped by the product's `maxDiscountValue`. |
 
 **Success Response (201 Created):**
 ```json
@@ -131,7 +133,10 @@ Admin includes `agentCode` to create an order for a specific agent.
         "productItemCode": "PA-001",
         "quantity": 2,
         "unitPrice": 60.00,
-        "subtotal": 120.00
+        "originalUnitPrice": 60.00,
+        "subtotal": 120.00,
+        "discountType": null,
+        "discountValue": null
       }
     ],
     "district": "Trincomalee",
@@ -156,7 +161,9 @@ Admin includes `agentCode` to create an order for a specific agent.
 | `orderNumber` | Prefix: `TM-D-...` | Prefix: `TM-A-...` |
 | Commission | No | Yes, auto-calculated |
 
-**Pricing Note:** The `unitPrice` in each order item reflects the product's **effective price** (after any active discount). If the product has `discountType: "PERCENTAGE"` with `discountValue: 10`, the `unitPrice` will be `price * 0.9`. Agents see this discounted price automatically and cannot override it.
+**Pricing Note:** The `unitPrice` in each order item reflects the product's **effective price** (after any active discount, plus any per-order admin discount). If the product has `discountType: "PERCENTAGE"` with `discountValue: 10`, the `unitPrice` will be `price * 0.9`. Agents see this discounted price automatically and cannot override it.
+
+**Per-order admin discount:** Admins can optionally apply a discount on each `OrderItem` by supplying `discountType` and `discountValue`. This is capped by the product's `maxDiscountType` / `maxDiscountValue`. The `originalUnitPrice` field captures the price before any per-order discount. When no per-order discount is applied, `originalUnitPrice` equals `unitPrice`.
 
 **Error Responses:**
 - 400: Agent not active / Product not active / Insufficient stock
@@ -479,7 +486,9 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
   "items": [
     {
       "productItemCode": "String (required, e.g. PA-001)",
-      "quantity": "Integer (required, positive)"
+      "quantity": "Integer (required, positive)",
+      "discountType": "String (optional; PERCENTAGE or FIXED — admin-only per-order discount)",
+      "discountValue": "BigDecimal (optional; required if discountType is set; capped by product's maxDiscount)"
     }
   ]
 }
@@ -518,7 +527,10 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
       "productItemCode": "String",
       "quantity": "Integer",
       "unitPrice": "BigDecimal",
-      "subtotal": "BigDecimal"
+      "originalUnitPrice": "BigDecimal",
+      "subtotal": "BigDecimal",
+      "discountType": "String or null",
+      "discountValue": "BigDecimal or null"
     }
   ]
 }

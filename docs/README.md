@@ -43,14 +43,14 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Authentication | [AUTH_API.md](AUTH_API.md) | Public (login/refresh) |
 | Users | [USER_API.md](USER_API.md) | ADMIN (mutate), any (read own) |
 | Profile | [PROFILE_API.md](PROFILE_API.md) | Authenticated users |
-| Products | [PRODUCT_API.md](PRODUCT_API.md) | ADMIN |
-| Inventory | [INVENTORY_API.md](INVENTORY_API.md) | ADMIN (mutate), any (read) |
+| Products | [PRODUCT_API.md](PRODUCT_API.md) | Public (read), ADMIN (mutate) |
+| Inventory | [INVENTORY_API.md](INVENTORY_API.md) | ADMIN, AGENT (some reads), ADMIN (mutate) |
 | Categories | [CATEGORY_API.md](CATEGORY_API.md) | ADMIN (mutate), any (read) |
-| Agents | [AGENT_API.md](AGENT_API.md) | ADMIN (create/update/delete), any (read) |
+| Agents | [AGENT_API.md](AGENT_API.md) | ADMIN |
 | Agent Applications | [AGENT_APPLICATION_API.md](AGENT_APPLICATION_API.md) | Public (submit), ADMIN (manage) |
 | Customers | [CUSTOMER_API.md](CUSTOMER_API.md) | ADMIN, AGENT |
 | Orders | [ORDER_API.md](ORDER_API.md) | ADMIN, AGENT |
-| Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN (mutate), any (read) |
+| Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN |
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
 | Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
 | Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |

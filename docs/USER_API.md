@@ -9,7 +9,7 @@ All endpoints require JWT:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Role:** Most endpoints require `ADMIN`. `GET /me` and `GET /{id}` are accessible to any authenticated user. `PATCH /{id}` allows ADMIN or the user themselves.
+**Role:** Most endpoints require `ADMIN`. `GET /me` is accessible to any authenticated user. `GET /{id}` and `PATCH /{id}` are accessible to ADMIN or the user themselves.
 
 ---
 

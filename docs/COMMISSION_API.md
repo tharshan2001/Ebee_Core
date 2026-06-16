@@ -19,7 +19,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 **Roles:**
 - `ADMIN` — full access (create, process, pay, reject, read, batch pay)
-- Any authenticated user — read access (by ID, by agent)
+- All commission endpoints are ADMIN-only
 
 ---
 
@@ -235,8 +235,8 @@ Marks one or more specific commissions as `PAID`. Only commissions in `PROCESSIN
 
 | Endpoint | Access | Description |
 |----------|--------|-------------|
-| **GET** `/api/commissions/{id}` | Any authenticated | Get by ID |
-| **GET** `/api/commissions/agent/{agentId}` | Any authenticated | Get by agent |
+| **GET** `/api/commissions/{id}` | ADMIN only | Get by ID |
+| **GET** `/api/commissions/agent/{agentId}` | ADMIN only | Get by agent |
 | **GET** `/api/commissions` | ADMIN only | Get all (paginated) |
 | **GET** `/api/commissions/status/{status}` | ADMIN only | Filter by status |
 

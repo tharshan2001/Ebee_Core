@@ -38,6 +38,8 @@ Product responses include:
 | `isActive` | `Boolean` | Whether product is active/orderable |
 | `discountType` | `String` | `PERCENTAGE`, `FIXED`, or `null` (no discount) |
 | `discountValue` | `BigDecimal` | Discount value (percentage or fixed amount) |
+| `maxDiscountType` | `String` | `PERCENTAGE`, `FIXED`, or `null` (no cap). Optional cap on the per-order discount an admin can apply at order time. |
+| `maxDiscountValue` | `BigDecimal` | Max discount value (paired with `maxDiscountType`). When set, admin can supply a discount on each order item up to this cap. |
 | `brand` | `String` | Brand name |
 | `tags` | `String` | Comma-separated tags (e.g. `"premium,sport"`) |
 | `effectivePrice` | `BigDecimal` | Computed price after discount: `price * (1 - value/100)` or `price - value` |
@@ -303,6 +305,8 @@ curl http://localhost:8085/api/products/stats
 | `costPrice` | `BigDecimal` | Yes | Cost price (positive) |
 | `discountType` | `String` | No | `PERCENTAGE` or `FIXED` |
 | `discountValue` | `BigDecimal` | No | Required if `discountType` is set |
+| `maxDiscountType` | `String` | No | `PERCENTAGE` or `FIXED`. Optional cap on per-order admin discount. |
+| `maxDiscountValue` | `BigDecimal` | No | Required if `maxDiscountType` is set. Max value for per-order discount. |
 | `brand` | `String` | No | Brand name (max 100 chars) |
 | `tags` | `String` | No | Comma-separated tags |
 | `images` | `File[]` | No | Up to 10 product images |
@@ -346,6 +350,8 @@ All fields are optional — only provided fields are updated.
 | `costPrice` | `BigDecimal` | No | Cost price |
 | `discountType` | `String` | No | `PERCENTAGE` or `FIXED` (set to clear, omit to leave unchanged) |
 | `discountValue` | `BigDecimal` | No | Required if `discountType` is set |
+| `maxDiscountType` | `String` | No | `PERCENTAGE` or `FIXED`. Optional cap on per-order admin discount. |
+| `maxDiscountValue` | `BigDecimal` | No | Required if `maxDiscountType` is set. Max value for per-order discount. |
 | `brand` | `String` | No | Brand name |
 | `tags` | `String` | No | Comma-separated tags |
 | `images` | `File[]` | No | New images to **append** (up to 10 total) |

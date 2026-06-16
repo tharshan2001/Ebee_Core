@@ -263,7 +263,7 @@ curl "http://localhost:8085/api/agents/search?q=AP" \
 
 **GET** `/api/agents/{id}`
 
-**Access:** Any authenticated user
+**Access:** ADMIN only
 
 **Response:** Same as single item in Get All response.
 
@@ -273,7 +273,7 @@ curl "http://localhost:8085/api/agents/search?q=AP" \
 
 **GET** `/api/agents/code/{agentCode}`
 
-**Access:** Any authenticated user
+**Access:** ADMIN only
 
 **Response:** Same as single item in Get All response.
 

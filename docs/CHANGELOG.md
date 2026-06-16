@@ -2,7 +2,7 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
-## [Unreleased] — 2026-06-15
+## [Unreleased] — 2026-06-17
 
 ### Security Fixes
 
@@ -21,6 +21,7 @@ All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD
 ### Race Condition / Data Integrity Fixes
 
 - **Duplicate order numbers under concurrency** (`OrderService.createOrder`) — Added `@Retryable` (5 attempts, exponential backoff) for `DataIntegrityViolationException`. Concurrent orders for the same district/source/date now both succeed (one retries with an incremented sequence) instead of one failing with a unique-constraint violation.
+- **Narrow @Retryable to duplicate-order-number only** (`OrderService.createOrder`) — `@Retryable` was previously on the entire method, retrying on any `DataIntegrityViolationException`. Narrowed to only catch the specific constraint name `uk_order_number`. Other constraint violations (e.g., FK violations) now fail immediately instead of silently retrying 5 times.
 - **Customer `totalOrders` lost updates** (`CustomerService.incrementTotalOrders`) — Replaced read-modify-write with atomic `UPDATE Customer SET totalOrders = totalOrders + 1 WHERE id = :id`. Concurrent order creations can no longer lose increments.
 - **Audit log "from X to X" bug** (`OrderService.updateOrderStatus`) — Captures `oldStatus` into a local variable before overwriting it. Audit log now correctly records actual state transitions.
 - **NPE when customer has no address** (`OrderService.createOrder`) — Added null check with clear error message.
@@ -29,6 +30,8 @@ All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD
 - **Stock adjustment ignores reserved quantity** (`InventoryService.adjustStock`, `recordOrderStock`, `recordOrderStocks`) — All three methods now reject stock changes that would leave `quantity < reservedQuantity` (preventing negative available stock).
 
 ### Logic Bug Fixes
+
+- **Reject mixed-type catalog + per-order discount** (`ProductService.validateDiscount`) — When a product has a catalog discount (`discountType`/`discountValue`) and a per-order max discount cap (`maxDiscountType`/`maxDiscountValue`), both must be the same type (`PERCENTAGE` or `FIXED`). Previously, mixed types (e.g., catalog `PERCENTAGE` + max-cap `FIXED`) could produce inconsistent pricing.
 
 - **PERCENTAGE discount > 100 produces negative price** (`Product.getEffectivePrice`) — Added `.max(BigDecimal.ZERO)` floor. `ProductService.validateDiscount` now rejects PERCENTAGE values > 100 at creation/update time.
 
@@ -51,6 +54,25 @@ All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD
   - `CommissionQueryService.getAllCommissions` — accepts `Pageable`, returns `Page<CommissionResponse>`
   - `DriverRepository.findByAvailability(..., Pageable)` — new paginated method
   - `CommissionRepository.findAllWithDetails(Pageable)` — new paginated method
+
+### Notification System Overhaul
+
+- **Channel-aware template resolution** (`NotificationTemplateService`) — Templates now use a `-email` or `-sms` suffix convention. The service resolves the correct template based on the `NotificationChannel` enum. Backward-compatible with legacy template names.
+- **Migrated order notifications** to channel-aware templates — All 8 order notification types (`order-created`, `order-cancelled`, `order-status`, `order-commission-calculated`) now have separate `-email.html` and `-sms.txt` templates for each recipient role (agent + customer).
+- **SMS template formatting overhaul** — All SMS templates now use a structured layout with currency formatting (`LKR X,XXX.XX`), line separators, and consistent header/footer. Uses `NumberUtils.formatCurrency()` for locale-independent formatting.
+- **HTML-escape template placeholders** (`NotificationTemplateService`) — All `[[placeholder]]` values are now HTML-escaped before template rendering to prevent XSS in email notifications.
+
+### API Hardening
+
+- **Use DiscountType enum in DTOs** (`ProductRequest`, `OrderItemRequest`) — Replaced raw `String` with `DiscountType` enum. Invalid discount values now return `400 Bad Request` instead of being silently ignored.
+- **Validate sort field against per-entity allow-list** (`SortableFields`) — Added `SortableFields.validate()` that checks sort fields against a whitelist per entity (`AGENT`, `COMMISSION`, etc.). Prevents DoS via arbitrary sort-by expressions on JPA queries.
+- **Cap pagination size and clamp negative page indices** (`PaginationUtils.safePage`, `safeSize`) — Negative page indexes are clamped to 0. Page sizes exceeding per-endpoint max are silently capped instead of returning all records.
+- **Add CHECK constraints on money and quantity columns** (Flyway V59) — Added database-level `CHECK` constraints: `commission_amount >= 0`, `total_amount > 0`, `quantity > 0`, `price > 0`, `cost_price > 0`. Prevents data corruption from application bugs reaching the DB.
+
+### Inventory
+
+- **Add @Retryable to recordOrderStocks** (`InventoryService`) — Added `@Retryable` for `OptimisticLockException` on bulk stock recording. Under high concurrency, inventory version conflicts no longer fail the entire order.
+- **Skip stock restore when delivery is already FAILED_PERMANENT** (`DeliveryService`) — Prevents double stock restoration on `FAILED_PERMANENT` when stock was already restored by an earlier `FAILED → PENDING` retry cycle.
 
 ### New Endpoints
 

@@ -7,6 +7,7 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.enums.District;
+import com.ebee.order.exception.DuplicateOrderNumberException;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.order.util.OrderItemSummaryBuilder;
@@ -66,7 +67,7 @@ public class OrderService {
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
 
-    @Retryable(retryFor = DataIntegrityViolationException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
+    @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
         Agent agent = null;
@@ -173,7 +174,15 @@ public class OrderService {
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
 
         order.setTotalAmount(totalAmount);
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder;
+        try {
+            savedOrder = orderRepository.save(order);
+        } catch (DataIntegrityViolationException ex) {
+            if (isDuplicateOrderNumber(ex)) {
+                throw new DuplicateOrderNumberException("Duplicate order number: " + order.getOrderNumber(), ex);
+            }
+            throw ex;
+        }
 
         Commission commission = null;
         if (agent != null) {
@@ -331,9 +340,23 @@ public class OrderService {
     }
 
     @Recover
-    public OrderResponse recoverDuplicateOrderNumber(DataIntegrityViolationException ex, OrderRequest request) {
-        log.error("Failed to create order after retries due to duplicate order number: {}", ex.getMessage());
+    public OrderResponse recoverDuplicateOrderNumber(DuplicateOrderNumberException ex, OrderRequest request) {
+        log.error("Failed to create order after retries: {}", ex.getMessage());
         throw new IllegalStateException("Unable to generate unique order number. Please try again.", ex);
+    }
+
+    /**
+     * Check whether a {@link DataIntegrityViolationException} was
+     * caused by the {@code uk_orders_order_number} unique constraint.
+     * The precise constraint name is database-specific (PostgreSQL
+     * reports it via the SQL exception chain), so we compare against
+     * the most specific substring we control.
+     */
+    private static boolean isDuplicateOrderNumber(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause == null) return false;
+        String msg = cause.getMessage();
+        return msg != null && msg.contains("uk_orders_order_number");
     }
 
 }

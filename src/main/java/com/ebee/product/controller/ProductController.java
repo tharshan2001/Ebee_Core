@@ -44,6 +44,8 @@ public class ProductController {
             @RequestParam(value = "images", required = false) MultipartFile[] images,
             @RequestParam(value = "discountType", required = false) String discountType,
             @RequestParam(value = "discountValue", required = false) BigDecimal discountValue,
+            @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
+            @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
             @RequestParam(value = "tags", required = false) String tags) {
 
@@ -56,6 +58,8 @@ public class ProductController {
         request.setCostPrice(costPrice);
         request.setDiscountType(discountType);
         request.setDiscountValue(discountValue);
+        request.setMaxDiscountType(maxDiscountType);
+        request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
         if (images != null) {
@@ -157,6 +161,8 @@ public class ProductController {
             @RequestParam(value = "images", required = false) MultipartFile[] images,
             @RequestParam(value = "discountType", required = false) String discountType,
             @RequestParam(value = "discountValue", required = false) BigDecimal discountValue,
+            @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
+            @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
             @RequestParam(value = "tags", required = false) String tags) {
 
@@ -169,6 +175,8 @@ public class ProductController {
         request.setCostPrice(costPrice);
         request.setDiscountType(discountType);
         request.setDiscountValue(discountValue);
+        request.setMaxDiscountType(maxDiscountType);
+        request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
         if (images != null) {

@@ -42,13 +42,21 @@ public class SecurityService {
     }
 
     public boolean isAdmin() {
+        return hasRole("ROLE_ADMIN") || hasRole("ROLE_SUPER_ADMIN");
+    }
+
+    public boolean isSuperAdmin() {
+        return hasRole("ROLE_SUPER_ADMIN");
+    }
+
+    private boolean hasRole(String role) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null) {
             return false;
         }
         return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+                .anyMatch(auth -> auth.equals(role));
     }
 
     public String getCurrentUserEmail() {

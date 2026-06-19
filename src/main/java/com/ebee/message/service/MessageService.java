@@ -9,11 +9,14 @@ import com.ebee.message.enums.MessageTargetType;
 import com.ebee.message.repository.MessageRecipientRepository;
 import com.ebee.message.repository.MessageRepository;
 import com.ebee.user.entity.User;
+import com.ebee.user.enums.RoleType;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,14 +79,17 @@ public class MessageService {
 
     @Transactional(readOnly = true)
     public Page<MessageResponse> getSentMessages(User admin, Pageable pageable) {
-        return messageRepository.findBySentByIdOrderBySentAtDesc(admin.getId(), pageable)
-                .map(msg -> MessageResponse.builder()
-                        .id(msg.getId())
-                        .subject(msg.getSubject())
-                        .targetType(msg.getTargetType())
-                        .totalRecipients(msg.getTotalRecipients())
-                        .sentAt(msg.getSentAt())
-                        .build());
+        Page<Message> page = isSuperAdmin(admin)
+                ? messageRepository.findAll(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "sentAt")))
+                : messageRepository.findBySentByIdOrderBySentAtDesc(admin.getId(), pageable);
+
+        return page.map(msg -> MessageResponse.builder()
+                .id(msg.getId())
+                .subject(msg.getSubject())
+                .targetType(msg.getTargetType())
+                .totalRecipients(msg.getTotalRecipients())
+                .sentAt(msg.getSentAt())
+                .build());
     }
 
     @Transactional(readOnly = true)
@@ -91,7 +97,7 @@ public class MessageService {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
 
-        if (!message.getSentBy().getId().equals(admin.getId())) {
+        if (!isSuperAdmin(admin) && !message.getSentBy().getId().equals(admin.getId())) {
             throw new RuntimeException("Access denied");
         }
 
@@ -115,5 +121,9 @@ public class MessageService {
                         .sentEmail(r.getSentEmail())
                         .build()).toList())
                 .build();
+    }
+
+    private boolean isSuperAdmin(User user) {
+        return user.getRole() == RoleType.SUPER_ADMIN;
     }
 }

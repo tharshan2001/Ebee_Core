@@ -126,6 +126,7 @@ public class AgentService {
                 .district(savedAgent.getDistrict() != null ? savedAgent.getDistrict().getDisplayName() : null)
                 .phoneNumber(savedAgent.getPhoneNumber())
                 .commissionRate(savedAgent.getCommissionRate())
+                .effectiveCommissionRate(savedAgent.getCommissionRate())
                 .commissionType(savedAgent.getCommissionType())
                 .nicNumber(savedAgent.getNicNumber())
                 .bankAccountNumber(savedAgent.getBankAccountNumber())

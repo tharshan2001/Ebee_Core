@@ -6,9 +6,11 @@ import com.ebee.commission.dto.CommissionRequest;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.entity.CommissionConfig;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
 public interface CommissionMapper {
@@ -27,6 +29,7 @@ public interface CommissionMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateConfigFromRequest(CommissionConfigRequest request, @MappingTarget CommissionConfig config);
 
     CommissionConfigResponse toConfigResponse(CommissionConfig config);

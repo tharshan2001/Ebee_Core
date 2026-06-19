@@ -106,25 +106,13 @@ class CommissionCalculationServiceTest {
     }
 
     @Test
-    void calculateCommissionForOrder_noConfig_usesAgentRate() {
+    void calculateCommissionForOrder_noConfig_throws() {
         when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT))
                 .thenReturn(Optional.empty());
 
-        Commission commission = Commission.builder()
-                .id(UUID.randomUUID())
-                .agent(agent)
-                .order(order)
-                .orderAmount(order.getTotalAmount())
-                .commissionRate(BigDecimal.valueOf(agent.getCommissionRate()))
-                .commissionAmount(new BigDecimal("750.00"))
-                .status(CommissionStatus.CALCULATED)
-                .build();
-        when(commissionRepository.save(any())).thenReturn(commission);
-
-        Commission result = commissionCalculationService.calculateCommissionForOrder(order);
-
-        assertThat(result.getCommissionAmount()).isEqualByComparingTo(new BigDecimal("750.00"));
-        assertThat(result.getCommissionRate()).isEqualByComparingTo(BigDecimal.valueOf(7.5));
+        assertThatThrownBy(() -> commissionCalculationService.calculateCommissionForOrder(order))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No active default commission config found");
     }
 
     @Test
@@ -196,14 +184,21 @@ class CommissionCalculationServiceTest {
         CommissionCalculateRequest request = new CommissionCalculateRequest();
         request.setOrderId(order.getId());
 
+        CommissionConfig config = CommissionConfig.builder()
+                .commissionRate(7.5)
+                .type(CommissionType.DEFAULT)
+                .isActive(true)
+                .build();
+
         when(commissionRepository.existsByOrderId(order.getId())).thenReturn(false);
         when(orderRepository.findById(request.getOrderId())).thenReturn(Optional.of(order));
-        when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)).thenReturn(Optional.empty());
+        when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)).thenReturn(Optional.of(config));
 
         Commission commission = Commission.builder()
                 .id(UUID.randomUUID())
                 .agent(agent)
                 .order(order)
+                .config(config)
                 .orderAmount(order.getTotalAmount())
                 .commissionRate(BigDecimal.valueOf(7.5))
                 .commissionAmount(new BigDecimal("750.00"))

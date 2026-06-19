@@ -74,6 +74,11 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
     @Query("SELECT c FROM Commission c WHERE c.status = 'APPROVED' AND c.approvedAt IS NOT NULL AND c.approvedAt <= :threshold")
     List<Commission> findApprovedCommissionsOlderThan(@Param("threshold") LocalDateTime threshold);
 
+    @Query("SELECT c FROM Commission c WHERE c.config.id = :configId AND c.status IN :statuses")
+    List<Commission> findByConfigIdAndStatusIn(
+            @Param("configId") UUID configId,
+            @Param("statuses") List<CommissionStatus> statuses);
+
     @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.status = :status")
     BigDecimal sumCommissionAmountByStatus(@Param("status") CommissionStatus status);
 

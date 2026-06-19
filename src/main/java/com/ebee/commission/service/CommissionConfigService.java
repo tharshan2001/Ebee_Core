@@ -5,12 +5,17 @@ import com.ebee.commission.dto.CommissionConfigResponse;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.mapper.CommissionMapper;
+import com.ebee.commission.entity.Commission;
+import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.repository.CommissionConfigRepository;
+import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +26,7 @@ import java.util.UUID;
 public class CommissionConfigService {
 
     private final CommissionConfigRepository configRepository;
+    private final CommissionRepository commissionRepository;
     private final CommissionMapper mapper;
 
     @Transactional
@@ -37,8 +43,12 @@ public class CommissionConfigService {
     @Transactional
     public CommissionConfigResponse updateConfig(UUID id, CommissionConfigRequest request) {
         CommissionConfig config = getConfigEntity(id);
+        Double previousRate = config.getCommissionRate();
         mapper.updateConfigFromRequest(request, config);
         config = configRepository.save(config);
+        if (config.getType() == CommissionType.DEFAULT && rateChanged(previousRate, request.getCommissionRate())) {
+            recalculateLinkedCommissions(config);
+        }
         return mapper.toConfigResponse(config);
     }
 
@@ -89,17 +99,51 @@ public class CommissionConfigService {
         CommissionConfig config;
         if (existing.isPresent()) {
             config = existing.get();
+            Double previousRate = config.getCommissionRate();
             mapper.updateConfigFromRequest(request, config);
+            config.setType(CommissionType.DEFAULT);
+            if (config.getMinAmount() == null) config.setMinAmount(0.0);
+            config = configRepository.save(config);
+            if (rateChanged(previousRate, request.getCommissionRate())) {
+                recalculateLinkedCommissions(config);
+            }
         } else {
             config = mapper.toConfigEntity(request);
             config.setType(CommissionType.DEFAULT);
+            if (config.getEffectiveFrom() == null) {
+                config.setEffectiveFrom(LocalDateTime.now());
+            }
+            config.setIsActive(true);
+            config = configRepository.save(config);
         }
-        if (request.getEffectiveFrom() == null) {
-            config.setEffectiveFrom(LocalDateTime.now());
-        }
-        config.setIsActive(true);
-        config = configRepository.save(config);
         return mapper.toConfigResponse(config);
+    }
+
+    private boolean rateChanged(Double previousRate, Double newRate) {
+        if (previousRate == null && newRate == null) {
+            return false;
+        }
+        if (previousRate == null || newRate == null) {
+            return true;
+        }
+        return !previousRate.equals(newRate);
+    }
+
+    private void recalculateLinkedCommissions(CommissionConfig config) {
+        List<Commission> commissions = commissionRepository.findByConfigIdAndStatusIn(
+                config.getId(), List.of(CommissionStatus.CALCULATED, CommissionStatus.APPROVED));
+
+        BigDecimal newRate = BigDecimal.valueOf(config.getCommissionRate());
+        for (Commission commission : commissions) {
+            BigDecimal amount = commission.getOrderAmount()
+                    .multiply(newRate)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            commission.setCommissionRate(newRate);
+            commission.setCommissionAmount(amount);
+        }
+        if (!commissions.isEmpty()) {
+            commissionRepository.saveAll(commissions);
+        }
     }
 
     private CommissionConfig getConfigEntity(UUID id) {

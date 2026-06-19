@@ -21,6 +21,7 @@ public class AgentResponse {
     private String district;
     private String phoneNumber;
     private Double commissionRate;
+    private Double effectiveCommissionRate;
     private Double totalSales;
     private Double totalCommission;
     private AgentCommissionType commissionType;

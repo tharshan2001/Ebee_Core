@@ -35,7 +35,7 @@ public class CommissionConfigController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> updateConfig(
             @PathVariable UUID id,
-            @Valid @RequestBody CommissionConfigRequest request) {
+            @RequestBody CommissionConfigRequest request) {
         CommissionConfigResponse response = configService.updateConfig(id, request);
         return ResponseEntity.ok(ApiResponse.success("Commission config updated successfully", response));
     }
@@ -86,16 +86,16 @@ public class CommissionConfigController {
     }
 
     @GetMapping("/default")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> getDefaultConfig() {
         CommissionConfigResponse response = configService.getDefaultConfig();
         return ResponseEntity.ok(ApiResponse.success("Default commission config retrieved successfully", response));
     }
 
     @PutMapping("/default")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionConfigResponse>> updateDefaultConfig(
-            @Valid @RequestBody CommissionConfigRequest request) {
+            @RequestBody CommissionConfigRequest request) {
         CommissionConfigResponse response = configService.updateDefaultConfig(request);
         return ResponseEntity.ok(ApiResponse.success("Default commission config updated successfully", response));
     }

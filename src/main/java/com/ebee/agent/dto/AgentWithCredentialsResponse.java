@@ -22,6 +22,7 @@ public class AgentWithCredentialsResponse {
     private String district;
     private String phoneNumber;
     private Double commissionRate;
+    private Double effectiveCommissionRate;
     private String nicNumber;
     private String bankAccountNumber;
     private String bankName;

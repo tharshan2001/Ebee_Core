@@ -93,9 +93,7 @@ public class CommissionCalculationService {
         }
         CommissionConfig config = findApplicableConfig(agent);
 
-        BigDecimal commissionRate = config != null ?
-                BigDecimal.valueOf(config.getCommissionRate()) :
-                BigDecimal.valueOf(agent.getCommissionRate());
+        BigDecimal commissionRate = resolveCommissionRate(agent, config);
 
         BigDecimal commissionAmount = order.getTotalAmount()
                 .multiply(commissionRate)
@@ -120,7 +118,28 @@ public class CommissionCalculationService {
             return null;
         }
 
+        LocalDateTime now = LocalDateTime.now();
         return configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
-                .orElse(null);
+                .filter(config -> isConfigEffective(config, now))
+                .orElseThrow(() -> new IllegalStateException(
+                        "No active default commission config found. " +
+                        "Please configure a default commission rate before creating orders for DEFAULT agents."));
+    }
+
+    private BigDecimal resolveCommissionRate(Agent agent, CommissionConfig config) {
+        if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
+            return BigDecimal.valueOf(agent.getCommissionRate());
+        }
+        return BigDecimal.valueOf(config.getCommissionRate());
+    }
+
+    private boolean isConfigEffective(CommissionConfig config, LocalDateTime now) {
+        if (config.getEffectiveFrom() != null && config.getEffectiveFrom().isAfter(now)) {
+            return false;
+        }
+        if (config.getEffectiveTo() != null && config.getEffectiveTo().isBefore(now)) {
+            return false;
+        }
+        return true;
     }
 }

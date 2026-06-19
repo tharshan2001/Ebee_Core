@@ -35,6 +35,7 @@ public class SuperAdminSeeder implements CommandLineRunner {
 
         User superAdmin = User.builder()
                 .email(properties.getEmail())
+                .phoneNumber(properties.getPhoneNumber())
                 .password(passwordEncoder.encode(properties.getPassword()))
                 .firstName(properties.getFirstName())
                 .lastName(properties.getLastName())

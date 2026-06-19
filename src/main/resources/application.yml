@@ -87,6 +87,7 @@ app:
     dir: ${user.dir}/backups
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:super@ebee.lk}
+    phone-number: ${SUPER_ADMIN_PHONE:}
     password: ${SUPER_ADMIN_PASSWORD:}
     first-name: Super
     last-name: Admin

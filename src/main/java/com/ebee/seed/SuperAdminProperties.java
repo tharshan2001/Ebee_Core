@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class SuperAdminProperties {
 
     private String email;
+    private String phoneNumber;
     private String password;
     private String firstName;
     private String lastName;

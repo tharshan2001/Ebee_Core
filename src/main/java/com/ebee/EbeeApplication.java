@@ -3,10 +3,12 @@ package com.ebee;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 @EnableScheduling
 @EnableRetry
 @EnableSchedulerLock(defaultLockAtMostFor = "10m")

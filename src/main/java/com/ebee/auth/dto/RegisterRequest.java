@@ -1,6 +1,7 @@
 package com.ebee.auth.dto;
 
 import com.ebee.user.enums.RoleType;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,4 +33,9 @@ public class RegisterRequest {
 
     @NotNull(message = "Role is required")
     private RoleType role;
+
+    @AssertTrue(message = "Cannot register as SUPER_ADMIN")
+    public boolean isValidRole() {
+        return role != RoleType.SUPER_ADMIN;
+    }
 }

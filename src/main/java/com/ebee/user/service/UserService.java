@@ -1,6 +1,7 @@
 package com.ebee.user.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
@@ -15,6 +16,7 @@ import com.ebee.user.mapper.UserMapper;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,9 +36,17 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final NotificationPort notificationPort;
+    private final SecurityService securityService;
 
     @Transactional
     public UserResponse createUser(UserRequest request) {
+        if (!securityService.isSuperAdmin() && request.getRole() == RoleType.ADMIN) {
+            throw new AccessDeniedException("Only super admin can create ADMIN users");
+        }
+        if (request.getRole() == RoleType.SUPER_ADMIN) {
+            throw new AccessDeniedException("Cannot create SUPER_ADMIN users");
+        }
+
         request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
@@ -79,6 +89,7 @@ public class UserService {
     public UserResponse getUserById(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        assertAdminNotManagingAdmin(user);
         return userMapper.toResponse(user);
     }
 
@@ -105,6 +116,7 @@ public class UserService {
     public UserResponse updateUser(UUID id, UserUpdateRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        assertAdminNotManagingAdmin(user);
 
         request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (!user.getEmail().equals(request.getEmail()) &&
@@ -126,6 +138,10 @@ public class UserService {
     public void deleteUser(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        assertAdminNotManagingAdmin(user);
+        if (user.getRole() == RoleType.ADMIN) {
+            throw new AccessDeniedException("Cannot deactivate ADMIN users");
+        }
         user.setIsActive(false);
         userRepository.save(user);
     }
@@ -134,9 +150,16 @@ public class UserService {
     public UserResponse activateUser(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        assertAdminNotManagingAdmin(user);
         user.setStatus(UserStatus.ACTIVE);
         user.setIsActive(true);
         return userMapper.toResponse(userRepository.save(user));
+    }
+
+    private void assertAdminNotManagingAdmin(User user) {
+        if (!securityService.isSuperAdmin() && user.getRole() == RoleType.ADMIN) {
+            throw new AccessDeniedException("Only super admin can manage ADMIN users");
+        }
     }
 
     private void encodePasswordIfPresent(User user, String rawPassword) {

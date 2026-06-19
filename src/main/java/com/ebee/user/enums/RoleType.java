@@ -1,5 +1,5 @@
 package com.ebee.user.enums;
 
 public enum RoleType {
-    ADMIN, AGENT, DRIVER
+    SUPER_ADMIN, ADMIN, AGENT, DRIVER
 }

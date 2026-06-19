@@ -85,6 +85,11 @@ notification:
 app:
   backup:
     dir: ${user.dir}/backups
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:super@ebee.lk}
+    password: ${SUPER_ADMIN_PASSWORD:}
+    first-name: Super
+    last-name: Admin
 
 rate-limiting:
   login:

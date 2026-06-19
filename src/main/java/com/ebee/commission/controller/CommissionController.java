@@ -40,7 +40,7 @@ public class CommissionController {
     private final CommissionMapper mapper;
 
     @PostMapping("/calculate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> calculateCommission(
             @Valid @RequestBody CommissionCalculateRequest request) {
         CommissionResponse response = calculationService.calculateCommission(request);
@@ -49,21 +49,21 @@ public class CommissionController {
     }
 
     @PutMapping("/{id}/process")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> markAsProcessing(@PathVariable UUID id) {
         CommissionResponse response = lifecycleService.markAsProcessing(id);
         return ResponseEntity.ok(ApiResponse.success("Commission marked as processing", response));
     }
 
     @PutMapping("/{id}/pay")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> markAsPaid(@PathVariable UUID id) {
         CommissionResponse response = lifecycleService.markAsPaid(id);
         return ResponseEntity.ok(ApiResponse.success("Commission marked as paid", response));
     }
 
     @PutMapping("/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> rejectCommission(
             @PathVariable UUID id,
             @RequestParam String reason) {
@@ -72,7 +72,7 @@ public class CommissionController {
     }
 
     @GetMapping("/agent/{agentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getCommissionsByAgent(
             @PathVariable UUID agentId) {
         List<CommissionResponse> response = queryService.getCommissionsByAgent(agentId);
@@ -80,7 +80,7 @@ public class CommissionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<CommissionResponse>>> getAllCommissions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -97,7 +97,7 @@ public class CommissionController {
     }
 
     @GetMapping("/pending-payment")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PendingPaymentSummary>> getPendingPaymentSummary(
             @RequestParam UUID agentId) {
         PendingPaymentSummary response = queryService.getPendingPaymentSummary(agentId);
@@ -105,7 +105,7 @@ public class CommissionController {
     }
 
     @PostMapping("/pay-batch")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<BatchPaymentResponse>> payBatch(
             @Valid @RequestBody BatchPaymentRequest request) {
         BatchPaymentResponse response = lifecycleService.payBatch(request.getCommissionIds());
@@ -116,7 +116,7 @@ public class CommissionController {
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<CommissionResponse>>> getCommissionsByStatus(
             @PathVariable String status) {
         List<CommissionResponse> response = queryService.getCommissionsByStatus(
@@ -126,7 +126,7 @@ public class CommissionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CommissionResponse>> getCommissionById(@PathVariable UUID id) {
         CommissionResponse response = queryService.getCommissionById(id);
         return ResponseEntity.ok(ApiResponse.success("Commission retrieved successfully", response));

@@ -18,8 +18,9 @@ Authorization: Bearer <JWT_TOKEN>
 ```
 
 **Roles:**
-- `ADMIN` — full access (create, process, pay, reject, read, batch pay)
-- All commission endpoints are ADMIN-only
+- `ADMIN` — full access to commission lifecycle and non-default config CRUD
+- `SUPER_ADMIN` — default commission config only (view and update)
+- All commission endpoints are ADMIN or SUPER_ADMIN only
 
 ---
 
@@ -278,6 +279,8 @@ There is exactly **one** active `DEFAULT` config at any time. This is the global
 
 To give an agent a custom rate, set their `commissionType` to `PERFORMANCE` via PATCH update and set their `commissionRate` directly.
 
+> **Access note:** The `GET /api/commission-configs/default` and `PUT /api/commission-configs/default` endpoints require `SUPER_ADMIN` role. All other commission-config endpoints require `ADMIN`.
+
 ---
 
 ## Endpoints
@@ -306,6 +309,8 @@ To give an agent a custom rate, set their `commissionType` to `PERFORMANCE` via 
 
 **PUT** `/api/commission-configs/default`
 
+**Access:** SUPER_ADMIN only
+
 Creates or updates the single default config. If no default exists, a new one is created. If one exists, it is updated.
 
 ```bash
@@ -323,9 +328,9 @@ curl -X PUT http://localhost:8085/api/commission-configs/default \
 
 ### Shortcut Endpoint
 
-| Endpoint | Description |
-|----------|-------------|
-| **GET** `/api/commission-configs/default` | Returns the single default config object |
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| **GET** `/api/commission-configs/default` | SUPER_ADMIN | Returns the single default config object |
 
 ### Standard CRUD Endpoints
 

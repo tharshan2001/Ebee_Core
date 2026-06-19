@@ -22,6 +22,12 @@ All endpoints (except public ones) require a JWT Bearer token:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
+**Roles:**
+- `SUPER_ADMIN` — manages ADMIN users and default commission config only
+- `ADMIN` — full system access (orders, products, agents, commissions, etc.)
+- `AGENT` — creates orders, views own data
+- `DRIVER` — manages deliveries
+
 **Public endpoints** (no auth required, rate-limited):
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
@@ -41,7 +47,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Module | File | Auth |
 |--------|------|------|
 | Authentication | [AUTH_API.md](AUTH_API.md) | Public (login/refresh) |
-| Users | [USER_API.md](USER_API.md) | ADMIN (mutate), any (read own) |
+| Users | [USER_API.md](USER_API.md) | ADMIN, SUPER_ADMIN (mutate), any (read own) |
 | Profile | [PROFILE_API.md](PROFILE_API.md) | Authenticated users |
 | Products | [PRODUCT_API.md](PRODUCT_API.md) | Public (read), ADMIN (mutate) |
 | Inventory | [INVENTORY_API.md](INVENTORY_API.md) | ADMIN, AGENT (some reads), ADMIN (mutate) |
@@ -51,7 +57,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Customers | [CUSTOMER_API.md](CUSTOMER_API.md) | ADMIN, AGENT |
 | Orders | [ORDER_API.md](ORDER_API.md) | ADMIN, AGENT |
 | Commissions | [COMMISSION_API.md](COMMISSION_API.md) | ADMIN |
-| Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN |
+| Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN (CRUD), SUPER_ADMIN (default only) |
 | Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
 | Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
 | Expenses | [EXPENSE_API.md](EXPENSE_API.md) | ADMIN, AGENT, DRIVER |
@@ -185,6 +191,7 @@ All endpoints return a consistent JSON envelope:
 
 | Resource | Identifier | Notes |
 |----------|-----------|-------|
+| Super Admin | `super@ebee.lk` / set via `SUPER_ADMIN_PASSWORD` | Auto-created on first startup. Manages admins & default commission config. |
 | Admin | `admin@ebee.com` / `admin123` | Must change password on first login |
 | Agent | `JF-008` | PERFORMANCE type, rate 7.5% |
 | Agent | `JF-009` | DEFAULT type, rate 5.0% |
@@ -228,3 +235,5 @@ All secrets are loaded from environment variables (see `.env` in the project roo
 | `DIALOG_SMS_MASK` | SMS sender mask | `KISMET PLUS` |
 | `DIALOG_SMS_CAMPAIGN` | SMS campaign name | `Notification` |
 | `SERVER_PORT` | HTTP server port | `8085` |
+| `SUPER_ADMIN_EMAIL` | Super admin email (auto-created on startup) | `super@ebee.lk` |
+| `SUPER_ADMIN_PASSWORD` | Super admin password (leave empty to skip) | _(empty)_ |

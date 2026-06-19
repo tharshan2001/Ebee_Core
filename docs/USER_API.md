@@ -9,17 +9,47 @@ All endpoints require JWT:
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-**Role:** Most endpoints require `ADMIN`. `GET /me` is accessible to any authenticated user. `GET /{id}` and `PATCH /{id}` are accessible to ADMIN or the user themselves.
+**Roles:**
+- `SUPER_ADMIN` — unrestricted access to all user management endpoints
+- `ADMIN` — can manage `AGENT` and `DRIVER` users only; **cannot** create or manage `ADMIN` users
+- Any authenticated user — `GET /me`, `GET /{id}` (own only), `PATCH /{id}` (own only)
 
 ---
+
+## Super Admin
+
+The `SUPER_ADMIN` role is the highest-privilege role with **unrestricted access** to user management. It is auto-created on first startup via the `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` environment variables. **Only one SUPER_ADMIN can exist** — creation of additional SUPER_ADMIN users is blocked.
+
+### What SUPER_ADMIN Can Do
+
+- **Create** ADMIN, AGENT, or DRIVER users (any role except another SUPER_ADMIN)
+- **List** all users (all roles)
+- **View, update, deactivate, reactivate** any user (any role)
+- **Set the default commission config** (via `PUT /api/commission-configs/default`)
+
+### What SUPER_ADMIN Cannot Do
+
+- Create another SUPER_ADMIN
+- Access any other API module (orders, products, agents, customers, etc.)
+- Register via `POST /api/auth/register` (the `RegisterRequest` DTO rejects `SUPER_ADMIN` role)
+
+### What ADMIN Users Cannot Do
+
+- **Create** or **update** other ADMIN users
+- **Deactivate** or **reactivate** ADMIN users
+- ADMIN users themselves **cannot be deactivated** (permanent)
+
+---
+
+
 
 ## Create User
 
 **POST** `/api/users`
 
-**Access:** ADMIN
+**Access:** ADMIN, SUPER_ADMIN
 
-Creates a new user with the specified role.
+Creates a new user. SUPER_ADMIN can create any role except `SUPER_ADMIN`. ADMIN can only create `AGENT` or `DRIVER` users (cannot create `ADMIN`).
 
 **Request Body:**
 ```json
@@ -41,7 +71,7 @@ Creates a new user with the specified role.
 | `firstName` | Yes | String | User's first name |
 | `lastName` | Yes | String | User's last name |
 | `phoneNumber` | No | String | Phone number |
-| `role` | Yes | `RoleType` | `ADMIN`, `AGENT`, or `DRIVER` |
+| `role` | Yes | `RoleType` | `ADMIN`, `AGENT`, or `DRIVER`. `ADMIN` can only create `AGENT` or `DRIVER`. |
 | `status` | No | `UserStatus` | `ACTIVE`, `INACTIVE`, or `LOCKED` (default: `ACTIVE`) |
 
 **Response (201):**
@@ -72,7 +102,7 @@ Creates a new user with the specified role.
 | `firstName` | `String` | First name |
 | `lastName` | `String` | Last name |
 | `phoneNumber` | `String` | Phone number |
-| `role` | `RoleType` | `ADMIN`, `AGENT`, or `DRIVER` |
+| `role` | `RoleType` | `SUPER_ADMIN`, `ADMIN`, `AGENT`, or `DRIVER` |
 | `status` | `UserStatus` | `ACTIVE`, `INACTIVE`, or `LOCKED` |
 | `isActive` | `Boolean` | Whether user is active |
 | `mustChangePassword` | `Boolean` | Whether password change is required on next login |
@@ -138,7 +168,7 @@ Returns the profile of the currently authenticated user. Overlaps with `GET /api
 
 **GET** `/api/users`
 
-**Access:** ADMIN
+**Access:** ADMIN, SUPER_ADMIN
 
 Returns all users in the system.
 
@@ -157,13 +187,13 @@ Returns all users in the system.
 
 **GET** `/api/users/role/{role}`
 
-**Access:** ADMIN
+**Access:** ADMIN, SUPER_ADMIN
 
 **Path Parameters:**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `role` | `String` | Role name: `ADMIN`, `AGENT`, or `DRIVER` |
+| `role` | `String` | Role name: `ADMIN`, `AGENT`, or `DRIVER`. |
 
 **Response:**
 ```json
@@ -180,7 +210,9 @@ Returns all users in the system.
 
 **PATCH** `/api/users/{id}`
 
-**Access:** ADMIN or the user themselves
+**Access:** ADMIN, SUPER_ADMIN, or the user themselves
+
+ADMIN cannot update other ADMIN users.
 
 Updates user details. The `role` cannot be changed via this endpoint.
 
@@ -219,9 +251,9 @@ Updates user details. The `role` cannot be changed via this endpoint.
 
 **DELETE** `/api/users/{id}`
 
-**Access:** ADMIN
+**Access:** ADMIN, SUPER_ADMIN
 
-Soft-deletes or removes a user.
+Soft-deletes a user by setting `isActive = false`. ADMIN users **cannot** be deactivated (permanent). ADMIN cannot deactivate other ADMIN users.
 
 **Path Parameters:**
 
@@ -244,9 +276,9 @@ Soft-deletes or removes a user.
 
 **PUT** `/api/users/{id}/activate`
 
-**Access:** ADMIN
+**Access:** ADMIN, SUPER_ADMIN
 
-Re-activates a user that was deactivated or locked.
+Re-activates a user that was deactivated or locked. ADMIN cannot reactivate other ADMIN users.
 
 **Path Parameters:**
 
@@ -262,8 +294,8 @@ Re-activates a user that was deactivated or locked.
 
 | HTTP Status | Scenario |
 |-------------|----------|
-| 401 / 403 | Missing or invalid JWT, or insufficient role |
+| 401 / 403 | Missing or invalid JWT, insufficient role, or ADMIN tried to manage an ADMIN user |
 | 404 | User not found |
-| 400 | Validation failure (missing required fields, invalid email format) |
+| 400 | Validation failure (missing required fields, invalid email format, or SUPER_ADMIN creation attempt) |
 | 409 | Email already in use |
 | 500 | Server error |

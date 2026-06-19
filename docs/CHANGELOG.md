@@ -2,7 +2,17 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
-## [Unreleased] — 2026-06-17
+## [Unreleased] — 2026-06-20
+
+### Security Fixes
+
+- **SUPER_ADMIN role hierarchy inverted** — Previously SUPER_ADMIN was restricted to managing only ADMIN users; ADMIN had unrestricted access. Now SUPER_ADMIN has **unrestricted** access to all user management, while ADMIN is **restricted**: cannot create, update, deactivate, or reactivate other ADMIN users. See [USER_API.md](USER_API.md#super-admin).
+- **ADMIN users cannot be deactivated** — `DELETE /api/users/{id}` now blocks deactivation of ADMIN users (permanent role).
+- **ADMIN cannot manage ADMIN users** — `assertAdminNotManagingAdmin` guard added to `getUserById`, `updateUser`, `deleteUser`, and `activateUser`. Only SUPER_ADMIN can manage ADMIN accounts.
+
+### Features
+
+- **SUPER_ADMIN role with auto-seeder** — New `SUPER_ADMIN` role with restricted scope: can only manage ADMIN users (create, list, update, deactivate) and set the default commission config. Auto-created on first startup via `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` env vars. See [USER_API.md](USER_API.md#super-admin) for details.
 
 ### Security Fixes
 

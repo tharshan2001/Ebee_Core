@@ -14,7 +14,9 @@
 
 **POST** `/api/auth/register`
 
-**Access:** ADMIN only (`@PreAuthorize("hasRole('ADMIN')")`)
+**Access:** ADMIN only (`@PreAuthorize("hasRole('ADMIN')")`). SUPER_ADMIN cannot register via this endpoint.
+
+> The `role` field rejects `SUPER_ADMIN` — you cannot register a SUPER_ADMIN account. SUPER_ADMIN accounts are auto-created on first startup via `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` env vars.
 
 **Request:**
 ```json
@@ -79,6 +81,29 @@ Optionally validate the user's role matches by including `role`:
     "role": "ADMIN",
     "mustChangePassword": true,
     "expiresAt": "2026-06-02T22:17:53",
+    "driverId": null,
+    "licenseNumber": null,
+    "contactNumber": null,
+    "driverAvailability": null
+  }
+}
+```
+
+**Response (super admin login — `role: "SUPER_ADMIN"`):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "token": "eyJhbGci...",
+    "refreshToken": "eyJhbGci...",
+    "userId": "uuid",
+    "email": "super@ebee.lk",
+    "firstName": "Super",
+    "lastName": "Admin",
+    "role": "SUPER_ADMIN",
+    "mustChangePassword": false,
+    "expiresAt": "2026-06-18T12:17:34",
     "driverId": null,
     "licenseNumber": null,
     "contactNumber": null,

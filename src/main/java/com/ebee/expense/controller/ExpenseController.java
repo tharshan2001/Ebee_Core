@@ -44,7 +44,7 @@ public class ExpenseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getAllExpenses(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -60,21 +60,21 @@ public class ExpenseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @expenseService.isOwner(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN') or @expenseService.isOwner(#id, authentication)")
     public ResponseEntity<ApiResponse<ExpenseResponse>> getExpenseById(@PathVariable UUID id) {
         ExpenseResponse response = expenseService.getExpenseById(id);
         return ResponseEntity.ok(ApiResponse.success("Expense retrieved successfully", response));
     }
 
     @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> approveExpense(@PathVariable UUID id) {
         ExpenseResponse response = expenseService.approveExpense(id);
         return ResponseEntity.ok(ApiResponse.success("Expense approved successfully", response));
     }
 
     @PutMapping("/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> rejectExpense(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason) {

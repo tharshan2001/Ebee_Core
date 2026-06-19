@@ -30,4 +30,8 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, UUID
     @Modifying(clearAutomatically = true)
     @Query(value = "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP)", nativeQuery = true)
     void insertImage(UUID id, UUID productId, String imageUrl, String imageName, String imageType, Integer sortOrder);
+
+    @Modifying
+    @Query("UPDATE ProductImage pi SET pi.sortOrder = pi.sortOrder - 1 WHERE pi.product.id = :productId AND pi.sortOrder > :deletedSortOrder")
+    void decrementSortOrderAfter(@Param("productId") UUID productId, @Param("deletedSortOrder") Integer deletedSortOrder);
 }

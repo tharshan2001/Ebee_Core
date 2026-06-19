@@ -222,6 +222,7 @@ public class ProductService {
                 productImageRepository.deleteByProductIdAndImageUrl(id, imageUrl);
             }
             product.getImages().removeIf(img -> request.getRemoveImageUrls().contains(img.getImageUrl()));
+            jdbcTemplate.update("UPDATE product_images SET sort_order = s.new_order FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY sort_order) - 1 AS new_order FROM product_images WHERE product_id = ?) s WHERE product_images.id = s.id", id);
             imagesChanged = true;
         }
 
@@ -313,8 +314,10 @@ public class ProductService {
         ProductImage productImage = productImageRepository.findByIdAndProductId(imageId, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductImage", "id", imageId));
         String imageUrl = productImage.getImageUrl();
+        int deletedSortOrder = productImage.getSortOrder();
         s3Service.deleteFile(imageUrl);
         productImageRepository.delete(productImage);
+        productImageRepository.decrementSortOrderAfter(productId, deletedSortOrder);
     }
 
     private ProductResponse toResponseWithRelations(Product product) {

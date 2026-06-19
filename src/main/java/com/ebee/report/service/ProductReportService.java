@@ -30,7 +30,7 @@ public class ProductReportService {
 
     public ProductSummaryReport getSummary() {
         long total = productRepository.count();
-        long active = productRepository.findAll().stream().filter(p -> Boolean.TRUE.equals(p.getIsActive())).count();
+        long active = productRepository.countByIsActiveTrue();
         long inactive = total - active;
         long categories = productRepository.countDistinctCategories();
 

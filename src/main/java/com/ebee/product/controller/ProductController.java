@@ -176,7 +176,8 @@ public class ProductController {
             @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
-            @RequestParam(value = "tags", required = false) String tags) {
+            @RequestParam(value = "tags", required = false) String tags,
+            @RequestParam(value = "removeImageUrls", required = false) List<String> removeImageUrls) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -191,6 +192,7 @@ public class ProductController {
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
+        request.setRemoveImageUrls(removeImageUrls);
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }

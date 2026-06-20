@@ -1,5 +1,6 @@
 package com.ebee.auth.security;
 
+import com.ebee.common.util.RequestUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,7 +31,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = getClientIp(request);
+        String clientIp = RequestUtils.getClientIp(request);
 
         if (!rateLimitingService.isIpAllowed(clientIp)) {
             log.warn("IP rate limit exceeded: {}", clientIp);
@@ -41,17 +42,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        String xri = request.getHeader("X-Real-IP");
-        if (xri != null && !xri.isBlank()) {
-            return xri;
-        }
-        return request.getRemoteAddr();
     }
 }

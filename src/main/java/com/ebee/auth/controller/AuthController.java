@@ -4,6 +4,7 @@ import com.ebee.auth.dto.*;
 import com.ebee.auth.service.AuthService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.util.RequestUtils;
 import com.ebee.user.dto.UserResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,8 +30,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest,
             HttpServletResponse response) {
-        AuthResponse authResponse = authService.login(request);
+        String clientIp = RequestUtils.getClientIp(servletRequest);
+        AuthResponse authResponse = authService.login(request, clientIp);
 
         addAuthCookies(response, authResponse.getToken(), authResponse.getRefreshToken());
 

@@ -58,9 +58,10 @@ public class AuthService {
     private final DriverRepository driverRepository;
     private final AuditLogService auditLogService;
     private final RateLimitingService rateLimitingService;
+    private final IpWhitelistService ipWhitelistService;
     private final ApplicationEventPublisher eventPublisher;
 
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String clientIp) {
         String email = request.getEmail();
         String loginKey = "login:" + email;
 
@@ -92,6 +93,13 @@ public class AuthService {
             driverRepository.findByUserId(user.getId())
                     .filter(d -> d.getAvailability() == DriverAvailability.SUSPENDED)
                     .ifPresent(d -> { throw new IllegalStateException("Your account has been suspended"); });
+        }
+
+        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.SUPER_ADMIN) {
+            if (!ipWhitelistService.isAllowed(user, clientIp)) {
+                log.warn("Login blocked by IP whitelist: user={} role={} ip={}", email, user.getRole(), clientIp);
+                throw new AccessDeniedException("Your IP is not whitelisted.");
+            }
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);

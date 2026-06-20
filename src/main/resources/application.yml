@@ -91,6 +91,8 @@ app:
     password: ${SUPER_ADMIN_PASSWORD:}
     first-name: Super
     last-name: Admin
+  ip-whitelist:
+    super-admin-ips: ${SUPER_ADMIN_IPS:}
 
 rate-limiting:
   login:

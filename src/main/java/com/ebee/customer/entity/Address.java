@@ -28,16 +28,16 @@ public class Address {
     @JoinColumn(name = "customer_id", nullable = false, unique = true)
     private Customer customer;
 
-    @Column(length = 255)
+    @Column(nullable = false, length = 255)
     private String street;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private String city;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private District district;
 
-    @Column(name = "postal_code", length = 20)
+    @Column(name = "postal_code", nullable = false, length = 20)
     private String postalCode;
 
     @CreationTimestamp

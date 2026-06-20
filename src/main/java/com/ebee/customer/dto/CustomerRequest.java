@@ -21,5 +21,6 @@ public class CustomerRequest {
     private String email;
 
     @Valid
+    @jakarta.validation.constraints.NotNull(message = "Address is required")
     private AddressRequest address;
 }

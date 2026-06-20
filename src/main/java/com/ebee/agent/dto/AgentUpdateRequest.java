@@ -19,8 +19,10 @@ public class AgentUpdateRequest {
 
     private AgentCommissionType commissionType;
 
+    @NotBlank(message = "Address is required")
     private String address;
 
+    @NotBlank(message = "District is required")
     private String district;
 
     private String nicNumber;

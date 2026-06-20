@@ -39,7 +39,7 @@ public class Customer {
     @Builder.Default
     private Integer totalOrders = 0;
 
-    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true, optional = false)
     private Address address;
 
     @CreationTimestamp

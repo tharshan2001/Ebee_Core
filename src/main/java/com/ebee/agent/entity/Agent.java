@@ -56,10 +56,10 @@ public class Agent {
     @Builder.Default
     private AgentCommissionType commissionType = AgentCommissionType.DEFAULT;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String address;
 
-    @Column(length = 50)
+    @Column(nullable = false, length = 50)
     private District district;
 
     @Column(name = "nic_number")

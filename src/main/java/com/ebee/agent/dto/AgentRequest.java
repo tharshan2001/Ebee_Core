@@ -19,6 +19,7 @@ public class AgentRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
+    @NotBlank(message = "Address is required")
     private String address;
 
     @NotBlank(message = "District is required")

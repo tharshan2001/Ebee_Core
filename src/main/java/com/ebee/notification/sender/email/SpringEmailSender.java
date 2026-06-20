@@ -51,7 +51,7 @@ public class SpringEmailSender implements EmailSender {
                     .build();
 
         } catch (MessagingException | MailException e) {
-            log.error("Failed to send email to: {}", request.getTo(), e);
+            log.warn("Failed to send email to: {} - {}", request.getTo(), e.getMessage());
             return NotificationResult.builder()
                     .success(false)
                     .message("Failed to send email: " + e.getMessage())

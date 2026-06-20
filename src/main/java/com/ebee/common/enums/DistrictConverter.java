@@ -21,7 +21,7 @@ public class DistrictConverter implements AttributeConverter<District, String> {
         try {
             return District.fromDisplayName(dbData);
         } catch (IllegalArgumentException e) {
-            log.warn("Unknown district value '{}' in database, returning null", dbData);
+            log.debug("Unknown district value '{}' in database, returning null", dbData);
             return null;
         }
     }

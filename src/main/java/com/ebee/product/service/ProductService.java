@@ -22,11 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -115,13 +117,13 @@ public class ProductService {
     }
 
     public Page<ProductResponse> getAllProductsPaginated(Pageable pageable) {
-        return productRepository.findAllWithInventoryAndImages(pageable)
-                .map(this::toResponseWithRelations);
+        Page<UUID> idPage = productRepository.findProductIds(pageable);
+        return toProductResponsePage(idPage, pageable);
     }
 
     public Page<ProductResponse> getActiveProductsPaginated(Pageable pageable) {
-        return productRepository.findAllActiveWithInventoryAndImages(pageable)
-                .map(this::toResponseWithRelations);
+        Page<UUID> idPage = productRepository.findActiveProductIds(pageable);
+        return toProductResponsePage(idPage, pageable);
     }
 
     public java.util.Map<String, Long> getProductStats() {
@@ -133,8 +135,21 @@ public class ProductService {
     }
 
     public Page<ProductResponse> searchProducts(String search, Pageable pageable) {
-        return productRepository.findBySearchTerm(search, pageable)
-                .map(this::toResponseWithRelations);
+        Page<UUID> idPage = productRepository.findProductIdsBySearchTerm(search, pageable);
+        return toProductResponsePage(idPage, pageable);
+    }
+
+    private Page<ProductResponse> toProductResponsePage(Page<UUID> idPage, Pageable pageable) {
+        if (!idPage.hasContent()) {
+            return Page.empty();
+        }
+        List<Product> products = productRepository.findProductsWithRelationsByIds(Set.copyOf(idPage.getContent()));
+        java.util.Map<UUID, Product> productMap = products.stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+        List<ProductResponse> responses = idPage.getContent().stream()
+                .map(id -> toResponseWithRelations(productMap.get(id)))
+                .toList();
+        return new PageImpl<>(responses, pageable, idPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)

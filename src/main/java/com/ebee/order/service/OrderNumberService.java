@@ -15,7 +15,7 @@ public class OrderNumberService {
 
     private final OrderRepository orderRepository;
 
-    public String generateOrderNumber(District district, OrderSource source) {
+    public synchronized String generateOrderNumber(District district, OrderSource source) {
         String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String type = source == OrderSource.DIRECT ? "D" : "A";
         String prefix = district.name() + "-" + type;

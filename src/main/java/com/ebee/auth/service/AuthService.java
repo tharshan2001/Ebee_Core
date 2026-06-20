@@ -98,7 +98,7 @@ public class AuthService {
         if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.SUPER_ADMIN) {
             if (!ipWhitelistService.isAllowed(user, clientIp)) {
                 log.warn("Login blocked by IP whitelist: user={} role={} ip={}", email, user.getRole(), clientIp);
-                throw new AccessDeniedException("Your IP is not whitelisted.");
+                throw new AccessDeniedException("Access denied.");
             }
         }
 

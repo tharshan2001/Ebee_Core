@@ -28,8 +28,19 @@ public class SuperAdminSeeder implements CommandLineRunner {
             return;
         }
 
-        if (userRepository.findByEmail(properties.getEmail()).isPresent()) {
-            log.info("Super admin already exists: {}", properties.getEmail());
+        User existing = userRepository.findByEmail(properties.getEmail()).orElse(null);
+        if (existing != null) {
+            boolean updated = false;
+            if (properties.getPhoneNumber() != null && !properties.getPhoneNumber().equals(existing.getPhoneNumber())) {
+                existing.setPhoneNumber(properties.getPhoneNumber());
+                updated = true;
+            }
+            if (updated) {
+                userRepository.save(existing);
+                log.info("Super admin updated: {} phone={}", existing.getEmail(), existing.getPhoneNumber());
+            } else {
+                log.info("Super admin already exists: {}", properties.getEmail());
+            }
             return;
         }
 
@@ -43,6 +54,7 @@ public class SuperAdminSeeder implements CommandLineRunner {
                 .status(UserStatus.ACTIVE)
                 .isActive(true)
                 .mustChangePassword(false)
+                .loginAlertsEnabled(true)
                 .passwordChangedAt(LocalDateTime.now())
                 .build();
 

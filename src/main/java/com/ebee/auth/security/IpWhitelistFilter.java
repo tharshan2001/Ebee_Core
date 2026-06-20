@@ -49,7 +49,7 @@ public class IpWhitelistFilter extends OncePerRequestFilter {
                     response.setStatus(HttpStatus.FORBIDDEN.value());
                     response.setContentType("application/json");
                     response.getWriter().write(
-                            "{\"success\":false,\"message\":\"Access denied. Your IP is not whitelisted.\"}");
+                            "{\"success\":false,\"message\":\"Access denied.\"}");
                     return;
                 }
             }

@@ -50,7 +50,8 @@ public class IpWhitelistService {
                         user.getEmail(), user.getId(), ip);
                 return false;
             }
-            return entries.stream().anyMatch(e -> e.getIpAddress().equals(ip));
+            String normalizedIp = ip.replace("0:0:0:0:0:0:0:1", "::1");
+            return entries.stream().anyMatch(e -> e.getIpAddress().equals(ip) || e.getIpAddress().equals(normalizedIp));
         }
 
         return true;

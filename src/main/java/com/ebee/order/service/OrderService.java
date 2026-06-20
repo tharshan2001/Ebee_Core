@@ -356,7 +356,7 @@ public class OrderService {
         Throwable cause = ex.getMostSpecificCause();
         if (cause == null) return false;
         String msg = cause.getMessage();
-        return msg != null && msg.contains("uk_orders_order_number");
+        return msg != null && (msg.contains("uk_orders_order_number") || msg.contains("orders_order_number_key"));
     }
 
 }

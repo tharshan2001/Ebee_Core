@@ -37,6 +37,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p.id FROM Product p ORDER BY p.createdAt DESC")
     Page<UUID> findProductIds(Pageable pageable);
 
+    @Query("SELECT p.id FROM Product p WHERE p.category = :category ORDER BY p.createdAt DESC")
+    Page<UUID> findProductIdsByCategory(@Param("category") String category, Pageable pageable);
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.id IN :ids")
     List<Product> findProductsWithRelationsByIds(@Param("ids") Set<UUID> ids);
 
@@ -59,6 +62,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true ORDER BY p.createdAt DESC")
     Page<UUID> findActiveProductIds(Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.category = :category ORDER BY p.createdAt DESC")
+    Page<UUID> findActiveProductIdsByCategory(@Param("category") String category, Pageable pageable);
 
     long countByIsActiveTrue();
 

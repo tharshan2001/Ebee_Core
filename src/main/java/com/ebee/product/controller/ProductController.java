@@ -93,7 +93,9 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String stock) {
 
         String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
         Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
@@ -105,7 +107,7 @@ public class ProductController {
 
         Page<ProductResponse> productsPage = search != null && !search.trim().isEmpty()
                 ? productService.searchProducts(search.trim(), pageable)
-                : productService.getAllProductsPaginated(pageable);
+                : productService.getAllProductsPaginated(pageable, category, stock);
 
         PageResponse<ProductResponse> response = new PageResponse<>(
                 productsPage.getContent(),
@@ -130,7 +132,9 @@ public class ProductController {
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getActiveProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String stock) {
 
         String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
         Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
@@ -140,7 +144,7 @@ public class ProductController {
                 PaginationUtils.safeSize(size),
                 Sort.by(direction, sortField));
 
-        Page<ProductResponse> productsPage = productService.getActiveProductsPaginated(pageable);
+        Page<ProductResponse> productsPage = productService.getActiveProductsPaginated(pageable, category, stock);
 
         PageResponse<ProductResponse> response = new PageResponse<>(
                 productsPage.getContent(),

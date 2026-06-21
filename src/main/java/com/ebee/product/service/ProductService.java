@@ -116,13 +116,23 @@ public class ProductService {
         return buildResponsesWithBatchImages(products);
     }
 
-    public Page<ProductResponse> getAllProductsPaginated(Pageable pageable) {
-        Page<UUID> idPage = productRepository.findProductIds(pageable);
+    public Page<ProductResponse> getAllProductsPaginated(Pageable pageable, String category, String stock) {
+        Page<UUID> idPage;
+        if (category != null && !category.isBlank()) {
+            idPage = productRepository.findProductIdsByCategory(category, pageable);
+        } else {
+            idPage = productRepository.findProductIds(pageable);
+        }
         return toProductResponsePage(idPage, pageable);
     }
 
-    public Page<ProductResponse> getActiveProductsPaginated(Pageable pageable) {
-        Page<UUID> idPage = productRepository.findActiveProductIds(pageable);
+    public Page<ProductResponse> getActiveProductsPaginated(Pageable pageable, String category, String stock) {
+        Page<UUID> idPage;
+        if (category != null && !category.isBlank()) {
+            idPage = productRepository.findActiveProductIdsByCategory(category, pageable);
+        } else {
+            idPage = productRepository.findActiveProductIds(pageable);
+        }
         return toProductResponsePage(idPage, pageable);
     }
 

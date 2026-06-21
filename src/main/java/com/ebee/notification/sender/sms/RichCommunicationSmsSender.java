@@ -37,7 +37,7 @@ public class RichCommunicationSmsSender implements SmsSender {
     @Override
     public NotificationResult send(SmsRequest request) {
         try {
-            String digest = md5(properties.getSms().getPassword());
+            String digest = sha256(properties.getSms().getPassword());
             String created = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
             HttpHeaders headers = new HttpHeaders();
@@ -108,13 +108,13 @@ public class RichCommunicationSmsSender implements SmsSender {
         return PhoneUtils.forSms(phone);
     }
 
-    private String md5(String value) {
+    private String sha256(String value) {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(value.getBytes());
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest).toLowerCase();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("MD5 algorithm not available", e);
+            throw new RuntimeException("SHA-256 algorithm not available", e);
         }
     }
 }

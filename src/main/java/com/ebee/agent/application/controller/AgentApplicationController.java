@@ -44,8 +44,8 @@ public class AgentApplicationController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
-        return ResponseEntity.ok(ApiResponse.success("Application deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 }

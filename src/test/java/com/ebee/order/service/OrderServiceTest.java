@@ -107,7 +107,7 @@ class OrderServiceTest {
                 .id(UUID.randomUUID())
                 .user(agentUser)
                 .agentCode("JF-008")
-                .commissionRate(7.5)
+                .commissionRate(BigDecimal.valueOf(7.5))
                 .isActive(true)
                 .build();
 

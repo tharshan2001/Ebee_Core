@@ -128,9 +128,9 @@ public class CommissionCalculationService {
 
     private BigDecimal resolveCommissionRate(Agent agent, CommissionConfig config) {
         if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
-            return BigDecimal.valueOf(agent.getCommissionRate());
+            return agent.getCommissionRate();
         }
-        return BigDecimal.valueOf(config.getCommissionRate());
+        return config.getCommissionRate();
     }
 
     private boolean isConfigEffective(CommissionConfig config, LocalDateTime now) {

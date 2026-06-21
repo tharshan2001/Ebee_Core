@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -52,8 +53,12 @@ public class ReminderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ReminderResponse>> getReminder(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ReminderResponse>> getReminder(@PathVariable UUID id, Authentication authentication) {
         ReminderResponse response = reminderService.getReminderById(id);
+        UUID currentUserId = getUserId(authentication);
+        if (!response.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("You do not have access to this reminder");
+        }
         return ResponseEntity.ok(ApiResponse.success("Reminder retrieved successfully", response));
     }
 
@@ -70,19 +75,35 @@ public class ReminderController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ReminderResponse>> updateReminder(
             @PathVariable UUID id,
-            @Valid @RequestBody ReminderRequest request) {
+            @Valid @RequestBody ReminderRequest request,
+            Authentication authentication) {
+        ReminderResponse existing = reminderService.getReminderById(id);
+        UUID currentUserId = getUserId(authentication);
+        if (!existing.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("You do not have access to this reminder");
+        }
         ReminderResponse response = reminderService.updateReminder(id, request);
         return ResponseEntity.ok(ApiResponse.success("Reminder updated successfully", response));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteReminder(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteReminder(@PathVariable UUID id, Authentication authentication) {
+        ReminderResponse existing = reminderService.getReminderById(id);
+        UUID currentUserId = getUserId(authentication);
+        if (!existing.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("You do not have access to this reminder");
+        }
         reminderService.deleteReminder(id);
-        return ResponseEntity.ok(ApiResponse.success("Reminder deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/complete")
-    public ResponseEntity<ApiResponse<ReminderResponse>> completeReminder(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<ReminderResponse>> completeReminder(@PathVariable UUID id, Authentication authentication) {
+        ReminderResponse existing = reminderService.getReminderById(id);
+        UUID currentUserId = getUserId(authentication);
+        if (!existing.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("You do not have access to this reminder");
+        }
         ReminderResponse response = reminderService.completeReminder(id);
         return ResponseEntity.ok(ApiResponse.success("Reminder completed successfully", response));
     }

@@ -59,6 +59,6 @@ public class SuperAdminSeeder implements CommandLineRunner {
                 .build();
 
         userRepository.save(superAdmin);
-        log.info("Super admin created: {} / {}", properties.getEmail(), properties.getPassword());
+        log.info("Super admin created: {}", properties.getEmail());
     }
 }

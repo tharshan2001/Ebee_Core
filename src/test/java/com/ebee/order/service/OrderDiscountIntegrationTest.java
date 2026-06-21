@@ -99,7 +99,7 @@ class OrderDiscountIntegrationTest {
                 .id(UUID.randomUUID())
                 .user(agentUser)
                 .agentCode("JF-008")
-                .commissionRate(10.0)
+                .commissionRate(BigDecimal.valueOf(10.0))
                 .isActive(true)
                 .build();
 

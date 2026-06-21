@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortUtils;
 import com.ebee.common.util.SortableFields;
 
 import java.math.BigDecimal;
@@ -97,27 +97,16 @@ public class ProductController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String stock) {
 
-        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
-        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
-                Sort.by(direction, sortField));
+                SortUtils.parse(sort, SortableFields.AllowedFor.PRODUCT));
 
         Page<ProductResponse> productsPage = search != null && !search.trim().isEmpty()
-                ? productService.searchProducts(search.trim(), pageable)
+                ? productService.searchProducts(search.trim(), pageable, category, stock)
                 : productService.getAllProductsPaginated(pageable, category, stock);
 
-        PageResponse<ProductResponse> response = new PageResponse<>(
-                productsPage.getContent(),
-                productsPage.getNumber(),
-                productsPage.getSize(),
-                productsPage.getTotalElements(),
-                productsPage.getTotalPages(),
-                productsPage.isFirst(),
-                productsPage.isLast()
-        );
+        PageResponse<ProductResponse> response = PageResponse.from(productsPage);
 
         return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
     }
@@ -136,25 +125,14 @@ public class ProductController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String stock) {
 
-        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.PRODUCT);
-        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
-                Sort.by(direction, sortField));
+                SortUtils.parse(sort, SortableFields.AllowedFor.PRODUCT));
 
         Page<ProductResponse> productsPage = productService.getActiveProductsPaginated(pageable, category, stock);
 
-        PageResponse<ProductResponse> response = new PageResponse<>(
-                productsPage.getContent(),
-                productsPage.getNumber(),
-                productsPage.getSize(),
-                productsPage.getTotalElements(),
-                productsPage.getTotalPages(),
-                productsPage.isFirst(),
-                productsPage.isLast()
-        );
+        PageResponse<ProductResponse> response = PageResponse.from(productsPage);
 
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
@@ -225,12 +203,12 @@ public class ProductController {
 
     @DeleteMapping("/{productId}/images/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteProductImage(
+    public ResponseEntity<Void> deleteProductImage(
             @PathVariable UUID productId,
             @PathVariable UUID imageId) {
 
         productService.deleteProductImage(productId, imageId);
-        return ResponseEntity.ok(ApiResponse.success("Product image deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/activate")
@@ -240,11 +218,18 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Product activated successfully", response));
     }
 
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deactivateProduct(@PathVariable UUID id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok(ApiResponse.success("Product deactivated successfully", null));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
         productService.deleteProduct(id);
-        return ResponseEntity.ok(ApiResponse.success("Product deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 
     private void validate(ProductRequest request) {

@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +26,17 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OtpServiceTest {
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
@@ -42,7 +55,7 @@ class OtpServiceTest {
     void verifyOtp_validOtp_returnsTrue() {
         String email = "user@ebee.com";
         when(redisTemplate.hasKey("otp:attempts:" + email)).thenReturn(false);
-        when(valueOps.get("otp:" + email)).thenReturn("123456");
+        when(valueOps.get("otp:" + email)).thenReturn(sha256Hex("123456"));
 
         boolean result = otpService.verifyOtp(email, "123456");
 
@@ -55,7 +68,7 @@ class OtpServiceTest {
     void verifyOtp_wrongOtp_returnsFalseAndIncrementsAttempts() {
         String email = "user@ebee.com";
         when(redisTemplate.hasKey("otp:attempts:" + email)).thenReturn(false);
-        when(valueOps.get("otp:" + email)).thenReturn("123456");
+        when(valueOps.get("otp:" + email)).thenReturn(sha256Hex("123456"));
         when(valueOps.increment("otp:attempts:" + email)).thenReturn(1L);
 
         boolean result = otpService.verifyOtp(email, "000000");
@@ -69,7 +82,7 @@ class OtpServiceTest {
     void verifyOtp_wrongOtp_reachesMaxAttempts_invalidatesOtp() {
         String email = "user@ebee.com";
         when(redisTemplate.hasKey("otp:attempts:" + email)).thenReturn(false);
-        when(valueOps.get("otp:" + email)).thenReturn("123456");
+        when(valueOps.get("otp:" + email)).thenReturn(sha256Hex("123456"));
         when(valueOps.increment("otp:attempts:" + email)).thenReturn(5L);
 
         boolean result = otpService.verifyOtp(email, "000000");
@@ -98,7 +111,7 @@ class OtpServiceTest {
         String email = "user@ebee.com";
         when(redisTemplate.hasKey("otp:attempts:" + email)).thenReturn(true);
         when(valueOps.get("otp:attempts:" + email)).thenReturn("3");
-        when(valueOps.get("otp:" + email)).thenReturn("123456");
+        when(valueOps.get("otp:" + email)).thenReturn(sha256Hex("123456"));
 
         boolean result = otpService.verifyOtp(email, "123456");
 

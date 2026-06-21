@@ -30,6 +30,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,6 +54,7 @@ class AuthServiceTest {
     @Mock private DriverRepository driverRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private RateLimitingService rateLimitingService;
+    @Mock private IpWhitelistService ipWhitelistService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private AuthService authService;
@@ -87,10 +90,11 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(true);
+        when(ipWhitelistService.isAllowed(any(), anyString())).thenReturn(true);
         when(jwtService.generateToken(any(Authentication.class))).thenReturn("access-token");
         when(jwtService.generateRefreshToken(any(Authentication.class))).thenReturn("refresh-token");
 
-        var response = authService.login(request);
+        var response = authService.login(request, "127.0.0.1");
 
         assertThat(response.getToken()).isEqualTo("access-token");
         assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
@@ -114,7 +118,7 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Invalid role for login");
     }
@@ -129,7 +133,7 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
@@ -141,7 +145,7 @@ class AuthServiceTest {
 
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Too many login attempts");
     }
@@ -154,7 +158,7 @@ class AuthServiceTest {
 
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Too many login attempts");
 
@@ -181,7 +185,7 @@ class AuthServiceTest {
                 .build();
         when(driverRepository.findByUserId(user.getId())).thenReturn(Optional.of(driver));
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("suspended");
     }
@@ -198,12 +202,27 @@ class AuthServiceTest {
         when(authentication.getPrincipal()).thenReturn(new UserPrincipal(user));
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         when(rateLimitingService.isLoginAllowed(anyString())).thenReturn(true);
+        when(ipWhitelistService.isAllowed(any(), anyString())).thenReturn(true);
         when(jwtService.generateToken(any())).thenReturn("token");
         when(jwtService.generateRefreshToken(any())).thenReturn("refresh");
 
-        var response = authService.login(request);
+        var response = authService.login(request, "127.0.0.1");
 
         assertThat(response.getMustChangePassword()).isTrue();
+    }
+
+    private String sha256Hex(String value) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(value.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test
@@ -271,6 +290,8 @@ class AuthServiceTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(jwtService.generateToken(any(Authentication.class))).thenReturn("new-access-token");
         when(jwtService.generateRefreshToken(any(Authentication.class))).thenReturn("new-refresh-token");
+
+        user.setRefreshTokenHash(sha256Hex(refreshToken));
 
         var response = authService.refreshToken(refreshToken);
 

@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NotificationTemplateService {
 
     private static final String TEMPLATE_PREFIX = "classpath:templates/notification/";
+    private static final Set<String> SAFE_UNESCAPED_KEYS = Set.of("link", "buttonText");
 
     private final ResourceLoader resourceLoader;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
@@ -39,7 +40,9 @@ public class NotificationTemplateService {
         String raw = loadWithCache(templateName);
         String resolved = raw;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            if (entry.getValue() == null) continue;
             String safe = HtmlUtils.htmlEscape(entry.getValue());
+            // NOTE: String.replace is used for simplicity. For high-throughput template rendering, consider a proper template engine.
             resolved = resolved.replace("{{" + entry.getKey() + "}}", safe);
         }
         return resolved;
@@ -75,12 +78,14 @@ public class NotificationTemplateService {
 
         String resolved = content;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            if (entry.getValue() == null) continue;
             String value;
-            if (channel == NotificationChannel.EMAIL && !unescapedKeys.contains(entry.getKey())) {
+            if (channel == NotificationChannel.EMAIL && !SAFE_UNESCAPED_KEYS.contains(entry.getKey())) {
                 value = HtmlUtils.htmlEscape(entry.getValue());
             } else {
                 value = entry.getValue();
             }
+            // NOTE: String.replace is used for simplicity. For high-throughput template rendering, consider a proper template engine.
             resolved = resolved.replace("{{" + entry.getKey() + "}}", value);
         }
         return resolved;

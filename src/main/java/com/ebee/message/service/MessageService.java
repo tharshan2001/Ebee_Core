@@ -8,6 +8,7 @@ import com.ebee.message.entity.MessageRecipient;
 import com.ebee.message.enums.MessageTargetType;
 import com.ebee.message.repository.MessageRecipientRepository;
 import com.ebee.message.repository.MessageRepository;
+import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import jakarta.annotation.PostConstruct;
@@ -53,8 +54,6 @@ public class MessageService {
                 .totalRecipients(0)
                 .build();
 
-        message = messageRepository.save(message);
-
         RecipientResolver resolver = resolverMap.get(request.getTargetType());
         if (resolver == null) {
             throw new IllegalArgumentException("Unsupported target type: " + request.getTargetType());
@@ -62,9 +61,10 @@ public class MessageService {
 
         List<MessageRecipient> recipients = resolver.resolve(message, RecipientResolutionContext.from(request));
 
-        recipientRepository.saveAll(recipients);
         message.setTotalRecipients(recipients.size());
-        messageRepository.save(message);
+        message = messageRepository.save(message);
+
+        recipientRepository.saveAll(recipients);
 
         eventPublisher.publishEvent(message);
 
@@ -95,10 +95,10 @@ public class MessageService {
     @Transactional(readOnly = true)
     public MessageResponse getMessageWithRecipients(UUID messageId, User admin, Pageable pageable) {
         Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
 
         if (!isSuperAdmin(admin) && !message.getSentBy().getId().equals(admin.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
         }
 
         Page<MessageRecipient> recipientPage = recipientRepository.findByMessageId(messageId, pageable);

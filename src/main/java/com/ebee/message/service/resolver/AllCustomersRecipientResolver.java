@@ -26,6 +26,7 @@ public class AllCustomersRecipientResolver implements RecipientResolver {
 
     @Override
     public List<MessageRecipient> resolve(Message message, RecipientResolutionContext context) {
+        // TODO: For large customer bases, use paginated or streaming queries instead of loading all into memory
         return customerRepository.findAll().stream()
                 .map(customer -> buildRecipient(message, customer))
                 .toList();

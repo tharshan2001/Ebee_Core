@@ -1,6 +1,7 @@
 package com.ebee.auth.security;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,11 @@ public class RateLimitingService {
     @PostConstruct
     void startCleaner() {
         cleaner.scheduleAtFixedRate(this::cleanup, 1, 1, TimeUnit.MINUTES);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        cleaner.shutdown();
     }
 
     public boolean isLoginAllowed(String key) {

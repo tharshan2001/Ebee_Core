@@ -4,17 +4,43 @@ import java.security.SecureRandom;
 
 public final class PasswordGenerator {
 
-    private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*()_+";
-    private static final int LENGTH = 12;
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
+    private static final String UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String DIGITS = "0123456789";
+    private static final String SPECIAL = "!@#$%^&*()-_=+";
 
     private PasswordGenerator() {}
 
     public static String generate() {
-        StringBuilder password = new StringBuilder(LENGTH);
-        for (int i = 0; i < LENGTH; i++) {
-            password.append(CHARS.charAt(RANDOM.nextInt(CHARS.length())));
+        return generate(12);
+    }
+
+    public static String generate(int length) {
+        if (length < 4) length = 8;
+        SecureRandom random = new SecureRandom();
+        StringBuilder password = new StringBuilder(length);
+
+        // Guarantee at least one from each class
+        password.append(LOWERCASE.charAt(random.nextInt(LOWERCASE.length())));
+        password.append(UPPERCASE.charAt(random.nextInt(UPPERCASE.length())));
+        password.append(DIGITS.charAt(random.nextInt(DIGITS.length())));
+        password.append(SPECIAL.charAt(random.nextInt(SPECIAL.length())));
+
+        // Fill remaining with all characters
+        String all = LOWERCASE + UPPERCASE + DIGITS + SPECIAL;
+        for (int i = 4; i < length; i++) {
+            password.append(all.charAt(random.nextInt(all.length())));
         }
-        return password.toString();
+
+        // Shuffle to avoid predictable prefix pattern
+        char[] chars = password.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char temp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = temp;
+        }
+
+        return new String(chars);
     }
 }

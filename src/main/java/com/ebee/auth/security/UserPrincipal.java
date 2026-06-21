@@ -41,12 +41,12 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return user.getStatus() != UserStatus.LOCKED;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return !user.getMustChangePassword();
     }
 
     @Override

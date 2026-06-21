@@ -54,8 +54,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query(value = "SELECT p.category, COUNT(DISTINCT p.id), COALESCE(SUM(oi.quantity), 0), COALESCE(SUM(oi.subtotal), 0) FROM products p LEFT JOIN order_items oi ON oi.product_id = p.id LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY p.category ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC", nativeQuery = true)
     List<Object[]> findProductCategorySummary(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 
-    @Query("SELECT p.id FROM Product p WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true ORDER BY p.createdAt DESC")
+    @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.isActive = true ORDER BY p.createdAt DESC")
     Page<UUID> findProductIdsBySearchTerm(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.category = :category AND p.isActive = true ORDER BY p.createdAt DESC")
+    Page<UUID> findProductIdsBySearchTermAndCategory(@Param("search") String search, @Param("category") String category, Pageable pageable);
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
     List<Product> findBySearchTerm(@Param("search") String search);

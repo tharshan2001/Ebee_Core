@@ -1,7 +1,9 @@
 package com.ebee.commission.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.commission.dto.BatchPaymentRequest;
 import com.ebee.commission.dto.BatchPaymentResponse;
@@ -19,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -81,25 +82,22 @@ public class CommissionController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Page<CommissionResponse>>> getAllCommissions(
+    public ResponseEntity<ApiResponse<PageResponse<CommissionResponse>>> getAllCommissions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "calculatedAt,desc") String sort) {
-        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.COMMISSION);
-        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
-                Sort.by(direction, sortField));
-        Page<CommissionResponse> response = queryService.getAllCommissions(pageable);
-        return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
+                SortUtils.parse(sort, SortableFields.AllowedFor.COMMISSION));
+        Page<CommissionResponse> commissionPage = queryService.getAllCommissions(pageable);
+        return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", PageResponse.from(commissionPage)));
     }
 
-    @GetMapping("/pending-payment")
+    @GetMapping("/pending-payment/{agentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PendingPaymentSummary>> getPendingPaymentSummary(
-            @RequestParam UUID agentId) {
+            @PathVariable UUID agentId) {
         PendingPaymentSummary response = queryService.getPendingPaymentSummary(agentId);
         return ResponseEntity.ok(ApiResponse.success("Pending payment summary retrieved successfully", response));
     }

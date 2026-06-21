@@ -88,7 +88,7 @@ class CommissionLockTest {
                 .user(agentUser)
                 .agentCode("MN-001")
                 .phoneNumber("0771234567")
-                .commissionRate(7.5)
+                .commissionRate(BigDecimal.valueOf(7.5))
                 .isActive(true)
                 .district(District.MN)
                 .commissionType(AgentCommissionType.DEFAULT)

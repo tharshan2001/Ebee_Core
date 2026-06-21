@@ -92,18 +92,18 @@ class ExpenseServiceTest {
     }
 
     @Test
-    void createExpense_asAgent_setsApproved() {
+    void createExpense_asAgent_setsPending() {
         when(securityService.getCurrentUserId()).thenReturn(agent.getId());
         when(userRepository.findById(agent.getId())).thenReturn(Optional.of(agent));
 
-        Expense expense = Expense.builder().id(UUID.randomUUID()).status(ExpenseStatus.APPROVED).build();
+        Expense expense = Expense.builder().id(UUID.randomUUID()).status(ExpenseStatus.PENDING).build();
         when(expenseRepository.save(any())).thenReturn(expense);
         when(expenseMapper.toResponse(expense)).thenReturn(new ExpenseResponse());
 
         expenseService.createExpense(request, null);
 
         verify(expenseRepository).save(expenseCaptor.capture());
-        assertThat(expenseCaptor.getValue().getStatus()).isEqualTo(ExpenseStatus.APPROVED);
+        assertThat(expenseCaptor.getValue().getStatus()).isEqualTo(ExpenseStatus.PENDING);
     }
 
     @Test

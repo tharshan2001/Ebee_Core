@@ -31,6 +31,7 @@ public class MessageDispatcher {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void dispatch(Message message) {
+        // TODO: For large recipient bases, use streaming or paginated queries instead of loading all into memory
         List<MessageRecipient> recipients = recipientRepository.findByMessageId(message.getId(),
                 org.springframework.data.domain.PageRequest.of(0, Integer.MAX_VALUE)).getContent();
 
@@ -66,8 +67,9 @@ public class MessageDispatcher {
 
             recipient.setSentSms(sentSms);
             recipient.setSentEmail(sentEmail);
-            recipientRepository.save(recipient);
         }
+
+        recipientRepository.saveAll(recipients);
 
         log.info("Dispatched message {} to {} recipients", message.getId(), recipients.size());
     }

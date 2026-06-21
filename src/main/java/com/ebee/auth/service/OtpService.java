@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +37,7 @@ public class OtpService {
 
     public void generateAndSendOtp(String email, String purpose) {
         String otp = generateOtp();
-        redisTemplate.opsForValue().set(OTP_KEY_PREFIX + email, otp, OTP_TTL_SECONDS, TimeUnit.SECONDS);
+        redisTemplate.opsForValue().set(OTP_KEY_PREFIX + email, sha256Hex(otp), OTP_TTL_SECONDS, TimeUnit.SECONDS);
 
         User user = userRepository.findByEmail(email).orElse(null);
         String subject = "Ebee - OTP for " + purpose;
@@ -76,8 +78,11 @@ public class OtpService {
             return false;
         }
 
-        if (!storedOtp.equals(otp.trim())) {
+        if (!MessageDigest.isEqual(storedOtp.getBytes(StandardCharsets.UTF_8), sha256Hex(otp.trim()).getBytes(StandardCharsets.UTF_8))) {
             Long attempts = redisTemplate.opsForValue().increment(attemptsKey);
+            if (attempts != null && attempts == 1) {
+                redisTemplate.expire(attemptsKey, 5, TimeUnit.MINUTES);
+            }
             if (attempts != null && attempts >= MAX_OTP_ATTEMPTS) {
                 redisTemplate.expire(attemptsKey, OTP_TTL_SECONDS, TimeUnit.SECONDS);
                 redisTemplate.delete(key);
@@ -89,6 +94,21 @@ public class OtpService {
         redisTemplate.delete(key);
         redisTemplate.delete(attemptsKey);
         return true;
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 
     private String generateOtp() {

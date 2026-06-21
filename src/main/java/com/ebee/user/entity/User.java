@@ -73,6 +73,9 @@ public class User {
     @Column(name = "profile_picture_type")
     private String profilePictureType;
 
+    @Column(name = "refresh_token_hash", length = 64)
+    private String refreshTokenHash;
+
     @Column(name = "login_alerts_enabled", nullable = false)
     @Builder.Default
     private Boolean loginAlertsEnabled = true;

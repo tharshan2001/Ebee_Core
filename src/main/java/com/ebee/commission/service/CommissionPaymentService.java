@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -54,12 +55,12 @@ public class CommissionPaymentService {
                 + commission.getOrder().getOrderNumber() + " paid");
 
         Agent agent = commission.getAgent();
-        agent.setTotalCommission(agent.getTotalCommission() + commission.getCommissionAmount().doubleValue());
-        agent.setTotalSales(agent.getTotalSales() + commission.getOrderAmount().doubleValue());
+        agent.setTotalCommission(agent.getTotalCommission().add(commission.getCommissionAmount()));
+        agent.setTotalSales(agent.getTotalSales().add(commission.getOrderAmount()));
 
         commissionNotificationService.sendCommissionNotification(commission, "Paid",
                 "It has been paid. Total earnings to date: LKR "
-                + String.format("%.2f", agent.getTotalCommission()) + ".");
+                + agent.getTotalCommission().setScale(2, RoundingMode.HALF_UP).toPlainString() + ".");
 
         return mapper.toResponse(commission);
     }
@@ -103,8 +104,8 @@ public class CommissionPaymentService {
             c.setPaidAt(LocalDateTime.now());
 
             Agent agent = c.getAgent();
-            agent.setTotalCommission(agent.getTotalCommission() + c.getCommissionAmount().doubleValue());
-            agent.setTotalSales(agent.getTotalSales() + c.getOrderAmount().doubleValue());
+            agent.setTotalCommission(agent.getTotalCommission() != null ? agent.getTotalCommission().add(c.getCommissionAmount()) : c.getCommissionAmount());
+            agent.setTotalSales(agent.getTotalSales() != null ? agent.getTotalSales().add(c.getOrderAmount()) : c.getOrderAmount());
 
             commissionRepository.save(c);
             auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", c.getId(),
@@ -112,7 +113,7 @@ public class CommissionPaymentService {
                     + c.getOrder().getOrderNumber() + " paid via batch payment");
             commissionNotificationService.sendCommissionNotification(c, "Paid",
                     "It has been paid. Total earnings to date: LKR "
-                    + String.format("%.2f", agent.getTotalCommission()) + ".");
+                    + agent.getTotalCommission().setScale(2, RoundingMode.HALF_UP).toPlainString() + ".");
 
             totalPaid = totalPaid.add(c.getCommissionAmount());
             count++;

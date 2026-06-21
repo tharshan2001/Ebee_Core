@@ -7,8 +7,11 @@ import com.ebee.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +19,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "agents")
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -24,6 +29,7 @@ public class Agent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @EqualsAndHashCode.Include
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,16 +42,16 @@ public class Agent {
     @Column(nullable = false)
     private String phoneNumber;
 
-    @Column(name = "commission_rate", nullable = false)
-    private Double commissionRate;
+    @Column(name = "commission_rate", nullable = false, precision = 10, scale = 2)
+    private BigDecimal commissionRate;
 
-    @Column(name = "total_sales", nullable = false)
+    @Column(name = "total_sales", nullable = false, precision = 12, scale = 2)
     @Builder.Default
-    private Double totalSales = 0.0;
+    private BigDecimal totalSales = BigDecimal.ZERO;
 
-    @Column(name = "total_commission", nullable = false)
+    @Column(name = "total_commission", nullable = false, precision = 12, scale = 2)
     @Builder.Default
-    private Double totalCommission = 0.0;
+    private BigDecimal totalCommission = BigDecimal.ZERO;
 
     @Column(name = "is_active")
     @Builder.Default

@@ -24,6 +24,9 @@ public class RepositoryAuditAspect {
 
     @Around("execution(* org.springframework.data.repository.CrudRepository+.save(..)) && args(entity)")
     public Object aroundSave(ProceedingJoinPoint jp, Object entity) throws Throwable {
+        if (entity instanceof Iterable) {
+            return jp.proceed();
+        }
         if (auditing.get() || entity instanceof AuditLog) {
             return jp.proceed();
         }
@@ -49,6 +52,9 @@ public class RepositoryAuditAspect {
 
     @Around("execution(* org.springframework.data.repository.CrudRepository+.delete(..)) && args(entity)")
     public Object aroundDelete(ProceedingJoinPoint jp, Object entity) throws Throwable {
+        if (entity instanceof Iterable) {
+            return jp.proceed();
+        }
         if (auditing.get() || entity instanceof AuditLog) {
             return jp.proceed();
         }

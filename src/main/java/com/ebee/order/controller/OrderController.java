@@ -13,11 +13,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import com.ebee.common.util.SortUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -80,27 +81,16 @@ public class OrderController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) OrderStatus status) {
 
-        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.ORDER);
-        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
-                Sort.by(direction, sortField));
+                SortUtils.parse(sort, SortableFields.AllowedFor.ORDER));
 
         Page<OrderResponse> ordersPage = status != null
                 ? orderService.getOrdersByStatusPaginated(status, pageable)
                 : orderService.getAllOrdersPaginated(pageable);
 
-        PageResponse<OrderResponse> response = new PageResponse<>(
-                ordersPage.getContent(),
-                ordersPage.getNumber(),
-                ordersPage.getSize(),
-                ordersPage.getTotalElements(),
-                ordersPage.getTotalPages(),
-                ordersPage.isFirst(),
-                ordersPage.isLast()
-        );
+        PageResponse<OrderResponse> response = PageResponse.from(ordersPage);
 
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }

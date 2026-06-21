@@ -35,7 +35,7 @@ public class AuthController {
         String clientIp = RequestUtils.getClientIp(servletRequest);
         AuthResponse authResponse = authService.login(request, clientIp);
 
-        addAuthCookies(response, authResponse.getToken(), authResponse.getRefreshToken());
+        addAuthCookies(response, servletRequest, authResponse.getToken(), authResponse.getRefreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
     }
@@ -93,7 +93,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.refreshToken(refreshToken);
 
-        addAuthCookies(response, authResponse.getToken(), authResponse.getRefreshToken());
+        addAuthCookies(response, request, authResponse.getToken(), authResponse.getRefreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
     }
@@ -115,6 +115,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
+        // TODO: add per-IP rate limiting (e.g., 3 requests per 15 minutes per IP)
         authService.forgotPassword(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success("OTP sent to your email and phone"));
     }
@@ -134,18 +135,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 
-    private void addAuthCookies(HttpServletResponse response, String token, String refreshToken) {
-        addCookie(response, "refresh_token", refreshToken, 7 * 24 * 60 * 60, "/api/auth/refresh");
+    private void addAuthCookies(HttpServletResponse response, HttpServletRequest request, String token, String refreshToken) {
+        addCookie(response, request, "refresh_token", refreshToken, 7 * 24 * 60 * 60, "/api/auth/refresh");
     }
 
     private void clearAuthCookies(HttpServletResponse response) {
-        addCookie(response, "refresh_token", null, 0, "/api/auth/refresh");
+        addCookie(response, null, "refresh_token", null, 0, "/api/auth/refresh");
     }
 
-    private void addCookie(HttpServletResponse response, String name, String value, int maxAge, String path) {
+    private void addCookie(HttpServletResponse response, HttpServletRequest request, String name, String value, int maxAge, String path) {
         Cookie cookie = new Cookie(name, value);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(request != null && request.isSecure());
         cookie.setPath(path);
         cookie.setMaxAge(maxAge);
         cookie.setAttribute("SameSite", "Strict");

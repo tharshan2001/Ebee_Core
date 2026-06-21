@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,9 @@ public class NotificationService implements NotificationPort {
     private final NotificationTemplateService templateService;
     private final AlertRepository alertRepository;
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void sendEmail(EmailRequest request) {
         try {
             emailSender.send(request);
@@ -41,7 +44,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void sendSms(SmsRequest request) {
         try {
             smsSender.send(request);
@@ -50,7 +55,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyAgent(Agent agent, String subject, String message) {
         try {
             if (agent.getUser() != null && agent.getUser().getEmail() != null) {
@@ -79,7 +86,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyAgent(Agent agent, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
             String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders, unescapedKeys);
@@ -110,7 +119,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyUser(User user, String subject, String message) {
         try {
             if (user.getEmail() != null) {
@@ -139,7 +150,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyUser(User user, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
             String emailBody = templateService.resolve(templateName, NotificationChannel.EMAIL, placeholders, unescapedKeys);
@@ -170,7 +183,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void sendHtmlEmail(String to, String subject, String template, Map<String, String> placeholders) {
         try {
             String body = templateService.resolve(template, placeholders);
@@ -190,7 +205,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyCustomer(Customer customer, String subject, String message) {
         try {
             if (customer.getPhoneNumber() != null) {
@@ -219,7 +236,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void notifyCustomer(Customer customer, String subject, String templateName, Map<String, String> placeholders, Set<String> unescapedKeys) {
         try {
             String smsBody = templateService.resolve(templateName, NotificationChannel.SMS, placeholders);
@@ -250,7 +269,9 @@ public class NotificationService implements NotificationPort {
         }
     }
 
+    @Override
     @Async
+    @Transactional(readOnly = true)
     public void createInternalAlert(User recipient, String title, String message,
                                      AlertType alertType, UUID referenceId, String referenceType) {
         try {

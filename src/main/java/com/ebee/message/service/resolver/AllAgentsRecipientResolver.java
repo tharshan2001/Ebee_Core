@@ -26,6 +26,7 @@ public class AllAgentsRecipientResolver implements RecipientResolver {
 
     @Override
     public List<MessageRecipient> resolve(Message message, RecipientResolutionContext context) {
+        // TODO: For large agent bases, use paginated or streaming queries instead of loading all into memory
         return agentRepository.findAllWithUser().stream()
                 .map(agent -> buildRecipient(message, agent))
                 .toList();

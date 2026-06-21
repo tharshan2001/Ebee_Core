@@ -60,7 +60,7 @@ class CommissionCalculationServiceTest {
                 .id(UUID.randomUUID())
                 .user(agentUser)
                 .agentCode("JF-008")
-                .commissionRate(7.5)
+                .commissionRate(BigDecimal.valueOf(7.5))
                 .commissionType(AgentCommissionType.DEFAULT)
                 .isActive(true)
                 .build();
@@ -77,7 +77,7 @@ class CommissionCalculationServiceTest {
     @Test
     void calculateCommissionForOrder_withDefaultConfig_calculatesCorrectly() {
         CommissionConfig config = CommissionConfig.builder()
-                .commissionRate(10.0)
+                .commissionRate(BigDecimal.valueOf(10.0))
                 .type(CommissionType.DEFAULT)
                 .isActive(true)
                 .build();
@@ -185,7 +185,7 @@ class CommissionCalculationServiceTest {
         request.setOrderId(order.getId());
 
         CommissionConfig config = CommissionConfig.builder()
-                .commissionRate(7.5)
+                .commissionRate(BigDecimal.valueOf(7.5))
                 .type(CommissionType.DEFAULT)
                 .isActive(true)
                 .build();
@@ -231,7 +231,7 @@ class CommissionCalculationServiceTest {
                 .build();
 
         CommissionConfig config = CommissionConfig.builder()
-                .commissionRate(10.0)
+                .commissionRate(BigDecimal.valueOf(10.0))
                 .type(CommissionType.DEFAULT)
                 .isActive(true)
                 .build();
@@ -272,7 +272,7 @@ class CommissionCalculationServiceTest {
                 .build();
 
         CommissionConfig config = CommissionConfig.builder()
-                .commissionRate(10.0)
+                .commissionRate(BigDecimal.valueOf(10.0))
                 .type(CommissionType.DEFAULT)
                 .isActive(true)
                 .build();

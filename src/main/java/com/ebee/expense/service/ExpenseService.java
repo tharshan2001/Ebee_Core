@@ -59,7 +59,7 @@ public class ExpenseService {
             builder.driver(driver);
         }
 
-        if (currentUser.getRole() == RoleType.AGENT || currentUser.getRole() == RoleType.ADMIN) {
+        if (currentUser.getRole() == RoleType.ADMIN) {
             builder.status(ExpenseStatus.APPROVED);
             builder.approvedBy(currentUser);
             builder.approvedAt(LocalDateTime.now());
@@ -144,8 +144,6 @@ public class ExpenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
 
         expense.setStatus(ExpenseStatus.REJECTED);
-        expense.setApprovedBy(admin);
-        expense.setApprovedAt(LocalDateTime.now());
         expense.setRejectionReason(reason);
         expense = expenseRepository.save(expense);
 

@@ -14,12 +14,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.ebee.common.util.SortUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -123,27 +124,16 @@ public class AgentController {
             @RequestParam(defaultValue = "createdAt,desc") String sort,
             @RequestParam(required = false) String search) {
 
-        String normalisedSort = SortableFields.validate(sort, SortableFields.AllowedFor.AGENT);
-        Sort.Direction direction = normalisedSort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = normalisedSort.replace(",asc", "").replace(",desc", "");
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
-                Sort.by(direction, sortField));
+                SortUtils.parse(sort, SortableFields.AllowedFor.AGENT));
 
         Page<AgentResponse> agentsPage = search != null && !search.trim().isEmpty()
                 ? agentService.searchAgentsPaginated(search.trim(), pageable)
                 : agentService.getAllAgentsPaginated(pageable);
 
-        PageResponse<AgentResponse> response = new PageResponse<>(
-                agentsPage.getContent(),
-                agentsPage.getNumber(),
-                agentsPage.getSize(),
-                agentsPage.getTotalElements(),
-                agentsPage.getTotalPages(),
-                agentsPage.isFirst(),
-                agentsPage.isLast()
-        );
+        PageResponse<AgentResponse> response = PageResponse.from(agentsPage);
 
         return ResponseEntity.ok(ApiResponse.success("Agents retrieved successfully", response));
     }
@@ -192,9 +182,9 @@ public class AgentController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteAgent(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteAgent(@PathVariable UUID id) {
         agentService.deleteAgent(id);
-        return ResponseEntity.ok(ApiResponse.success("Agent deleted successfully"));
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/commission-rate")

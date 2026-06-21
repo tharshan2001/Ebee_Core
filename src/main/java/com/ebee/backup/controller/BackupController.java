@@ -9,6 +9,7 @@ import com.ebee.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +51,8 @@ public class BackupController {
             @RequestParam String otp) {
         verifyOtp(authentication, otp);
         Map<String, Object> backup = backupService.createBackup();
-        return ResponseEntity.ok(ApiResponse.success("Backup created successfully", backup));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Backup created successfully", backup));
     }
 
     @GetMapping("/backups/{filename}")

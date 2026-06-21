@@ -18,21 +18,19 @@ public class AsyncConfig implements AsyncConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(AsyncConfig.class);
 
+    @Override
     @Bean(name = "taskExecutor")
-    public ThreadPoolTaskExecutor taskExecutor() {
+    public Executor getAsyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(5);
         executor.setMaxPoolSize(10);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("ebee-async-");
         executor.setTaskDecorator(new MdcTaskDecorator());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
-    }
-
-    @Override
-    public Executor getAsyncExecutor() {
-        return taskExecutor();
     }
 
     @Override

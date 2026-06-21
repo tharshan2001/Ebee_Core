@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PasswordGeneratorTest {
 
-    private static final String VALID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*()_+";
+    private static final String VALID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+";
 
     @Test
     void generate_returns12CharacterString() {

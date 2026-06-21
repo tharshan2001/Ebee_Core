@@ -35,6 +35,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -70,15 +72,9 @@ public class AuthService {
             throw new IllegalStateException("Too many login attempts. Please try again later.");
         }
 
-        Authentication authentication;
-        try {
-            authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
-            );
-        } catch (Exception e) {
-            log.debug("Authentication failed for: {}", email);
-            throw e;
-        }
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(email, request.getPassword())
+        );
 
         rateLimitingService.resetLoginAttempts(loginKey);
 
@@ -89,9 +85,10 @@ public class AuthService {
                     + " but user has role " + user.getRole());
         }
 
+        java.util.Optional<Driver> driverOpt = null;
         if (user.getRole() == RoleType.DRIVER) {
-            driverRepository.findByUserId(user.getId())
-                    .filter(d -> d.getAvailability() == DriverAvailability.SUSPENDED)
+            driverOpt = driverRepository.findByUserId(user.getId());
+            driverOpt.filter(d -> d.getAvailability() == DriverAvailability.SUSPENDED)
                     .ifPresent(d -> { throw new IllegalStateException("Your account has been suspended"); });
         }
 
@@ -122,9 +119,9 @@ public class AuthService {
                 .role(user.getRole())
                 .mustChangePassword(user.getMustChangePassword())
                 .expiresAt(jwtService.getExpirationDate(token))
-                .driverId(driverId(user))
-                .licenseNumber(licenseNumber(user))
-                .driverAvailability(driverAvailability(user))
+                .driverId(driverOpt != null ? driverOpt.map(Driver::getId).orElse(null) : null)
+                .licenseNumber(driverOpt != null ? driverOpt.map(Driver::getLicenseNumber).orElse(null) : null)
+                .driverAvailability(driverOpt != null ? driverOpt.map(d -> d.getAvailability().name()).orElse(null) : null)
                 .build();
     }
 
@@ -195,6 +192,11 @@ public class AuthService {
             throw new DisabledException("User account is not active");
         }
 
+        String refreshTokenHash = sha256Hex(refreshToken);
+        if (!refreshTokenHash.equals(user.getRefreshTokenHash())) {
+            throw new AccessDeniedException("Invalid refresh token");
+        }
+
         Collection<? extends GrantedAuthority> authorities =
             java.util.Collections.singletonList(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name())
@@ -206,6 +208,9 @@ public class AuthService {
 
         String newToken = jwtService.generateToken(authentication);
         String newRefreshToken = jwtService.generateRefreshToken(authentication);
+
+        user.setRefreshTokenHash(sha256Hex(newRefreshToken));
+        userRepository.save(user);
 
         return AuthResponse.builder()
                 .token(newToken)
@@ -268,6 +273,7 @@ public class AuthService {
         eventPublisher.publishEvent(new PasswordChangedEvent(this, user));
     }
 
+    @Transactional
     public void forgotPassword(String email) {
         userRepository.findByEmail(email).ifPresent(user -> {
             otpService.generateAndSendOtp(user.getEmail());
@@ -309,5 +315,20 @@ public class AuthService {
 
     private String extractEmailFromResetToken(String token) {
         return jwtService.extractEmailFromResetToken(token);
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 }

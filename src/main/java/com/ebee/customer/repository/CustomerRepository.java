@@ -24,6 +24,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     @Query("UPDATE Customer c SET c.totalOrders = c.totalOrders + 1 WHERE c.id = :id")
     int incrementTotalOrders(@Param("id") UUID id);
 
+    @Modifying
+    @Query("UPDATE Customer c SET c.totalOrders = c.totalOrders - 1 WHERE c.id = :id")
+    int decrementTotalOrders(@Param("id") UUID id);
+
     @Query("SELECT COUNT(c) FROM Customer c WHERE c.createdAt >= :start AND c.createdAt < :end")
     Long countNewCustomersSince(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 

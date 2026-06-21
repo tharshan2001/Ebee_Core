@@ -35,6 +35,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,9 +106,9 @@ public class AgentService {
                 .isActive(true)
                 .build();
 
-        agentDocumentService.uploadNewDocuments(agent, request.getNicDocument(), request.getBankPassbookDocument());
-
         Agent savedAgent = agentRepository.save(agent);
+
+        agentDocumentService.uploadNewDocuments(agent, request.getNicDocument(), request.getBankPassbookDocument());
 
         auditLogService.record(AuditAction.CREATE, "Agent", savedAgent.getId(),
                 "Agent " + savedAgent.getAgentCode() + " (" + savedAgent.getUser().getEmail() + ") created");
@@ -125,8 +126,8 @@ public class AgentService {
                 .address(savedAgent.getAddress())
                 .district(savedAgent.getDistrict() != null ? savedAgent.getDistrict().getDisplayName() : null)
                 .phoneNumber(savedAgent.getPhoneNumber())
-                .commissionRate(savedAgent.getCommissionRate())
-                .effectiveCommissionRate(savedAgent.getCommissionRate())
+                .commissionRate(savedAgent.getCommissionRate().doubleValue())
+                .effectiveCommissionRate(savedAgent.getCommissionRate().doubleValue())
                 .commissionType(savedAgent.getCommissionType())
                 .nicNumber(savedAgent.getNicNumber())
                 .bankAccountNumber(savedAgent.getBankAccountNumber())
@@ -328,7 +329,7 @@ public class AgentService {
         }
 
         if (request.getCommissionRate() != null) {
-            agent.setCommissionRate(request.getCommissionRate());
+            agent.setCommissionRate(BigDecimal.valueOf(request.getCommissionRate()));
         } else if (request.getCommissionType() == AgentCommissionType.DEFAULT) {
             CommissionConfig defaultConfig = commissionConfigRepository
                     .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
@@ -344,9 +345,10 @@ public class AgentService {
         agent.setBankName(request.getBankName());
         agent.setBankBranch(request.getBankBranch());
 
-        agentDocumentService.replaceDocuments(agent, request.getNicDocument(), request.getBankPassbookDocument());
+        Agent savedAgent = agentRepository.save(agent);
+        agentDocumentService.replaceDocuments(savedAgent, request.getNicDocument(), request.getBankPassbookDocument());
 
-        return agentMapper.toResponse(agentRepository.save(agent));
+        return agentMapper.toResponse(savedAgent);
     }
 
     @Transactional(readOnly = true)
@@ -382,7 +384,7 @@ public class AgentService {
     public AgentResponse updateCommissionRate(UUID id, Double commissionRate) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
-        agent.setCommissionRate(commissionRate);
+        agent.setCommissionRate(BigDecimal.valueOf(commissionRate));
         return agentMapper.toResponse(agentRepository.save(agent));
     }
 

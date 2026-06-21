@@ -46,12 +46,12 @@ public abstract class AgentMapper {
     @AfterMapping
     protected void setEffectiveCommissionRate(Agent agent, @MappingTarget AgentResponse response) {
         if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
-            response.setEffectiveCommissionRate(agent.getCommissionRate());
+            response.setEffectiveCommissionRate(agent.getCommissionRate().doubleValue());
         } else {
             CommissionConfig config = commissionConfigRepository
                     .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
                     .orElse(null);
-            response.setEffectiveCommissionRate(config != null ? config.getCommissionRate() : agent.getCommissionRate());
+            response.setEffectiveCommissionRate(config != null ? config.getCommissionRate().doubleValue() : agent.getCommissionRate().doubleValue());
         }
     }
 }

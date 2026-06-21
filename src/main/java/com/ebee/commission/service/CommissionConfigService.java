@@ -43,10 +43,10 @@ public class CommissionConfigService {
     @Transactional
     public CommissionConfigResponse updateConfig(UUID id, CommissionConfigRequest request) {
         CommissionConfig config = getConfigEntity(id);
-        Double previousRate = config.getCommissionRate();
+        BigDecimal previousRate = config.getCommissionRate();
         mapper.updateConfigFromRequest(request, config);
         config = configRepository.save(config);
-        if (config.getType() == CommissionType.DEFAULT && rateChanged(previousRate, request.getCommissionRate())) {
+        if (config.getType() == CommissionType.DEFAULT && rateChanged(previousRate, request.getCommissionRate() != null ? BigDecimal.valueOf(request.getCommissionRate()) : null)) {
             recalculateLinkedCommissions(config);
         }
         return mapper.toConfigResponse(config);
@@ -99,12 +99,12 @@ public class CommissionConfigService {
         CommissionConfig config;
         if (existing.isPresent()) {
             config = existing.get();
-            Double previousRate = config.getCommissionRate();
+            BigDecimal previousRate = config.getCommissionRate();
             mapper.updateConfigFromRequest(request, config);
             config.setType(CommissionType.DEFAULT);
-            if (config.getMinAmount() == null) config.setMinAmount(0.0);
+            if (config.getMinAmount() == null) config.setMinAmount(BigDecimal.ZERO);
             config = configRepository.save(config);
-            if (rateChanged(previousRate, request.getCommissionRate())) {
+            if (rateChanged(previousRate, request.getCommissionRate() != null ? BigDecimal.valueOf(request.getCommissionRate()) : null)) {
                 recalculateLinkedCommissions(config);
             }
         } else {
@@ -119,21 +119,21 @@ public class CommissionConfigService {
         return mapper.toConfigResponse(config);
     }
 
-    private boolean rateChanged(Double previousRate, Double newRate) {
+    private boolean rateChanged(BigDecimal previousRate, BigDecimal newRate) {
         if (previousRate == null && newRate == null) {
             return false;
         }
         if (previousRate == null || newRate == null) {
             return true;
         }
-        return !previousRate.equals(newRate);
+        return previousRate.compareTo(newRate) != 0;
     }
 
     private void recalculateLinkedCommissions(CommissionConfig config) {
         List<Commission> commissions = commissionRepository.findByConfigIdAndStatusIn(
                 config.getId(), List.of(CommissionStatus.CALCULATED, CommissionStatus.APPROVED));
 
-        BigDecimal newRate = BigDecimal.valueOf(config.getCommissionRate());
+        BigDecimal newRate = config.getCommissionRate();
         for (Commission commission : commissions) {
             BigDecimal amount = commission.getOrderAmount()
                     .multiply(newRate)

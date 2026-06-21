@@ -132,14 +132,14 @@ public class DeliveryService {
         DeliveryStatus previousStatus = order.getDeliveryStatus();
         DeliveryStatus newStatus = request.getStatus();
 
+        User previousDriver = order.getDeliveryAssignedTo();
+
         DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
                 order, newStatus, request.getReason(), securityService.isAdmin());
 
-        if (previousStatus == DeliveryStatus.FAILED
-                && newStatus == DeliveryStatus.PENDING
-                && order.getDeliveryAssignedTo() != null) {
-            UUID previousDriverUserId = order.getDeliveryAssignedTo().getId();
-            driverRepository.findByUserId(previousDriverUserId).ifPresent(driver -> {
+        if ((newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT)
+                && previousDriver != null) {
+            driverRepository.findByUserId(previousDriver.getId()).ifPresent(driver -> {
                 driver.setAvailability(DriverAvailability.AVAILABLE);
                 driverRepository.save(driver);
             });

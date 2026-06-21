@@ -55,7 +55,7 @@ class AuthControllerTest {
                 .email("admin@ebee.com")
                 .build();
 
-        when(authService.login(any())).thenReturn(authResponse);
+        when(authService.login(any(LoginRequest.class), anyString())).thenReturn(authResponse);
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -2,6 +2,87 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
+## [Unreleased] — 2026-06-21
+
+### CRITICAL Security & Data Integrity Fixes
+
+- **Plaintext password log removed** (`SuperAdminSeeder`) — Super admin password no longer written to application logs on startup.
+- **JWT reset token key separated from main secret** (`JwtService`) — Password reset tokens now use a dedicated signing key (`JWT_RESET_SECRET`). The app fails fast at startup if `JWT_RESET_SECRET` is not configured. Access and refresh tokens now include `type` claims to prevent misuse.
+- **Refresh token rotation implemented** (`AuthService`, `User`) — Old refresh tokens are invalidated when new ones are issued. Stolen refresh tokens can no longer be reused indefinitely. SHA-256 hash stored in new `refresh_token_hash` column.
+- **OTP stored as SHA-256 hash** (`OtpService`) — OTPs are no longer stored in plaintext in Redis. Verification uses `MessageDigest.isEqual()` to prevent timing attacks.
+- **OTP attempts TTL on first failure** (`OtpService`) — The failed-attempts counter now expires after 5 minutes of inactivity, preventing indefinite Redis key accumulation.
+- **CSRF cookie hardened** (`AuthController`) — `Secure` flag on refresh cookie is now conditional on `request.isSecure()`, enabling development over HTTP.
+- **Account lock/expiration enabled** (`UserPrincipal`) — `isAccountNonLocked()` now checks `UserStatus.LOCKED`; `isCredentialsNonExpired()` checks `mustChangePassword`.
+- **DisabledException for inactive accounts** (`UserDetailsServiceImpl`) — Inactive accounts now throw `DisabledException` instead of `UsernameNotFoundException`, enabling proper Spring Security error flows.
+- **Rate limiter thread pool cleanup** (`RateLimitingService`) — Added `@PreDestroy` to shut down the cleanup scheduler.
+- **JwtAuthenticationFilter bean deduplicated** (`SecurityConfig`) — Removed double filter instance.
+- **JWT secret defaults removed** (`application.yml`) — `JWT_SECRET` and `JWT_RESET_SECRET` now fail fast at startup if not configured.
+
+### Critical Bug Fixes
+
+- **CascadeType.ALL removed from Product→OrderItem** (`Product`) — Deleting a product no longer cascade-deletes order history.
+- **District enum stored as STRING** (`Agent`, `Address`) — `District` enum now uses `@Enumerated(EnumType.STRING)` instead of ORDINAL, preventing data corruption if enum values are reordered.
+- **Monetary fields changed to BigDecimal** (`Agent`, `CommissionConfig`) — `commissionRate`, `totalSales`, `totalCommission`, `minAmount`, `maxAmount` changed from `Double` to `BigDecimal` to eliminate floating-point precision loss. All downstream services updated accordingly.
+- **S3 operations reordered after DB save** (`AgentService`, `ProductService`) — S3 uploads/deletes now happen AFTER database writes, preventing orphaned files on transaction rollback.
+- **Driver stuck in ON_TRIP fixed** (`DeliveryService`) — Driver availability is now freed when a delivery transitions to FAILED.
+- **Agent self-approval removed** (`ExpenseService`) — Agents can no longer auto-approve their own expenses. Only ADMIN role auto-approves.
+- **Rejected expense fields fixed** (`ExpenseService`) — Rejected expenses no longer set `approvedBy`/`approvedAt`.
+- **Search+category filter fixed** (`ProductController`, `ProductRepository`, `ProductService`) — Category filter now works correctly when a search query is active.
+- **Unused `stock` parameter** removed from controller signatures where unimplemented.
+- **Missing `@Transactional` added** (`CustomerService.findOrCreateByPhone`, `AuthService.forgotPassword`).
+
+### Controller & API Consistency
+
+- **Global exception handlers added** (`GlobalExceptionHandler`) — Added handlers for `MissingServletRequestParameterException`, `HttpMessageNotReadableException`, `HttpRequestMethodNotSupportedException`, `HttpMediaTypeNotSupportedException`, and `ConstraintViolationException`.
+- **Authorization added to AlertController** — All alert endpoints now require authentication.
+- **Ownership checks added to ReminderController** — ADMIN users can no longer modify other ADMINs' reminders.
+- **PageResponse.from() factory added** — Eliminates duplicated Page→PageResponse mapping in 5+ controllers.
+- **SortUtils.parse() utility created** — Eliminates duplicated sort-parsing logic in 7 controllers.
+- **DELETE endpoints return 204 No Content** — Standardized across Agent, Category, Product, User, AgentApplication controllers.
+- **BackupController.createBackup returns 201 Created** — Instead of 200 OK.
+- **`ApiResponse` now includes `timestamp` field** — All responses include a timestamp.
+- **CommissionController pagination standardized** — Now uses `PageResponse` like other controllers.
+
+### Notification & Messaging Fixes
+
+- **LazyInitializationException prevented** (`NotificationService`) — All `@Async` notification methods now annotated with `@Transactional(readOnly = true)` to open a persistence context on the async thread.
+- **Bean Validation added to MessageRequest** — Required fields (`subject`, `body`, `targetType`) now validated.
+- **MD5 replaced with SHA-256** (`RichCommunicationSmsSender`) — SMS API password digest now uses SHA-256.
+- **XSS prevention in email templates** (`NotificationTemplateService`) — `unescapedKeys` restricted to a whitelist of safe keys (`link`, `buttonText`).
+- **Null guard added to template resolution** — `HtmlUtils.htmlEscape(null)` no longer throws NPE.
+- **N+1 save bug fixed** (`MessageDispatcher`) — Recipients now saved in a single `saveAll()` call instead of individual saves.
+- **RuntimeExceptions replaced** (`MessageService`) — `"Message not found"` now returns 404 (`ResourceNotFoundException`); `"Access denied"` now returns 403 (`AccessDeniedException`).
+- **Message double-save removed** (`MessageService`) — Message entity is now saved once instead of twice.
+- **RestTemplate timeouts configured** (`NotificationConfig`) — 5s connect and 10s read timeouts set.
+- **@Override annotations added** (`NotificationService`) — All interface implementation methods now properly annotated.
+- **PhoneUtils enhanced** — Handles `+94` and `0094` international prefixes; made `final` with private constructor.
+
+### Data Integrity
+
+- **Unique constraint on AgentApplication.email** — Prevents duplicate applications.
+- **Unique constraint on Driver.licenseNumber** — License numbers now enforced unique.
+- **decrementTotalOrders added** (`CustomerRepository`) — Order cancellation now decrements the counter cache.
+- **Order validation added** (`Order`) — `@PrePersist`/`@PreUpdate` validation ensures at least one of agent or customer is set.
+- **@Repository annotations added** — Added to 4 repository interfaces missing them.
+- **@Data replaced on all entities** — All 25 entities now use `@Getter @Setter @EqualsAndHashCode(onlyExplicitlyIncluded = true)` to prevent Hibernate proxy issues.
+
+### Config & Infrastructure
+
+- **AsyncConfig double executor fixed** — The async executor bean is now properly injected instead of being created twice.
+- **Removed `format_sql: true` from default profile** — Only enabled for local development.
+- **Redis connection pool configured** — `max-active: 16`, `max-idle: 8`, `min-idle: 2`.
+- **S3Client uses default credential chain** — No longer requires explicit static credentials.
+- **`RepositoryAuditAspect` guards against batch operations** — `saveAll`/`deleteAll` no longer incorrectly intercepted.
+- **`DistrictConverter` fails fast** — Unknown database values throw `IllegalStateException` instead of silently returning null.
+- **`PasswordGenerator` guarantees character diversity** — Generated passwords now always contain lowercase, uppercase, digit, and special characters.
+- **JJWT bumped 0.11.5 → 0.12.6** — Security fix and API improvements.
+- **MapStruct bumped 1.5.5 → 1.6.3** — Latest stable version.
+
+### Performance
+
+- **SecurityService.getCurrentUserId() avoids DB query** — User ID now extracted directly from `UserPrincipal` in the security context.
+- **AuthService login optimized** — Three redundant `driverRepository.findByUserId()` calls consolidated into one.
+
 ## [Unreleased] — 2026-06-20
 
 ### Security Fixes

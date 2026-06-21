@@ -9,6 +9,9 @@ import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.service.DriverService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.SortUtils;
+import com.ebee.common.util.SortableFields;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,16 +40,14 @@ public class DriverController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<Page<DriverResponse>>> getDrivers(
+    public ResponseEntity<ApiResponse<PageResponse<DriverResponse>>> getDrivers(
             @RequestParam(required = false) DriverAvailability availability,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
-        Sort.Direction direction = sort.endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        String sortField = sort.replace(",asc", "").replace(",desc", "");
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = PageRequest.of(page, size, SortUtils.parse(sort, SortableFields.AllowedFor.AGENT));
         Page<DriverResponse> responses = driverService.getDrivers(availability, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Drivers retrieved successfully", responses));
+        return ResponseEntity.ok(ApiResponse.success("Drivers retrieved successfully", PageResponse.from(responses)));
     }
 
     @GetMapping("/available")

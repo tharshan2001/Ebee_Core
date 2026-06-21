@@ -27,7 +27,7 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.reset-secret:}")
+    @Value("${jwt.reset-secret}")
     private String resetSecret;
 
     @Value("${jwt.expiration:86400000}")
@@ -50,6 +50,7 @@ public class JwtService {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
+                .claim("type", "access")
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
@@ -63,6 +64,7 @@ public class JwtService {
 
         return Jwts.builder()
                 .setSubject(email)
+                .claim("type", "refresh")
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
@@ -78,7 +80,11 @@ public class JwtService {
     public RoleType extractRole(String token) {
         Claims claims = extractAllClaims(token);
         String role = claims.get("role", String.class);
-        return RoleType.valueOf(role.replace("ROLE_", ""));
+        try {
+            return RoleType.valueOf(role.replace("ROLE_", ""));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private boolean isTokenExpired(String token) {
@@ -95,11 +101,11 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+        return Jwts.parser()
+                .verifyWith((javax.crypto.SecretKey) getSigningKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public LocalDateTime getExpirationDate(String token) {
@@ -145,16 +151,15 @@ public class JwtService {
     }
 
     private Key getResetSigningKey() {
-        String key = resetSecret != null && !resetSecret.isEmpty() ? resetSecret : secret;
-        return Keys.hmacShaKeyFor(key.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(resetSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     private <T> T extractClaim(String token, Key signingKey, Function<Claims, T> claimsResolver) {
-        final Claims claims = Jwts.parserBuilder()
-                .setSigningKey(signingKey)
+        final Claims claims = Jwts.parser()
+                .verifyWith((javax.crypto.SecretKey) signingKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
         return claimsResolver.apply(claims);
     }
 }

@@ -1,5 +1,6 @@
 package com.ebee.common.security;
 
+import com.ebee.auth.security.UserPrincipal;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -32,13 +33,14 @@ public class SecurityService {
 
     public UUID getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new IllegalStateException("No authenticated user found");
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
         }
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .map(user -> user.getId())
-                .orElseThrow(() -> new IllegalStateException("User not found for email: " + email));
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal) {
+            return ((UserPrincipal) principal).getUser().getId();
+        }
+        return null;
     }
 
     public boolean isAdmin() {

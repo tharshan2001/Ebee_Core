@@ -5,6 +5,7 @@ import com.ebee.user.entity.User;
 import com.ebee.user.enums.UserStatus;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -22,7 +23,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
         if (!user.getIsActive() || user.getStatus() != UserStatus.ACTIVE) {
-            throw new UsernameNotFoundException("User account is inactive or locked");
+            throw new DisabledException("User account is inactive or locked");
         }
 
         return new UserPrincipal(user);

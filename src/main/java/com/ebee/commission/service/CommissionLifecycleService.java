@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -115,8 +116,8 @@ public class CommissionLifecycleService {
 
             if (commission.getStatus() == CommissionStatus.PAID) {
                 Agent agent = commission.getAgent();
-                agent.setTotalCommission(agent.getTotalCommission() - commission.getCommissionAmount().doubleValue());
-                agent.setTotalSales(agent.getTotalSales() - commission.getOrderAmount().doubleValue());
+                agent.setTotalCommission(agent.getTotalCommission().subtract(commission.getCommissionAmount()));
+                agent.setTotalSales(agent.getTotalSales().subtract(commission.getOrderAmount()));
             }
 
             commission.setStatus(CommissionStatus.CANCELLED);

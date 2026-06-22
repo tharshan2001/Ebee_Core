@@ -146,6 +146,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unexpected error", ex);
+        // Unwrap transaction/retry wrappers to get the real cause
+        Throwable cause = ex.getCause();
+        while (cause != null) {
+            if (cause instanceof IllegalArgumentException) {
+                log.warn("Invalid argument (unwrapped): {}", cause.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(cause.getMessage()));
+            }
+            if (cause instanceof ResourceNotFoundException) {
+                log.warn("Resource not found (unwrapped): {}", cause.getMessage());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error(cause.getMessage()));
+            }
+            if (cause instanceof IllegalStateException) {
+                log.warn("Illegal state (unwrapped): {}", cause.getMessage());
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error(cause.getMessage()));
+            }
+            cause = cause.getCause();
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("An unexpected error occurred"));
     }

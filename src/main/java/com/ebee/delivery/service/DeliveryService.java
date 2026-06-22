@@ -78,16 +78,11 @@ public class DeliveryService {
             throw new IllegalArgumentException("Cannot assign delivery — driver is suspended");
         }
 
-        if (driverProfile.getAvailability() == DriverAvailability.ON_TRIP) {
-            throw new IllegalArgumentException("Cannot assign delivery — driver is already on a trip");
-        }
-
-        driverProfile.setAvailability(DriverAvailability.ON_TRIP);
-        driverRepository.save(driverProfile);
-
         order.setDeliveryAssignedTo(driver);
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
         Order savedOrder = orderRepository.save(order);
+
+        updateDriverAvailability(driverId);
 
         Map<String, String> driverP = new HashMap<>();
         driverP.put("driverName", driver.getFirstName());
@@ -139,13 +134,13 @@ public class DeliveryService {
 
         if ((newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT)
                 && previousDriver != null) {
-            driverRepository.findByUserId(previousDriver.getId()).ifPresent(driver -> {
-                driver.setAvailability(DriverAvailability.AVAILABLE);
-                driverRepository.save(driver);
-            });
+            updateDriverAvailability(previousDriver.getId());
         }
 
         if (result.wasDelivered()) {
+            if (previousDriver != null) {
+                updateDriverAvailability(previousDriver.getId());
+            }
             commissionLifecycleService.approveCommissionForOrder(order.getId());
         }
 
@@ -205,6 +200,28 @@ public class DeliveryService {
         }
 
         return toDeliveryResponse(order);
+    }
+
+    /**
+     * Derive driver availability from actual active delivery count.
+     * Must be called within an active transaction.
+     * <p>
+     * Rules (see DRIVER_ASSIGNMENT.md):
+     * AVAILABLE — 0 orders with status ASSIGNED / PICKED_UP / IN_TRANSIT
+     * ON_TRIP   — ≥1 orders with status ASSIGNED / PICKED_UP / IN_TRANSIT
+     */
+    private void updateDriverAvailability(UUID driverUserId) {
+        List<DeliveryStatus> activeStatuses = List.of(
+                DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+        long activeCount = deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(
+                driverUserId, activeStatuses);
+        DriverAvailability newAvailability = activeCount > 0
+                ? DriverAvailability.ON_TRIP
+                : DriverAvailability.AVAILABLE;
+        driverRepository.findByUserId(driverUserId).ifPresent(driver -> {
+            driver.setAvailability(newAvailability);
+            driverRepository.save(driver);
+        });
     }
 
     private DeliveryResponse toDeliveryResponse(Order order) {

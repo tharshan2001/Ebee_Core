@@ -20,6 +20,8 @@ public interface DeliveryRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByDeliveryStatusAndDeliveryAssignedToId(DeliveryStatus status, UUID userId);
 
+    long countByDeliveryAssignedToIdAndDeliveryStatusIn(UUID userId, List<DeliveryStatus> statuses);
+
     long countByDeliveryStatus(DeliveryStatus status);
 
     @Query("SELECT o.deliveryStatus, COUNT(o) FROM Order o WHERE o.deliveryStatus IS NOT NULL AND o.updatedAt >= :start AND o.updatedAt < :end GROUP BY o.deliveryStatus")

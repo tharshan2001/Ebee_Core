@@ -7,6 +7,9 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.enums.District;
+import com.ebee.common.service.PrintTemplateService;
+import com.ebee.order.dto.InvoiceData;
+import com.ebee.order.dto.ShippingLabelData;
 import com.ebee.order.exception.DuplicateOrderNumberException;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
@@ -65,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerService customerService;
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
+    private final PrintTemplateService printTemplateService;
 
     @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
@@ -347,6 +351,148 @@ public class OrderServiceImpl implements OrderService {
         orderNotificationService.sendOrderCancelled(updatedOrder);
 
         return orderMapper.toResponse(updatedOrder);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public byte[] generateInvoicePdf(UUID id) {
+        Order order = orderRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        String address = null;
+        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
+            var a = order.getCustomer().getAddress();
+            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+        }
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal discountTotal = BigDecimal.ZERO;
+        var lineItems = new java.util.ArrayList<InvoiceData.LineItem>();
+        for (var item : order.getItems()) {
+            BigDecimal itemSubtotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+            BigDecimal discount = BigDecimal.ZERO;
+            if (item.getOriginalUnitPrice() != null && item.getOriginalUnitPrice().compareTo(item.getUnitPrice()) > 0) {
+                discount = item.getOriginalUnitPrice().subtract(item.getUnitPrice()).multiply(BigDecimal.valueOf(item.getQuantity()));
+            }
+            subtotal = subtotal.add(itemSubtotal);
+            discountTotal = discountTotal.add(discount);
+            lineItems.add(new InvoiceData.LineItem(
+                    item.getProduct().getName(),
+                    item.getProduct().getItemCode(),
+                    item.getQuantity(),
+                    item.getUnitPrice(),
+                    itemSubtotal,
+                    discount.compareTo(BigDecimal.ZERO) > 0 ? discount.toString() : null
+            ));
+        }
+
+        var data = new InvoiceData(
+                "INVOICE",
+                order.getOrderNumber(),
+                order.getCreatedAt(),
+                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
+                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
+                address,
+                order.getAgent() != null ? order.getAgent().getUser().getFirstName() + " " + order.getAgent().getUser().getLastName() : null,
+                order.getAgent() != null ? order.getAgent().getAgentCode() : null,
+                lineItems,
+                subtotal,
+                discountTotal,
+                order.getTotalAmount(),
+                order.getNotes()
+        );
+
+        return printTemplateService.renderToPdf("invoice", toMap(data));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public byte[] generateReceiptPdf(UUID id) {
+        Order order = orderRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        String address = null;
+        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
+            var a = order.getCustomer().getAddress();
+            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+        }
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal discountTotal = BigDecimal.ZERO;
+        var lineItems = new java.util.ArrayList<InvoiceData.LineItem>();
+        for (var item : order.getItems()) {
+            BigDecimal itemSubtotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+            BigDecimal discount = BigDecimal.ZERO;
+            if (item.getOriginalUnitPrice() != null && item.getOriginalUnitPrice().compareTo(item.getUnitPrice()) > 0) {
+                discount = item.getOriginalUnitPrice().subtract(item.getUnitPrice()).multiply(BigDecimal.valueOf(item.getQuantity()));
+            }
+            subtotal = subtotal.add(itemSubtotal);
+            discountTotal = discountTotal.add(discount);
+            lineItems.add(new InvoiceData.LineItem(
+                    item.getProduct().getName(),
+                    item.getProduct().getItemCode(),
+                    item.getQuantity(),
+                    item.getUnitPrice(),
+                    itemSubtotal,
+                    discount.compareTo(BigDecimal.ZERO) > 0 ? discount.toString() : null
+            ));
+        }
+
+        var data = new com.ebee.order.dto.ReceiptData(
+                "RECEIPT",
+                order.getOrderNumber(),
+                order.getCreatedAt(),
+                java.time.LocalDateTime.now(),
+                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
+                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
+                address,
+                order.getAgent() != null ? order.getAgent().getUser().getFirstName() + " " + order.getAgent().getUser().getLastName() : null,
+                order.getAgent() != null ? order.getAgent().getAgentCode() : null,
+                "Cash",
+                lineItems,
+                subtotal,
+                discountTotal,
+                order.getTotalAmount(),
+                order.getNotes()
+        );
+
+        return printTemplateService.renderToPdf("receipt", toMap(data));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public byte[] generateShippingLabelPdf(UUID id) {
+        Order order = orderRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        String address = null;
+        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
+            var a = order.getCustomer().getAddress();
+            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+        }
+
+        var data = new ShippingLabelData(
+                order.getOrderNumber(),
+                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
+                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
+                address,
+                order.getItems().size(),
+                order.getDeliveryNotes()
+        );
+
+        return printTemplateService.renderToPdf("shipping-label", toMap(data));
+    }
+
+    private java.util.Map<String, Object> toMap(Object record) {
+        java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+        try {
+            for (var method : record.getClass().getRecordComponents()) {
+                map.put(method.getName(), method.getAccessor().invoke(record));
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert record to map", e);
+        }
+        return map;
     }
 
     @Recover

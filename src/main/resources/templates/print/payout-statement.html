@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
+  .header { border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
+  .header h1 { margin: 0; font-size: 18pt; color: #1a1a1a; }
+  .header .company-info { color: #666; font-size: 8pt; margin-top: 3px; }
+  .header .title { float: right; font-size: 16pt; font-weight: bold; color: #d4a017; }
+  .clearfix::after { content: ""; display: table; clear: both; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  .info-table td { vertical-align: top; padding: 3px 5px; font-size: 9pt; }
+  .info-table .label { color: #888; font-size: 8pt; text-transform: uppercase; }
+  .info-table .value { font-size: 9pt; }
+  .amount-box { border: 2px solid #1a1a1a; padding: 15px; text-align: center; margin: 20px 0; }
+  .amount-box .label { font-size: 8pt; color: #888; text-transform: uppercase; }
+  .amount-box .value { font-size: 22pt; font-weight: bold; color: #d4a017; }
+  .status-box { display: inline-block; padding: 3px 10px; font-size: 8pt; font-weight: bold; text-transform: uppercase; }
+  .status-pending { background: #fff3cd; color: #856404; }
+  .status-processed { background: #d4edda; color: #155724; }
+  .footer { border-top: 1px solid #ddd; margin-top: 30px; padding-top: 10px; font-size: 7pt; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header clearfix">
+  <div style="float: left;">
+    <h1 th:text="${company.name}">Company Name</h1>
+    <div class="company-info">
+      <div th:text="${company.address}">Address</div>
+      <div th:text="${company.phone}">Phone</div>
+      <div th:text="${company.email}">Email</div>
+    </div>
+  </div>
+  <div class="title">PAYOUT STATEMENT</div>
+</div>
+
+<table class="info-table">
+  <tr>
+    <td>
+      <div class="label">Agent</div>
+      <div class="value" th:text="${agentName}">Agent Name</div>
+    </td>
+    <td>
+      <div class="label">Payout ID</div>
+      <div class="value" th:text="${payoutId}">ID</div>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <div class="label">Date</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'dd MMM yyyy')}">Date</div>
+    </td>
+    <td>
+      <div class="label">Status</div>
+      <div class="status-box" th:classappend="${status == 'PROCESSED'} ? 'status-processed' : 'status-pending'" th:text="${status}">PENDING</div>
+    </td>
+  </tr>
+</table>
+
+<div class="amount-box">
+  <div class="label">Total Payout Amount</div>
+  <div class="value" th:text="${#numbers.formatDecimal(totalAmount, 1, 2)}">0.00</div>
+</div>
+
+<div class="footer">
+  <p>This is a computer-generated payout statement.</p>
+</div>
+</body>
+</html>

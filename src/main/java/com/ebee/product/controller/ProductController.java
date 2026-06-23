@@ -21,6 +21,11 @@ import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortUtils;
 import com.ebee.common.util.SortableFields;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -230,6 +235,16 @@ public class ProductController {
     public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
         productService.deleteProduct(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/label")
+    public ResponseEntity<Resource> downloadLabel(@PathVariable UUID id) {
+        byte[] pdf = productService.generateProductLabelPdf(id);
+        ByteArrayResource resource = new ByteArrayResource(pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=product-label-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(resource);
     }
 
     private void validate(ProductRequest request) {

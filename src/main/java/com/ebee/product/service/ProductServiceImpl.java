@@ -2,6 +2,8 @@ package com.ebee.product.service;
 
 import com.ebee.category.service.CategoryService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.service.PrintTemplateService;
+import com.ebee.product.dto.LabelData;
 import com.ebee.common.service.S3Service;
 import com.ebee.inventory.mapper.InventoryMapper;
 import com.ebee.inventory.service.InventoryService;
@@ -46,6 +48,7 @@ public class ProductServiceImpl implements ProductService {
     private final InventoryMapper inventoryMapper;
     private final EntityManager entityManager;
     private final CategoryService categoryService;
+    private final PrintTemplateService printTemplateService;
 
     @Transactional
     @Override
@@ -300,10 +303,12 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Override
     public ProductResponse addImagesToProduct(UUID id, List<MultipartFile> images) {
-        Product product = productRepository.findByIdWithRelations(id)
+        productRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        int sortOrder = product.getImages().size();
+        int sortOrder = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM product_images WHERE product_id = ?",
+                Integer.class, id);
 
         if (sortOrder >= 10) {
             throw new IllegalStateException("Product already has maximum of 10 images");
@@ -325,8 +330,9 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        entityManager.refresh(product);
-        return toResponseWithRelations(product);
+        Product refreshed = productRepository.findByIdWithRelations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        return toResponseWithRelations(refreshed);
     }
 
     @Transactional
@@ -392,6 +398,35 @@ public class ProductServiceImpl implements ProductService {
         response.setImageType(productImage.getImageType());
         response.setSortOrder(productImage.getSortOrder());
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public byte[] generateProductLabelPdf(UUID id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        var data = new LabelData(
+                product.getName(),
+                product.getItemCode(),
+                product.getPrice(),
+                product.getCategory(),
+                product.getBrand()
+        );
+
+        return printTemplateService.renderToPdf("product-label", toMap(data));
+    }
+
+    private java.util.Map<String, Object> toMap(Object record) {
+        java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+        try {
+            for (var method : record.getClass().getRecordComponents()) {
+                map.put(method.getName(), method.getAccessor().invoke(record));
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert record to map", e);
+        }
+        return map;
     }
 
     private void validateDiscount(ProductRequest request) {

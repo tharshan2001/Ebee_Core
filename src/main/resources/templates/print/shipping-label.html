@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: 100mm 75mm; margin: 5mm; }
+  body { font-family: 'DejaVu Sans', sans-serif; font-size: 9pt; color: #333; margin: 0; padding: 0; }
+  .label { border: 1px solid #ccc; padding: 8px; height: calc(100% - 16px); box-sizing: border-box; }
+  .header { font-size: 8pt; color: #d4a017; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+  .order-ref { font-size: 7pt; color: #888; margin-bottom: 6px; }
+  .to-label { font-size: 7pt; color: #999; text-transform: uppercase; margin-bottom: 2px; }
+  .customer-name { font-size: 11pt; font-weight: bold; color: #1a1a1a; }
+  .customer-info { font-size: 8pt; color: #555; margin-bottom: 6px; }
+  .meta { font-size: 7pt; color: #999; border-top: 1px solid #ddd; padding-top: 4px; }
+</style>
+</head>
+<body>
+<div class="label">
+  <div class="header">SHIPPING</div>
+  <div class="order-ref" th:text="'Order: ' + ${orderNumber}">ORD-001</div>
+
+  <div class="to-label">TO:</div>
+  <div class="customer-name" th:text="${customerName}">Customer Name</div>
+  <div class="customer-info">
+    <div th:if="${customerPhone}" th:text="${customerPhone}">Phone</div>
+    <div th:text="${customerAddress}">Address</div>
+  </div>
+
+  <div class="meta">
+    <span th:text="'Items: ' + ${itemCount}">0</span>
+    <span th:if="${deliveryNotes}" th:text="' | ' + ${deliveryNotes}">Notes</span>
+  </div>
+</div>
+</body>
+</html>

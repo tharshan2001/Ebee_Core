@@ -19,6 +19,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.ebee.common.util.SortUtils;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import java.util.List;
 import java.util.UUID;
@@ -109,5 +113,38 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(@PathVariable UUID id) {
         OrderResponse response = orderService.cancelOrder(id);
         return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully", response));
+    }
+
+    @GetMapping("/{id}/invoice")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<Resource> downloadInvoice(@PathVariable UUID id) {
+        byte[] pdf = orderService.generateInvoicePdf(id);
+        ByteArrayResource resource = new ByteArrayResource(pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=invoice-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/receipt")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<Resource> downloadReceipt(@PathVariable UUID id) {
+        byte[] pdf = orderService.generateReceiptPdf(id);
+        ByteArrayResource resource = new ByteArrayResource(pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/shipping-label")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<Resource> downloadShippingLabel(@PathVariable UUID id) {
+        byte[] pdf = orderService.generateShippingLabelPdf(id);
+        ByteArrayResource resource = new ByteArrayResource(pdf);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=shipping-label-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(resource);
     }
 }

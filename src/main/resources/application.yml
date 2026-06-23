@@ -99,6 +99,13 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8085}
   backup:
     dir: ${BACKUP_DIR:${user.dir}/backups}
+  print:
+    company-name: ${PRINT_COMPANY_NAME:Kismet Plus (Pvt) Ltd}
+    company-address: ${PRINT_COMPANY_ADDRESS:Vavuniya}
+    company-phone: ${PRINT_COMPANY_PHONE:}
+    company-email: ${PRINT_COMPANY_EMAIL:}
+    company-registration: ${PRINT_COMPANY_REGISTRATION:}
+    logo-url: ${PRINT_LOGO_URL:https://s3.eu-north-1.amazonaws.com/pathfinder-app-media/products/8bced4aa-90b9-4a5b-a609-4deaad146fe3/eeb6cb2f-dbc3-4aec-a9a2-cb43a899c673-Untitled_-_05_June_2026_at_19.30.26_copy.png}
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:super@ebee.lk}
     phone-number: ${SUPER_ADMIN_PHONE:}

@@ -43,4 +43,6 @@ public interface ProductService {
     void deleteProduct(UUID id);
 
     void deleteProductImage(UUID productId, UUID imageId);
+
+    byte[] generateProductLabelPdf(UUID id);
 }

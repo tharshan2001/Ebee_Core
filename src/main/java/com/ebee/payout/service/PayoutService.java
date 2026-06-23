@@ -6,6 +6,7 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.service.PrintTemplateService;
 import com.ebee.payout.dto.PayoutResponse;
 import com.ebee.payout.entity.Payout;
 import com.ebee.payout.enums.PayoutStatus;
@@ -33,6 +34,7 @@ public class PayoutService {
     private final CommissionRepository commissionRepository;
     private final AgentRepository agentRepository;
     private final PayoutMapper payoutMapper;
+    private final PrintTemplateService printTemplateService;
 
     @Transactional(readOnly = true)
     public List<PayoutResponse> getAllPayouts() {
@@ -116,6 +118,14 @@ public class PayoutService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payout", "id", id));
 
         log.info("PDF requested for payout {}", id);
-        return new byte[0];
+
+        var variables = new java.util.LinkedHashMap<String, Object>();
+        variables.put("payoutId", payout.getId().toString());
+        variables.put("agentName", payout.getAgentName());
+        variables.put("totalAmount", payout.getTotalAmount());
+        variables.put("createdAt", payout.getCreatedAt());
+        variables.put("status", payout.getStatus().name());
+
+        return printTemplateService.renderToPdf("payout-statement", variables);
     }
 }

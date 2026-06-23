@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
+  .header { border-bottom: 2px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 20px; }
+  .header h1 { margin: 0; font-size: 18pt; color: #1a1a1a; }
+  .header .company-info { color: #666; font-size: 8pt; margin-top: 3px; }
+  .header .title { float: right; font-size: 16pt; font-weight: bold; color: #d4a017; }
+  .clearfix::after { content: ""; display: table; clear: both; }
+  .paid-stamp { border: 2px solid #2e7d32; color: #2e7d32; padding: 5px 15px; font-size: 14pt; font-weight: bold; text-align: center; display: inline-block; margin-bottom: 10px; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  .info-table td { vertical-align: top; padding: 3px 5px; }
+  .info-table td:first-child { width: 50%; }
+  .info-table .label { color: #888; font-size: 8pt; text-transform: uppercase; }
+  .info-table .value { font-size: 9pt; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+  table.items th { background: #1a1a1a; color: #fff; padding: 6px 8px; text-align: left; font-size: 8pt; text-transform: uppercase; }
+  table.items td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 9pt; }
+  table.items td.right { text-align: right; }
+  table.items tr:last-child td { border-bottom: 2px solid #1a1a1a; }
+  .totals { width: 300px; margin-left: auto; }
+  .totals table { width: 100%; }
+  .totals td { padding: 3px 8px; font-size: 9pt; }
+  .totals td.right { text-align: right; }
+  .totals .grand-total td { font-size: 12pt; font-weight: bold; border-top: 2px solid #1a1a1a; padding-top: 5px; }
+  .footer { border-top: 1px solid #ddd; margin-top: 30px; padding-top: 10px; font-size: 7pt; color: #999; text-align: center; }
+  .notes { border: 1px solid #ddd; padding: 8px; margin-top: 15px; font-size: 8pt; color: #666; }
+</style>
+</head>
+<body>
+<div class="header clearfix">
+  <div style="float: left;">
+    <h1 th:text="${company.name}">Company Name</h1>
+    <div class="company-info">
+      <div th:text="${company.address}">Address</div>
+      <div th:text="${company.phone}">Phone</div>
+      <div th:text="${company.email}">Email</div>
+      <div th:if="${company.registration}" th:text="'Reg: ' + ${company.registration}">Reg</div>
+    </div>
+  </div>
+  <div class="title" th:text="${title}">RECEIPT</div>
+</div>
+
+<div class="paid-stamp">PAID</div>
+
+<table class="info-table">
+  <tr>
+    <td>
+      <div class="label">Order Number</div>
+      <div class="value" th:text="${orderNumber}">ORD-001</div>
+    </td>
+    <td>
+      <div class="label">Date</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'dd MMM yyyy HH:mm')}">Date</div>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <div class="label">Paid At</div>
+      <div class="value" th:text="${#temporals.format(paidAt, 'dd MMM yyyy HH:mm')}">Paid Date</div>
+    </td>
+    <td>
+      <div class="label">Payment Method</div>
+      <div class="value" th:text="${paymentMethod}">Cash</div>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <div class="label">Customer</div>
+      <div class="value" th:text="${customerName}">Customer Name</div>
+      <div class="value" th:if="${customerPhone}" th:text="${customerPhone}">Phone</div>
+      <div class="value" th:if="${customerAddress}" th:text="${customerAddress}">Address</div>
+    </td>
+    <td>
+      <div class="label" th:if="${agentName}">Agent</div>
+      <div class="value" th:if="${agentName}" th:text="${agentName}">Agent</div>
+      <div class="value" th:if="${agentCode}" th:text="'Code: ' + ${agentCode}">Code</div>
+    </td>
+  </tr>
+</table>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width: 50px;">#</th>
+      <th>Item</th>
+      <th style="width: 60px;">Code</th>
+      <th style="width: 50px; text-align: right;">Qty</th>
+      <th style="width: 80px; text-align: right;">Unit Price</th>
+      <th style="width: 80px; text-align: right;">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr th:each="item, stat : ${items}">
+      <td th:text="${stat.count}">1</td>
+      <td th:text="${item.productName}">Product</td>
+      <td th:text="${item.productCode}">CODE</td>
+      <td class="right" th:text="${item.quantity}">1</td>
+      <td class="right" th:text="${#numbers.formatDecimal(item.unitPrice, 1, 2)}">0.00</td>
+      <td class="right" th:text="${#numbers.formatDecimal(item.subtotal, 1, 2)}">0.00</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr>
+      <td>Subtotal</td>
+      <td class="right" th:text="${#numbers.formatDecimal(subtotal, 1, 2)}">0.00</td>
+    </tr>
+    <tr th:if="${discountTotal > 0}">
+      <td>Discount</td>
+      <td class="right" th:text="'-' + ${#numbers.formatDecimal(discountTotal, 1, 2)}">0.00</td>
+    </tr>
+    <tr class="grand-total">
+      <td>Total Paid</td>
+      <td class="right" th:text="${#numbers.formatDecimal(totalAmount, 1, 2)}">0.00</td>
+    </tr>
+  </table>
+</div>
+
+<div th:if="${notes}" class="notes" th:text="${notes}">Notes</div>
+
+<div class="footer">
+  <p>This is a computer-generated receipt. Thank you for your business!</p>
+</div>
+</body>
+</html>

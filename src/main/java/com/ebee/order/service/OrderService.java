@@ -32,4 +32,10 @@ public interface OrderService {
     OrderResponse updateOrderStatus(UUID id, OrderStatus status);
 
     OrderResponse cancelOrder(UUID id);
+
+    byte[] generateInvoicePdf(UUID id);
+
+    byte[] generateReceiptPdf(UUID id);
+
+    byte[] generateShippingLabelPdf(UUID id);
 }

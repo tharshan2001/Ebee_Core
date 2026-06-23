@@ -32,6 +32,7 @@
 		<awssdk.version>2.20.0</awssdk.version>
 		<testcontainers.version>1.20.4</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
+		<flying-saucer.version>10.2.2</flying-saucer.version>
 		<jacoco.version>0.8.12</jacoco.version>
 	</properties>
 
@@ -182,6 +183,23 @@
 			<artifactId>shedlock-provider-jdbc-template</artifactId>
 			<version>5.16.0</version>
 		</dependency>
+
+		<!-- PDF Printing -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>ognl</groupId>
+			<artifactId>ognl</artifactId>
+			<version>3.3.4</version>
+		</dependency>
+		<dependency>
+			<groupId>org.xhtmlrenderer</groupId>
+			<artifactId>flying-saucer-pdf</artifactId>
+			<version>${flying-saucer.version}</version>
+		</dependency>
+
 
 		<!-- Testing -->
 		<dependency>

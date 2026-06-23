@@ -63,7 +63,7 @@ class OrderDiscountIntegrationTest {
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;
 
-    @InjectMocks private OrderService orderService;
+    @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
     @Captor private ArgumentCaptor<Commission> commissionCaptor;

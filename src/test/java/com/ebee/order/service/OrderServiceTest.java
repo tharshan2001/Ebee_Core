@@ -67,7 +67,7 @@ class OrderServiceTest {
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;
 
-    @InjectMocks private OrderService orderService;
+    @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
 

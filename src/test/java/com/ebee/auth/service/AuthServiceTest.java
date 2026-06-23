@@ -57,7 +57,7 @@ class AuthServiceTest {
     @Mock private IpWhitelistService ipWhitelistService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks private AuthService authService;
+    @InjectMocks private AuthServiceImpl authService;
 
     private User createUser(String email, RoleType role, boolean mustChangePassword) {
         return User.builder()

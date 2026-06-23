@@ -3,7 +3,7 @@ package com.ebee.common.security;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
-import com.ebee.user.repository.UserRepository;
+import com.ebee.user.service.UserLookupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -16,31 +16,34 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SecurityService {
 
-    private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
 
     public boolean isCurrentUser(UUID userId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return user != null && user.getId().equals(userId);
+    }
+
+    public User getCurrentUser(Authentication authentication) {
         if (authentication == null) {
             authentication = SecurityContextHolder.getContext().getAuthentication();
         }
-        if (authentication == null || authentication.getName() == null) {
-            return false;
-        }
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .map(user -> user.getId().equals(userId))
-                .orElse(false);
-    }
-
-    public UUID getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null) {
             return null;
         }
         Object principal = authentication.getPrincipal();
-        if (principal instanceof UserPrincipal) {
-            return ((UserPrincipal) principal).getUser().getId();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            return userPrincipal.getUser();
         }
-        return null;
+        return userLookupService.findByEmail(authentication.getName()).orElse(null);
+    }
+
+    public UUID getCurrentUserId(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return user != null ? user.getId() : null;
+    }
+
+    public UUID getCurrentUserId() {
+        return getCurrentUserId(null);
     }
 
     public boolean isAdmin() {

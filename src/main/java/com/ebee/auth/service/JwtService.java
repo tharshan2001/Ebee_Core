@@ -1,12 +1,12 @@
 package com.ebee.auth.service;
 
+import com.ebee.auth.config.JwtProperties;
 import com.ebee.user.enums.RoleType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,20 +24,14 @@ import java.util.function.Function;
 @Slf4j
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final JwtProperties jwtProperties;
 
-    @Value("${jwt.reset-secret}")
-    private String resetSecret;
-
-    @Value("${jwt.expiration:86400000}")
-    private long expiration;
-
-    @Value("${jwt.refreshExpiration:604800000}")
-    private long refreshExpiration;
+    public JwtService(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+    }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(Authentication authentication) {
@@ -54,7 +48,7 @@ public class JwtService {
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtProperties.getExpiration()))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -68,7 +62,7 @@ public class JwtService {
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setNotBefore(new Date(System.currentTimeMillis() - 30_000))
-                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtProperties.getRefreshExpiration()))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -151,7 +145,7 @@ public class JwtService {
     }
 
     private Key getResetSigningKey() {
-        return Keys.hmacShaKeyFor(resetSecret.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(jwtProperties.getResetSecret().getBytes(StandardCharsets.UTF_8));
     }
 
     private <T> T extractClaim(String token, Key signingKey, Function<Claims, T> claimsResolver) {

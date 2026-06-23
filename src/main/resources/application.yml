@@ -88,8 +88,15 @@ notification:
     default-mask: ${DIALOG_SMS_MASK:KISMET PLUS}
     default-campaign: ${DIALOG_SMS_CAMPAIGN:Notification}
 
+whatsapp:
+  api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  verify-token: ${WHATSAPP_VERIFY_TOKEN:ebee_wh_verify_2024}
+
 app:
-  # cors.allowed-origins: Comma-separated list of allowed CORS origins (default: http://localhost:5173,http://localhost:5174,http://localhost:8085)
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8085}
   backup:
     dir: ${BACKUP_DIR:${user.dir}/backups}
   super-admin:

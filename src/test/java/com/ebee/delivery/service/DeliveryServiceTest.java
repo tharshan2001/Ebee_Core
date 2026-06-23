@@ -145,6 +145,7 @@ class DeliveryServiceTest {
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
         when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
 
         var result = deliveryService.assignDelivery(orderId, driverUserId);
 

@@ -1,12 +1,10 @@
 package com.ebee.reminder.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.security.SecurityService;
 import com.ebee.reminder.dto.ReminderRequest;
 import com.ebee.reminder.dto.ReminderResponse;
 import com.ebee.reminder.service.ReminderService;
-import com.ebee.user.entity.User;
-import com.ebee.user.enums.RoleType;
-import com.ebee.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,7 +26,7 @@ import java.util.UUID;
 public class ReminderController {
 
     private final ReminderService reminderService;
-    private final UserRepository userRepository;
+    private final SecurityService securityService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<ReminderResponse>>> getReminders(
@@ -36,7 +34,7 @@ public class ReminderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        UUID userId = getUserId(authentication);
+        UUID userId = securityService.getCurrentUserId(authentication);
 
         if (startDate == null) startDate = LocalDate.now().withDayOfMonth(1);
         if (endDate == null) endDate = startDate.plusMonths(1).minusDays(1);
@@ -47,7 +45,7 @@ public class ReminderController {
 
     @GetMapping("/today")
     public ResponseEntity<ApiResponse<List<ReminderResponse>>> getTodayReminders(Authentication authentication) {
-        UUID userId = getUserId(authentication);
+        UUID userId = securityService.getCurrentUserId(authentication);
         List<ReminderResponse> reminders = reminderService.getTodayReminders(userId);
         return ResponseEntity.ok(ApiResponse.success("Today's reminders retrieved successfully", reminders));
     }
@@ -55,7 +53,7 @@ public class ReminderController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReminderResponse>> getReminder(@PathVariable UUID id, Authentication authentication) {
         ReminderResponse response = reminderService.getReminderById(id);
-        UUID currentUserId = getUserId(authentication);
+        UUID currentUserId = securityService.getCurrentUserId(authentication);
         if (!response.getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
@@ -66,7 +64,7 @@ public class ReminderController {
     public ResponseEntity<ApiResponse<ReminderResponse>> createReminder(
             Authentication authentication,
             @Valid @RequestBody ReminderRequest request) {
-        UUID userId = getUserId(authentication);
+        UUID userId = securityService.getCurrentUserId(authentication);
         ReminderResponse response = reminderService.createReminder(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Reminder created successfully", response));
@@ -78,7 +76,7 @@ public class ReminderController {
             @Valid @RequestBody ReminderRequest request,
             Authentication authentication) {
         ReminderResponse existing = reminderService.getReminderById(id);
-        UUID currentUserId = getUserId(authentication);
+        UUID currentUserId = securityService.getCurrentUserId(authentication);
         if (!existing.getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
@@ -89,7 +87,7 @@ public class ReminderController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReminder(@PathVariable UUID id, Authentication authentication) {
         ReminderResponse existing = reminderService.getReminderById(id);
-        UUID currentUserId = getUserId(authentication);
+        UUID currentUserId = securityService.getCurrentUserId(authentication);
         if (!existing.getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
@@ -100,17 +98,11 @@ public class ReminderController {
     @PatchMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<ReminderResponse>> completeReminder(@PathVariable UUID id, Authentication authentication) {
         ReminderResponse existing = reminderService.getReminderById(id);
-        UUID currentUserId = getUserId(authentication);
+        UUID currentUserId = securityService.getCurrentUserId(authentication);
         if (!existing.getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
         ReminderResponse response = reminderService.completeReminder(id);
         return ResponseEntity.ok(ApiResponse.success("Reminder completed successfully", response));
-    }
-
-    private UUID getUserId(Authentication authentication) {
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return user.getId();
     }
 }

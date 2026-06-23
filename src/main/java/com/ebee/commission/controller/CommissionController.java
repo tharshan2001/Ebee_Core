@@ -10,9 +10,7 @@ import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.dto.PendingPaymentSummary;
-import com.ebee.commission.entity.Commission;
 import com.ebee.commission.mapper.CommissionMapper;
-import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.commission.service.CommissionQueryService;
@@ -37,7 +35,6 @@ public class CommissionController {
     private final CommissionCalculationService calculationService;
     private final CommissionLifecycleService lifecycleService;
     private final CommissionQueryService queryService;
-    private final CommissionRepository commissionRepository;
     private final CommissionMapper mapper;
 
     @PostMapping("/calculate")

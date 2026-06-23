@@ -1,5 +1,6 @@
 package com.ebee.auth.service;
 
+import com.ebee.auth.config.JwtProperties;
 import com.ebee.user.enums.RoleType;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -12,7 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -35,11 +35,8 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
-        ReflectionTestUtils.setField(jwtService, "secret", SECRET);
-        ReflectionTestUtils.setField(jwtService, "resetSecret", RESET_SECRET);
-        ReflectionTestUtils.setField(jwtService, "expiration", EXPIRATION);
-        ReflectionTestUtils.setField(jwtService, "refreshExpiration", REFRESH_EXPIRATION);
+        JwtProperties properties = new JwtProperties(SECRET, RESET_SECRET, EXPIRATION, REFRESH_EXPIRATION);
+        jwtService = new JwtService(properties);
     }
 
     private Authentication createAuthentication(String email, String role) {

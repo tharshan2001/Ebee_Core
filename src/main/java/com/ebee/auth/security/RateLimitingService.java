@@ -1,9 +1,9 @@
 package com.ebee.auth.security;
 
+import com.ebee.auth.config.RateLimitingProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -16,29 +16,17 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class RateLimitingService {
 
-    @Value("${rate-limiting.login.max-attempts:5}")
-    private int maxLoginAttempts;
-
-    @Value("${rate-limiting.login.window-minutes:15}")
-    private int loginWindowMinutes;
-
-    @Value("${rate-limiting.generic.max-requests:20}")
-    private int maxRequests;
-
-    @Value("${rate-limiting.generic.window-minutes:15}")
-    private int genericWindowMinutes;
-
-    @Value("${rate-limiting.ip.max-requests:100}")
-    private int maxIpRequests;
-
-    @Value("${rate-limiting.ip.window-minutes:1}")
-    private int ipWindowMinutes;
+    private final RateLimitingProperties rateLimitingProperties;
 
     private final Map<String, SlidingWindow> loginAttempts = new ConcurrentHashMap<>();
     private final Map<String, SlidingWindow> genericRateLimiters = new ConcurrentHashMap<>();
     private final Map<String, SlidingWindow> ipRateLimiters = new ConcurrentHashMap<>();
 
     private final ScheduledExecutorService cleaner = Executors.newSingleThreadScheduledExecutor();
+
+    public RateLimitingService(RateLimitingProperties rateLimitingProperties) {
+        this.rateLimitingProperties = rateLimitingProperties;
+    }
 
     @PostConstruct
     void startCleaner() {
@@ -52,19 +40,22 @@ public class RateLimitingService {
 
     public boolean isLoginAllowed(String key) {
         SlidingWindow window = loginAttempts.computeIfAbsent(key,
-                k -> new SlidingWindow(maxLoginAttempts, loginWindowMinutes));
+                k -> new SlidingWindow(rateLimitingProperties.getLogin().getMaxAttempts(),
+                        rateLimitingProperties.getLogin().getWindowMinutes()));
         return window.tryAcquire();
     }
 
     public boolean isAllowed(String key) {
         SlidingWindow window = genericRateLimiters.computeIfAbsent(key,
-                k -> new SlidingWindow(maxRequests, genericWindowMinutes));
+                k -> new SlidingWindow(rateLimitingProperties.getGeneric().getMaxRequests(),
+                        rateLimitingProperties.getGeneric().getWindowMinutes()));
         return window.tryAcquire();
     }
 
     public boolean isIpAllowed(String ip) {
         SlidingWindow window = ipRateLimiters.computeIfAbsent(ip,
-                k -> new SlidingWindow(maxIpRequests, ipWindowMinutes));
+                k -> new SlidingWindow(rateLimitingProperties.getIp().getMaxRequests(),
+                        rateLimitingProperties.getIp().getWindowMinutes()));
         return window.tryAcquire();
     }
 

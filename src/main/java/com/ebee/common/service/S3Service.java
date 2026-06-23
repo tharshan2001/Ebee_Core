@@ -1,8 +1,8 @@
 package com.ebee.common.service;
 
+import com.ebee.common.config.AwsProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,12 +17,7 @@ import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 public class S3Service {
 
     private final S3Client s3Client;
-
-    @Value("${aws.bucket-name}")
-    private String bucketName;
-
-    @Value("${aws.region}")
-    private String region;
+    private final AwsProperties awsProperties;
 
     private static final java.util.Set<String> ALLOWED_CONTENT_TYPES = java.util.Set.of(
             "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -47,7 +42,7 @@ public class S3Service {
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(awsProperties.getBucketName())
                     .key(fileName)
                     .contentType(file.getContentType())
                     .serverSideEncryption(ServerSideEncryption.AES256)
@@ -56,7 +51,7 @@ public class S3Service {
             s3Client.putObject(putObjectRequest,
                     software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.getBytes()));
 
-            return "https://s3." + region + ".amazonaws.com/" + bucketName + "/" + fileName;
+            return "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/" + fileName;
 
         } catch (S3Exception e) {
             log.error("Failed to upload file to S3: {}", e.getMessage(), e);
@@ -77,7 +72,7 @@ public class S3Service {
             String key = extractKeyFromUrl(fileUrl);
 
             s3Client.deleteObject(b -> b
-                    .bucket(bucketName)
+                    .bucket(awsProperties.getBucketName())
                     .key(key)
             );
 
@@ -87,7 +82,7 @@ public class S3Service {
     }
 
     private String extractKeyFromUrl(String fileUrl) {
-        String baseUrl = "https://s3." + region + ".amazonaws.com/" + bucketName + "/";
+        String baseUrl = "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/";
         return fileUrl.replace(baseUrl, "");
     }
 }

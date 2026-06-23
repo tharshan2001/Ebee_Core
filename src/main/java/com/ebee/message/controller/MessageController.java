@@ -1,11 +1,11 @@
 package com.ebee.message.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.security.SecurityService;
 import com.ebee.message.dto.MessageRequest;
 import com.ebee.message.dto.MessageResponse;
 import com.ebee.message.service.MessageService;
 import com.ebee.user.entity.User;
-import com.ebee.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,13 +32,13 @@ import java.util.UUID;
 public class MessageController {
 
     private final MessageService messageService;
-    private final UserRepository userRepository;
+    private final SecurityService securityService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
             Authentication authentication,
             @Valid @RequestBody MessageRequest request) {
-        User admin = getUser(authentication);
+        User admin = securityService.getCurrentUser(authentication);
         MessageResponse response = messageService.sendMessage(admin, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message sent successfully", response));
@@ -50,7 +50,7 @@ public class MessageController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         size = Math.min(size, 200);
-        User admin = getUser(authentication);
+        User admin = securityService.getCurrentUser(authentication);
         Page<MessageResponse> messages = messageService.getSentMessages(admin,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "sentAt")));
         return ResponseEntity.ok(ApiResponse.success("Sent messages retrieved", messages));
@@ -63,14 +63,9 @@ public class MessageController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         size = Math.min(size, 200);
-        User admin = getUser(authentication);
+        User admin = securityService.getCurrentUser(authentication);
         MessageResponse response = messageService.getMessageWithRecipients(id, admin,
                 PageRequest.of(page, size));
         return ResponseEntity.ok(ApiResponse.success("Message retrieved", response));
-    }
-
-    private User getUser(Authentication authentication) {
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

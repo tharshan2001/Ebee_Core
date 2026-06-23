@@ -4,7 +4,6 @@ import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.common.util.RequestUtils;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
-import com.ebee.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,6 @@ import java.io.IOException;
 public class IpWhitelistFilter extends OncePerRequestFilter {
 
     private final IpWhitelistService ipWhitelistService;
-    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

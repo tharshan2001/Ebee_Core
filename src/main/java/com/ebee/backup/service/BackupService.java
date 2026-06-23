@@ -2,9 +2,10 @@ package com.ebee.backup.service;
 
 import com.ebee.backup.enums.BackupAction;
 import com.ebee.backup.service.BackupAuditLogService;
+import com.ebee.common.config.AppProperties;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,25 +26,24 @@ import java.util.*;
 public class BackupService {
 
     private final BackupAuditLogService auditLogService;
+    private final AppProperties appProperties;
+    private final DataSourceProperties dataSourceProperties;
 
-    @Value("${app.backup.dir}")
-    private String backupDir;
-
-    @Value("${spring.datasource.url}")
-    private String jdbcUrl;
-
-    @Value("${spring.datasource.username}")
-    private String dbUser;
-
-    @Value("${spring.datasource.password}")
-    private String dbPassword;
-
-    public BackupService(BackupAuditLogService auditLogService) {
+    public BackupService(BackupAuditLogService auditLogService,
+                         AppProperties appProperties,
+                         DataSourceProperties dataSourceProperties) {
         this.auditLogService = auditLogService;
+        this.appProperties = appProperties;
+        this.dataSourceProperties = dataSourceProperties;
+    }
+
+    private String getBackupDir() {
+        String dir = appProperties.getBackup().getDir();
+        return dir != null && !dir.isBlank() ? dir : System.getProperty("user.dir") + "/backups";
     }
 
     public List<Map<String, Object>> listBackups() {
-        File dir = new File(backupDir);
+        File dir = new File(getBackupDir());
         if (!dir.exists()) {
             dir.mkdirs();
             return Collections.emptyList();
@@ -68,7 +68,7 @@ public class BackupService {
         ensureDir();
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         String filename = "ebee_db_" + timestamp + ".dump";
-        Path filePath = Paths.get(backupDir, filename);
+        Path filePath = Paths.get(getBackupDir(), filename);
 
         Map<String, String> db = parseDbUrl();
 
@@ -201,12 +201,12 @@ public class BackupService {
             filename = filename + ".dump";
         }
 
-        Path target = Paths.get(backupDir, filename);
+        Path target = Paths.get(getBackupDir(), filename);
         int counter = 1;
         while (Files.exists(target)) {
             String base = filename.contains(".") ? filename.substring(0, filename.lastIndexOf('.')) : filename;
             String ext = filename.contains(".") ? filename.substring(filename.lastIndexOf('.')) : "";
-            target = Paths.get(backupDir, base + "_" + counter + ext);
+            target = Paths.get(getBackupDir(), base + "_" + counter + ext);
             counter++;
         }
 
@@ -234,7 +234,7 @@ public class BackupService {
     }
 
     private Path resolveSafePath(String filename) {
-        Path base = Paths.get(backupDir).normalize().toAbsolutePath();
+        Path base = Paths.get(getBackupDir()).normalize().toAbsolutePath();
         Path resolved = base.resolve(filename).normalize().toAbsolutePath();
         if (!resolved.startsWith(base)) {
             throw new SecurityException("Invalid path traversal: " + filename);
@@ -243,6 +243,7 @@ public class BackupService {
     }
 
     private Map<String, String> parseDbUrl() {
+        String jdbcUrl = dataSourceProperties.getUrl();
         String withoutPrefix = jdbcUrl.substring("jdbc:postgresql://".length());
         int slashIndex = withoutPrefix.indexOf('/');
         String hostPort = (slashIndex > 0) ? withoutPrefix.substring(0, slashIndex) : withoutPrefix;
@@ -260,8 +261,8 @@ public class BackupService {
         result.put("host", host);
         result.put("port", port);
         result.put("name", dbName);
-        result.put("user", dbUser);
-        result.put("password", dbPassword != null ? dbPassword : "");
+        result.put("user", dataSourceProperties.getUsername());
+        result.put("password", dataSourceProperties.getPassword() != null ? dataSourceProperties.getPassword() : "");
         return result;
     }
 
@@ -295,7 +296,7 @@ public class BackupService {
     }
 
     private void ensureDir() {
-        File dir = new File(backupDir);
+        File dir = new File(getBackupDir());
         if (!dir.exists()) {
             dir.mkdirs();
         }

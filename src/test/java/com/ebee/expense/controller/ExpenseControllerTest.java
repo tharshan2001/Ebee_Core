@@ -1,9 +1,12 @@
 package com.ebee.expense.controller;
 
+import com.ebee.auth.config.AuthPropertiesConfig;
 import com.ebee.auth.security.RateLimitingService;
 import com.ebee.auth.security.SecurityConfig;
+import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
+import com.ebee.common.config.CommonPropertiesConfig;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
 import com.ebee.expense.enums.ExpenseCategory;
@@ -35,7 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ExpenseController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AuthPropertiesConfig.class, CommonPropertiesConfig.class})
 class ExpenseControllerTest {
 
     @Autowired private MockMvc mockMvc;
@@ -45,10 +48,12 @@ class ExpenseControllerTest {
     @MockBean private JwtService jwtService;
     @MockBean private UserDetailsServiceImpl userDetailsService;
     @MockBean private RateLimitingService rateLimitingService;
+    @MockBean private IpWhitelistService ipWhitelistService;
 
     @BeforeEach
     void setUp() {
         when(rateLimitingService.isIpAllowed(anyString())).thenReturn(true);
+        when(ipWhitelistService.isAllowed(any(), anyString())).thenReturn(true);
     }
 
     @Test

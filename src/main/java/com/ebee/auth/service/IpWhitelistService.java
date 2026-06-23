@@ -4,6 +4,7 @@ import com.ebee.auth.dto.IpWhitelistRequest;
 import com.ebee.auth.dto.IpWhitelistResponse;
 import com.ebee.auth.entity.IpWhitelist;
 import com.ebee.auth.repository.IpWhitelistRepository;
+import com.ebee.common.config.AppProperties;
 import com.ebee.common.security.SecurityService;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
@@ -11,7 +12,6 @@ import com.ebee.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +27,7 @@ public class IpWhitelistService {
     private final IpWhitelistRepository ipWhitelistRepository;
     private final UserRepository userRepository;
     private final SecurityService securityService;
-
-    @Value("${app.ip-whitelist.super-admin-ips:}")
-    private String superAdminIps;
+    private final AppProperties appProperties;
 
     public boolean isAllowed(User user, String ip) {
         if (user.getRole() == RoleType.AGENT || user.getRole() == RoleType.DRIVER) {
@@ -37,7 +35,8 @@ public class IpWhitelistService {
         }
 
         if (user.getRole() == RoleType.SUPER_ADMIN) {
-            if (superAdminIps.isBlank()) {
+            String superAdminIps = appProperties.getIpWhitelist().getSuperAdminIps();
+            if (superAdminIps == null || superAdminIps.isBlank()) {
                 return true;
             }
             return matchesAny(ip, superAdminIps);

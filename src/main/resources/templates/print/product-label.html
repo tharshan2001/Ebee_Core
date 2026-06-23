@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <head>
 <meta charset="UTF-8"/>
 <style>
@@ -14,7 +14,16 @@
 </head>
 <body>
 <div class="label">
-  <div class="product-name" th:text="${productName}">Product Name</div>
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
+    <tr>
+      <td style="width: 26px; vertical-align: middle;">
+        <img src="ebee_logo.png" alt="Logo" style="width: 22px; height: auto; display: block;"/>
+      </td>
+      <td style="vertical-align: middle;">
+        <div class="product-name" style="margin-bottom: 0;" th:text="${productName}">Product Name</div>
+      </td>
+    </tr>
+  </table>
   <div class="sku" th:text="'SKU: ' + ${itemCode}">CODE</div>
   <div class="price" th:text="${#numbers.formatDecimal(price, 1, 2)}">0.00</div>
   <div class="meta">

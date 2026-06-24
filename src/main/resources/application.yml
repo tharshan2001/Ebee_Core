@@ -38,14 +38,18 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${GMAIL_USERNAME:}
-    password: ${GMAIL_APP_PASSWORD:}
+    username: ${APP_GMAIL_USERNAME:}
+    password: ${APP_GMAIL_PASSWORD:}
+    from: ${APP_GMAIL_USERNAME:}
     properties:
       mail:
+        debug: true
         smtp:
           auth: true
           starttls:
             enable: true
+          ssl:
+            trust: smtp.gmail.com
 
   flyway:
     enabled: true

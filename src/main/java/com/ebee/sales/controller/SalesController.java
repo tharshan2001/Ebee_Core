@@ -1,8 +1,12 @@
 package com.ebee.sales.controller;
 
+import com.ebee.agent.dto.AgentResponse;
+import com.ebee.agent.service.AgentService;
 import com.ebee.common.enums.District;
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.security.SecurityService;
 import com.ebee.sales.dto.*;
+import com.ebee.sales.service.AgentDashboardService;
 import com.ebee.sales.service.DashboardService;
 import com.ebee.sales.service.LeaderboardService;
 import com.ebee.sales.service.SalesService;
@@ -24,6 +28,9 @@ public class SalesController {
     private final SalesService salesService;
     private final DashboardService dashboardService;
     private final LeaderboardService leaderboardService;
+    private final AgentDashboardService agentDashboardService;
+    private final SecurityService securityService;
+    private final AgentService agentService;
 
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
@@ -75,6 +82,14 @@ public class SalesController {
         List<AgentLeaderboardResponse> response = leaderboardService.getMyRank(
                 metric, district, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("My rank retrieved successfully", response));
+    }
+
+    @GetMapping("/my-stats")
+    @PreAuthorize("hasRole('AGENT')")
+    public ResponseEntity<ApiResponse<AgentDashboardResponse>> getMyStats() {
+        UUID agentId = getCurrentAgentId();
+        AgentDashboardResponse response = agentDashboardService.getStats(agentId);
+        return ResponseEntity.ok(ApiResponse.success("Dashboard stats retrieved successfully", response));
     }
 
     @GetMapping("/by-product")
@@ -130,5 +145,10 @@ public class SalesController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         List<SalesTrendResponse> response = salesService.getYearlyTrend(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Yearly sales trend retrieved successfully", response));
+    }
+
+    private UUID getCurrentAgentId() {
+        UUID userId = securityService.getCurrentUserId();
+        return agentService.getAgentByUserId(userId).getId();
     }
 }

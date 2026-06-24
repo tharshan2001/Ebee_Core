@@ -1,7 +1,10 @@
 package com.ebee.commission.controller;
 
+import com.ebee.agent.dto.AgentResponse;
+import com.ebee.agent.service.AgentService;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortUtils;
 import com.ebee.common.util.SortableFields;
@@ -36,6 +39,8 @@ public class CommissionController {
     private final CommissionLifecycleService lifecycleService;
     private final CommissionQueryService queryService;
     private final CommissionMapper mapper;
+    private final SecurityService securityService;
+    private final AgentService agentService;
 
     @PostMapping("/calculate")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
@@ -99,6 +104,22 @@ public class CommissionController {
         return ResponseEntity.ok(ApiResponse.success("Pending payment summary retrieved successfully", response));
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('AGENT')")
+    public ResponseEntity<ApiResponse<List<CommissionResponse>>> getMyCommissions() {
+        UUID agentId = getCurrentAgentId();
+        List<CommissionResponse> response = queryService.getCommissionsByAgent(agentId);
+        return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", response));
+    }
+
+    @GetMapping("/my/pending-payment")
+    @PreAuthorize("hasRole('AGENT')")
+    public ResponseEntity<ApiResponse<PendingPaymentSummary>> getMyPendingPayment() {
+        UUID agentId = getCurrentAgentId();
+        PendingPaymentSummary response = queryService.getPendingPaymentSummary(agentId);
+        return ResponseEntity.ok(ApiResponse.success("Pending payment summary retrieved successfully", response));
+    }
+
     @PostMapping("/pay-batch")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<BatchPaymentResponse>> payBatch(
@@ -125,5 +146,10 @@ public class CommissionController {
     public ResponseEntity<ApiResponse<CommissionResponse>> getCommissionById(@PathVariable UUID id) {
         CommissionResponse response = queryService.getCommissionById(id);
         return ResponseEntity.ok(ApiResponse.success("Commission retrieved successfully", response));
+    }
+
+    private UUID getCurrentAgentId() {
+        UUID userId = securityService.getCurrentUserId();
+        return agentService.getAgentByUserId(userId).getId();
     }
 }

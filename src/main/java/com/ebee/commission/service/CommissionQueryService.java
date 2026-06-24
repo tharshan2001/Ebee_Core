@@ -7,12 +7,14 @@ import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.mapper.CommissionMapper;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.payout.repository.PayoutRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ebee.payout.entity.Payout;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class CommissionQueryService {
 
     private final CommissionRepository commissionRepository;
+    private final PayoutRepository payoutRepository;
     private final CommissionMapper mapper;
 
     public PendingPaymentSummary getPendingPaymentSummary(UUID agentId) {
@@ -33,6 +36,7 @@ public class CommissionQueryService {
         List<CommissionResponse> responses = processing.stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
                 .toList();
+        enrichWithPayoutIds(responses);
         return PendingPaymentSummary.builder()
                 .totalAvailable(total)
                 .processingCount(processing.size())
@@ -42,28 +46,36 @@ public class CommissionQueryService {
 
     public List<CommissionResponse> getCommissionsByAgent(UUID agentId) {
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);
-        return commissionRepository.findByAgentIdWithDetails(agentId).stream()
+        List<CommissionResponse> responses = commissionRepository.findByAgentIdWithDetails(agentId).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), totalSales))
                 .toList();
+        enrichWithPayoutIds(responses);
+        return responses;
     }
 
     public List<CommissionResponse> getCommissionsByStatus(CommissionStatus status) {
-        return commissionRepository.findByStatusWithDetails(status).stream()
+        List<CommissionResponse> responses = commissionRepository.findByStatusWithDetails(status).stream()
                 .map(c -> enrichWithAgentTotals(mapper.toResponse(c), null))
                 .toList();
+        enrichWithPayoutIds(responses);
+        return responses;
     }
 
     public CommissionResponse getCommissionById(UUID id) {
         Commission commission = commissionRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + id));
         BigDecimal totalSales = commissionRepository.sumSalesByAgentId(commission.getAgent().getId());
-        return enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
+        CommissionResponse response = enrichWithAgentTotals(mapper.toResponse(commission), totalSales);
+        enrichWithPayoutIds(List.of(response));
+        return response;
     }
 
     public Page<CommissionResponse> getAllCommissions(Pageable pageable) {
         Page<Commission> commissions = commissionRepository.findAllWithDetails(pageable);
         Map<UUID, BigDecimal> salesMap = buildSalesMap(commissions.getContent());
-        return commissions.map(c -> enrichWithAgentTotals(mapper.toResponse(c), salesMap.get(c.getAgent().getId())));
+        Page<CommissionResponse> page = commissions.map(c -> enrichWithAgentTotals(mapper.toResponse(c), salesMap.get(c.getAgent().getId())));
+        enrichWithPayoutIds(page.getContent());
+        return page;
     }
 
     private Map<UUID, BigDecimal> buildSalesMap(List<Commission> commissions) {
@@ -79,5 +91,19 @@ public class CommissionQueryService {
     private CommissionResponse enrichWithAgentTotals(CommissionResponse response, BigDecimal totalSales) {
         response.setAgentTotalSales(totalSales);
         return response;
+    }
+
+    private void enrichWithPayoutIds(List<CommissionResponse> responses) {
+        if (responses.isEmpty()) return;
+        List<UUID> commissionIds = responses.stream()
+                .map(CommissionResponse::getId)
+                .toList();
+        List<Payout> payouts = payoutRepository.findByCommissionIds(commissionIds);
+        Map<UUID, UUID> payoutMap = payouts.stream()
+                .flatMap(p -> p.getCommissionIds().stream().map(cid -> Map.entry(cid, p.getId())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+        for (CommissionResponse r : responses) {
+            r.setPayoutId(payoutMap.get(r.getId()));
+        }
     }
 }

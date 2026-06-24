@@ -26,6 +26,7 @@ public class CommissionResponse {
     private LocalDateTime paidAt;
     private String notes;
     private String errorMessage;
+    private UUID payoutId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

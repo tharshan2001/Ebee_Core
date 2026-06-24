@@ -165,6 +165,7 @@ public class UserService {
     private void encodePasswordIfPresent(User user, String rawPassword) {
         if (rawPassword != null && !rawPassword.isEmpty()) {
             user.setPassword(passwordEncoder.encode(rawPassword));
+            user.setMustChangePassword(false);
         }
     }
 }

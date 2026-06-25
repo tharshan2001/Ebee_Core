@@ -20,6 +20,7 @@ import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
+import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -154,6 +155,7 @@ class OrderDiscountIntegrationTest {
         OrderRequest request = new OrderRequest();
         request.setAgentCode("JF-008");
         request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(PaymentMethod.CASH);
         request.setItems(List.of(item));
 
         Commission commission = Commission.builder()
@@ -208,6 +210,7 @@ class OrderDiscountIntegrationTest {
         OrderRequest request = new OrderRequest();
         request.setAgentCode("JF-008");
         request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(PaymentMethod.CASH);
         request.setItems(List.of(item));
 
         Commission commission = Commission.builder()
@@ -253,6 +256,7 @@ class OrderDiscountIntegrationTest {
         OrderRequest request = new OrderRequest();
         request.setAgentCode("JF-008");
         request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(PaymentMethod.CASH);
         request.setItems(List.of(item));
 
         Commission commission = Commission.builder()
@@ -361,6 +365,7 @@ class OrderDiscountIntegrationTest {
         OrderRequest request = new OrderRequest();
         request.setAgentCode("JF-008");
         request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(PaymentMethod.CASH);
         request.setItems(List.of(item1, item2));
 
         Commission commission = Commission.builder()

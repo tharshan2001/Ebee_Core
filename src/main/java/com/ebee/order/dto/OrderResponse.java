@@ -3,6 +3,8 @@ package com.ebee.order.dto;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -24,6 +26,11 @@ public class OrderResponse {
     private String customerPhone;
     private BigDecimal totalAmount;
     private OrderStatus status;
+    private PaymentMethod paymentMethod;
+    private PaymentStatus paymentStatus;
+    private BigDecimal paidAmount;
+    private LocalDateTime paidAt;
+    private BigDecimal outstandingBalance;
     private String notes;
     private UUID createdById;
     private String createdByName;

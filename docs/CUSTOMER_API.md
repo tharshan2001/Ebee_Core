@@ -66,13 +66,13 @@ Creates a new customer. Phone number must be unique.
 |-------|------|----------|-------|
 | firstName | String | Yes | |
 | lastName | String | Yes | |
-| phoneNumber | String | Yes | Must be unique |
-| email | String | No | |
-| address | Object | No | Nested address object |
-| address.street | String | No | Max 255 chars |
-| address.city | String | No | Max 100 chars |
-| address.district | String | No | Must be a supported district (see table in [Agent API](AGENT_API.md#supported-districts)), case-insensitive |
-| address.postalCode | String | No | Max 20 chars |
+| phoneNumber | String | Yes | Must be unique, 10 digits starting with 0 |
+| email | String | Yes | Must be a valid email format |
+| address | Object | Yes | Nested address object |
+| address.street | String | Yes | Max 255 chars |
+| address.city | String | Yes | Max 100 chars |
+| address.district | String | Yes | Must be a supported district (see table in [Agent API](AGENT_API.md#supported-districts)), case-insensitive |
+| address.postalCode | String | Yes | Max 20 chars |
 
 **Success Response (201 Created):**
 ```json
@@ -86,6 +86,8 @@ Creates a new customer. Phone number must be unique.
     "phoneNumber": "+94111111111",
     "email": "arun@example.com",
     "totalOrders": 0,
+    "creditLimit": 50000.00,
+    "outstandingBalance": 0.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "123 Main St",
@@ -144,6 +146,8 @@ If the customer already has an address, it is **updated in place**. If they don'
     "phoneNumber": "+94111111111",
     "email": "newemail@example.com",
     "totalOrders": 0,
+    "creditLimit": 50000.00,
+    "outstandingBalance": 0.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "456 New Rd",
@@ -187,6 +191,8 @@ If the customer already has an address, it is **updated in place**. If they don'
     "phoneNumber": "+94111111111",
     "email": "arun@example.com",
     "totalOrders": 5,
+    "creditLimit": 50000.00,
+    "outstandingBalance": 2500.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "123 Main St",
@@ -256,6 +262,8 @@ curl "http://localhost:8085/api/customers/search?q=Praveen" \
       "phoneNumber": "0771684348",
       "email": null,
       "totalOrders": 5,
+      "creditLimit": 50000.00,
+      "outstandingBalance": 0.00,
       "address": {
         "id": "uuid",
         "street": "123 Main St",
@@ -312,6 +320,8 @@ curl "http://localhost:8085/api/customers?search=Arun&size=10"
         "phoneNumber": "+94111111111",
         "email": "arun@example.com",
         "totalOrders": 0,
+        "creditLimit": 50000.00,
+        "outstandingBalance": 0.00,
         "address": {
           "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
           "street": "123 Main St",
@@ -374,9 +384,9 @@ curl "http://localhost:8085/api/customers?search=Arun&size=10"
 {
   "firstName": "String (required)",
   "lastName": "String (required)",
-  "phoneNumber": "String (required, unique)",
-  "email": "String (optional)",
-  "address": "AddressRequest (optional)"
+  "phoneNumber": "String (required, unique, 10 digits starting with 0)",
+  "email": "String (required, valid email)",
+  "address": "AddressRequest (required)"
 }
 ```
 
@@ -389,6 +399,8 @@ curl "http://localhost:8085/api/customers?search=Arun&size=10"
   "phoneNumber": "String",
   "email": "String or null",
   "totalOrders": "Integer",
+  "creditLimit": "BigDecimal (default 0 — max credit allowed)",
+  "outstandingBalance": "BigDecimal (default 0 — current credit owed)",
   "address": "AddressResponse or null",
   "createdAt": "LocalDateTime",
   "updatedAt": "LocalDateTime"

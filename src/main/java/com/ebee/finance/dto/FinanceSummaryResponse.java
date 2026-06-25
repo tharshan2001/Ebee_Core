@@ -11,6 +11,8 @@ import com.ebee.finance.dto.CategoryBreakdown;
 @Builder
 public class FinanceSummaryResponse {
     private BigDecimal totalRevenue;
+    private BigDecimal collectedRevenue;
+    private BigDecimal outstandingRevenue;
     private BigDecimal totalCommissions;
     private BigDecimal totalExpenses;
     private BigDecimal netProfit;

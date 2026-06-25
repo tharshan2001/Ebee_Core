@@ -2,6 +2,20 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
+## [Unreleased] — 2026-06-25
+
+### Customer Payment System
+
+- **Payment methods enum** (`PaymentMethod`) — `CASH`, `COD`, `BANK_TRANSFER`, `CREDIT`, `CARD_PAYMENT`. Payment method required at order creation.
+- **Payment status enum** (`PaymentStatus`) — `UNPAID`, `PARTIALLY_PAID`, `PAID`, `REFUNDED`. Tracks lifecycle of order payments.
+- **Payment fields added to Order** — `paymentMethod`, `paymentStatus`, `paidAmount`, `paidAt`, `outstandingBalance`. Flyway V66.
+- **Credit fields added to Customer** — `creditLimit`, `outstandingBalance`. Updated automatically on credit orders/payments.
+- **Auto-payment on order create** — `CASH`, `CARD_PAYMENT`, `BANK_TRANSFER` auto-mark `PAID`. `CREDIT` supports flexible partial payment at creation.
+- **Record payment endpoint** — `POST /api/orders/{id}/payment` for subsequent payments (full or partial). Available to ADMIN and AGENT roles.
+- **Finance summary split** — `collectedRevenue` (PAID orders only) and `outstandingRevenue` tracked separately. `netProfit` now based on collected revenue, not total revenue.
+- **Receipt template updated** — Dynamically shows payment status (PAID / UNPAID / PARTIALLY_PAID) and outstanding balance on printed receipts.
+- **Migration V66** — Adds payment columns to `orders` table and credit columns to `customers` table with defaults.
+
 ## [Unreleased] — 2026-06-21
 
 ### CRITICAL Security & Data Integrity Fixes

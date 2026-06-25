@@ -15,6 +15,8 @@ public record ReceiptData(
         String agentName,
         String agentCode,
         String paymentMethod,
+        String paymentStatus,
+        BigDecimal outstandingBalance,
         List<InvoiceData.LineItem> items,
         BigDecimal subtotal,
         BigDecimal discountTotal,

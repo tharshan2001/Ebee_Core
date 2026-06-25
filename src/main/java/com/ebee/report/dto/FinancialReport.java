@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 @Builder
 public class FinancialReport {
     private BigDecimal totalRevenue;
+    private BigDecimal collectedRevenue;
+    private BigDecimal outstandingRevenue;
     private BigDecimal totalCostPrice;
     private BigDecimal grossProfit;
     private BigDecimal grossMargin;

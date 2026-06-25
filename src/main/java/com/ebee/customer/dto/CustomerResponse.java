@@ -2,6 +2,7 @@ package com.ebee.customer.dto;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ public class CustomerResponse {
     private String phoneNumber;
     private String email;
     private Integer totalOrders;
+    private BigDecimal creditLimit;
+    private BigDecimal outstandingBalance;
     private AddressResponse address;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

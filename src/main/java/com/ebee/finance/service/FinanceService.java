@@ -31,9 +31,11 @@ public class FinanceService {
         var endDt = DateUtils.toEndDateTime(end);
 
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(startDt, endDt);
+        BigDecimal collectedRevenue = orderRepository.sumCollectedRevenueByDateRange(startDt, endDt);
+        BigDecimal outstandingRevenue = orderRepository.sumOutstandingByDateRange(startDt, endDt);
         BigDecimal commissions = commissionRepository.sumCommissionLockedByDateRange(startDt, endDt);
         BigDecimal expenses = expenseRepository.sumApprovedByDateRange(start, end);
-        BigDecimal netProfit = revenue.subtract(commissions).subtract(expenses);
+        BigDecimal netProfit = collectedRevenue.subtract(commissions).subtract(expenses);
 
         List<Object[]> categoryRows = expenseRepository.sumApprovedGroupByCategory(start, end);
         List<CategoryBreakdown> expenseByCategory = categoryRows.stream()
@@ -44,6 +46,8 @@ public class FinanceService {
 
         return FinanceSummaryResponse.builder()
                 .totalRevenue(revenue)
+                .collectedRevenue(collectedRevenue)
+                .outstandingRevenue(outstandingRevenue)
                 .totalCommissions(commissions)
                 .totalExpenses(expenses)
                 .netProfit(netProfit)

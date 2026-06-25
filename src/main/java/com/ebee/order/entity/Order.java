@@ -6,6 +6,8 @@ import com.ebee.customer.entity.Customer;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -62,6 +64,26 @@ public class Order {
     @Column(nullable = false)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @Column(name = "paid_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
+    @Column(name = "outstanding_balance", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal outstandingBalance = BigDecimal.ZERO;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

@@ -58,6 +58,9 @@ public class FinancialReportService {
             costPrice = costPrice.add(unitCost.multiply(qty));
         }
 
+        BigDecimal collectedRevenue = orderRepository.sumCollectedRevenueByDateRange(start, end);
+        BigDecimal outstandingRevenue = orderRepository.sumOutstandingByDateRange(start, end);
+
         BigDecimal grossProfit = revenue.subtract(costPrice);
         BigDecimal grossMargin = revenue.compareTo(BigDecimal.ZERO) > 0
                 ? grossProfit.divide(revenue, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
@@ -69,6 +72,8 @@ public class FinancialReportService {
 
         return FinancialReport.builder()
                 .totalRevenue(revenue)
+                .collectedRevenue(collectedRevenue)
+                .outstandingRevenue(outstandingRevenue)
                 .totalCostPrice(costPrice)
                 .grossProfit(grossProfit)
                 .grossMargin(grossMargin.setScale(2, RoundingMode.HALF_UP))

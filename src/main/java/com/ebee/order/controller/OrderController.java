@@ -6,6 +6,7 @@ import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -113,6 +114,15 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(@PathVariable UUID id) {
         OrderResponse response = orderService.cancelOrder(id);
         return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully", response));
+    }
+
+    @PostMapping("/{id}/payment")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<OrderResponse>> recordPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecordPaymentRequest request) {
+        OrderResponse response = orderService.recordPayment(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
     }
 
     @GetMapping("/{id}/invoice")

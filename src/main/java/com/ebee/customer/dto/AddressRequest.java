@@ -1,7 +1,6 @@
 package com.ebee.customer.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -16,7 +15,7 @@ public class AddressRequest {
     @Size(max = 100, message = "City must not exceed 100 characters")
     private String city;
 
-    @NotNull(message = "District is required")
+    @NotBlank(message = "District is required")
     private String district;
 
     @NotBlank(message = "Postal code is required")

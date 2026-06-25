@@ -28,6 +28,29 @@ The system supports two types of orders:
 
 ---
 
+## Payment Methods
+
+The system supports the following payment methods:
+
+| Payment Method | Description | Auto-Payment Status on Create |
+|----------------|-------------|-------------------------------|
+| `CASH` | Cash payment | `PAID` — paidAmount = totalAmount |
+| `COD` | Cash on delivery | `UNPAID` — outstandingBalance = totalAmount |
+| `BANK_TRANSFER` | Bank transfer | `PAID` — paidAmount = totalAmount |
+| `CREDIT` | Credit (full or partial) | `PAID` / `PARTIALLY_PAID` / `UNPAID` — depends on paidAmount provided |
+| `CARD_PAYMENT` | Card payment | `PAID` — paidAmount = totalAmount |
+
+### Credit / Partial Payment
+
+When paying by credit:
+- If no `paidAmount` is provided → `UNPAID`
+- If `paidAmount < totalAmount` → `PARTIALLY_PAID`, `outstandingBalance` tracks remaining
+- If `paidAmount >= totalAmount` → `PAID`
+
+Additional payments can be recorded via the `POST /api/orders/{id}/payment` endpoint.
+
+---
+
 ## Endpoints
 
 ### 1. Create Order
@@ -49,6 +72,7 @@ The `agentCode` is **automatically resolved from the JWT token**.
 ```json
 {
   "customerPhoneNumber": "0111111111",
+  "paymentMethod": "CASH",
   "notes": "Optional order notes",
   "items": [
     {
@@ -65,6 +89,7 @@ Admin omits `agentCode`. Order is created as `orderSource: "DIRECT"`.
 ```json
 {
   "customerPhoneNumber": "0111111111",
+  "paymentMethod": "CARD_PAYMENT",
   "notes": "Walk-in customer",
   "items": [
     {
@@ -82,6 +107,7 @@ Admin includes `agentCode` to create an order for a specific agent.
 {
   "agentCode": "TEST-002",
   "customerPhoneNumber": "0111111111",
+  "paymentMethod": "CASH",
   "notes": "Order for agent TEST-002",
   "items": [
     {
@@ -92,17 +118,38 @@ Admin includes `agentCode` to create an order for a specific agent.
 }
 ```
 
+#### Scenario D: Credit order with partial payment
+Admin creates a credit order with a partial upfront payment. The order will be `PARTIALLY_PAID` with the remaining balance tracked.
+
+```json
+{
+  "agentCode": "TEST-002",
+  "customerPhoneNumber": "0111111111",
+  "paymentMethod": "CREDIT",
+  "paidAmount": 5000.00,
+  "notes": "Half paid via credit",
+  "items": [
+    {
+      "productItemCode": "PA-001",
+      "quantity": 10
+    }
+  ]
+}
+```
+
 **Validation:**
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | customerPhoneNumber | String | Yes | Must match an existing customer's phone number (e.g., `0111111111`) |
 | agentCode | String | No (admin only) | For admin: set to create order for a specific agent. For agent: **ignored** — resolved automatically from JWT. Omit for **direct order**. |
+| paymentMethod | String | Yes | `CASH`, `COD`, `BANK_TRANSFER`, `CREDIT`, or `CARD_PAYMENT` |
 | notes | String | No | Max 1000 characters |
 | items | Array | Yes | At least 1 item |
 | items[].productItemCode | String | Yes | Must match an active product's item code (e.g., `PA-001`) |
 | items[].quantity | Integer | Yes | Positive integer |
 | items[].discountType | String | No (admin only) | `PERCENTAGE` or `FIXED` — per-order discount. Ignored for AGENT-created orders. |
 | items[].discountValue | BigDecimal | No | Required if `discountType` is set. Capped by the product's `maxDiscountValue`. |
+| paidAmount | BigDecimal | No | For `CREDIT` payment — set to record partial/full payment at order creation. Ignored for non-credit methods. |
 
 **Success Response (201 Created):**
 ```json
@@ -120,6 +167,11 @@ Admin includes `agentCode` to create an order for a specific agent.
     "customerPhone": "0111111111",
     "totalAmount": 120.00,
     "status": "PENDING",
+    "paymentMethod": "CASH",
+    "paymentStatus": "PAID",
+    "paidAmount": 120.00,
+    "paidAt": "2026-06-14T22:23:36.573066",
+    "outstandingBalance": 0.00,
     "notes": "Direct order test",
     "createdById": "5b718629-785e-4adf-a475-01e7c5957670",
     "createdByName": "Admin User",
@@ -443,7 +495,60 @@ Updates the order status up to `SHIPPED`. Once shipped, all further status trans
 
 ---
 
-### 9. Cancel Order (Admin Only)
+### 9. Record Payment (Admin & Agent)
+**POST** `/api/orders/{id}/payment`
+
+Records a payment against an existing order. Supports full and partial payments. Cannot be used on already fully paid orders.
+
+**Access:** ADMIN, AGENT
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | UUID | Order ID |
+
+**Request Body:**
+```json
+{
+  "amount": 2000.00,
+  "paymentMethod": "CASH"
+}
+```
+
+**Validation:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| amount | BigDecimal | Yes | Positive amount to record |
+| paymentMethod | String | Yes | `CASH`, `COD`, `BANK_TRANSFER`, `CREDIT`, or `CARD_PAYMENT` |
+
+**Behavior:**
+- If `paidAmount + amount >= totalAmount` → order becomes `PAID`
+- If `paidAmount + amount < totalAmount` → order becomes `PARTIALLY_PAID`
+- If the payment method is `CREDIT`, the customer's `outstandingBalance` is updated
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Payment recorded successfully",
+  "data": {
+    "id": "fbd1b509-09a4-4848-92aa-8ad00360b9f3",
+    "paymentStatus": "PAID",
+    "paidAmount": 2000.00,
+    "outstandingBalance": 0.00,
+    "paymentMethod": "CASH",
+    "paidAt": "2026-06-14T22:30:00.000000"
+  }
+}
+```
+
+**Error Responses:**
+- 400: Order is already fully paid
+- 404: Order not found
+
+---
+
+### 10. Cancel Order (Admin Only)
 **PATCH** `/api/orders/{id}/cancel`
 
 Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING` can be cancelled.
@@ -482,7 +587,9 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
 {
   "agentCode": "String (optional; for admin only — set to create order for specific agent; omit for direct order)",
   "customerPhoneNumber": "String (required, e.g. 0111111111 — must match existing customer)",
+  "paymentMethod": "PaymentMethod (required — CASH, COD, BANK_TRANSFER, CREDIT, CARD_PAYMENT)",
   "notes": "String (optional)",
+  "paidAmount": "BigDecimal (optional — for CREDIT partial payment at creation; otherwise auto-determined by paymentMethod)",
   "items": [
     {
       "productItemCode": "String (required, e.g. PA-001)",
@@ -491,6 +598,14 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
       "discountValue": "BigDecimal (optional; required if discountType is set; capped by product's maxDiscount)"
     }
   ]
+}
+```
+
+### RecordPaymentRequest
+```json
+{
+  "amount": "BigDecimal (required, positive)",
+  "paymentMethod": "PaymentMethod (required — CASH, COD, BANK_TRANSFER, CREDIT, CARD_PAYMENT)"
 }
 ```
 
@@ -507,6 +622,11 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
   "customerPhone": "String or null",
   "totalAmount": "BigDecimal",
   "status": "OrderStatus (PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, RETURNED)",
+  "paymentMethod": "PaymentMethod or null (CASH, COD, BANK_TRANSFER, CREDIT, CARD_PAYMENT)",
+  "paymentStatus": "PaymentStatus (UNPAID, PARTIALLY_PAID, PAID, REFUNDED)",
+  "paidAmount": "BigDecimal",
+  "paidAt": "LocalDateTime or null",
+  "outstandingBalance": "BigDecimal",
   "notes": "String",
   "createdById": "UUID",
   "createdByName": "String",

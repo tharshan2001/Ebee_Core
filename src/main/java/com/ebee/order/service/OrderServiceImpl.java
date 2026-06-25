@@ -22,10 +22,13 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -114,6 +117,7 @@ public class OrderServiceImpl implements OrderService {
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
                 .orderSource(orderSource)
+                .paymentMethod(request.getPaymentMethod())
                 .items(new ArrayList<>())
                 .build();
 
@@ -178,6 +182,7 @@ public class OrderServiceImpl implements OrderService {
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
 
         order.setTotalAmount(totalAmount);
+        initPayment(order, request.getPaymentMethod(), request.getPaidAmount());
         Order savedOrder;
         try {
             savedOrder = orderRepository.save(order);
@@ -442,13 +447,15 @@ public class OrderServiceImpl implements OrderService {
                 "RECEIPT",
                 order.getOrderNumber(),
                 order.getCreatedAt(),
-                java.time.LocalDateTime.now(),
+                order.getPaidAt() != null ? order.getPaidAt() : java.time.LocalDateTime.now(),
                 order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
                 order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
                 address,
                 order.getAgent() != null ? order.getAgent().getUser().getFirstName() + " " + order.getAgent().getUser().getLastName() : null,
                 order.getAgent() != null ? order.getAgent().getAgentCode() : null,
-                "Cash",
+                order.getPaymentMethod() != null ? order.getPaymentMethod().name() : "Cash",
+                order.getPaymentStatus() != null ? order.getPaymentStatus().name() : "PAID",
+                order.getOutstandingBalance(),
                 lineItems,
                 subtotal,
                 discountTotal,
@@ -481,6 +488,95 @@ public class OrderServiceImpl implements OrderService {
         );
 
         return printTemplateService.renderToPdf("shipping-label", toMap(data));
+    }
+
+    private void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount) {
+        if (paymentMethod == PaymentMethod.COD) {
+            order.setPaymentMethod(PaymentMethod.COD);
+            order.setPaymentStatus(PaymentStatus.UNPAID);
+            order.setPaidAmount(BigDecimal.ZERO);
+            order.setOutstandingBalance(order.getTotalAmount());
+        } else if (paymentMethod == PaymentMethod.CREDIT) {
+            order.setPaymentMethod(PaymentMethod.CREDIT);
+            BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
+            order.setPaidAmount(paid);
+            if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+                order.setOutstandingBalance(order.getTotalAmount());
+            } else if (paid.compareTo(order.getTotalAmount()) >= 0) {
+                order.setPaymentStatus(PaymentStatus.PAID);
+                order.setPaidAmount(order.getTotalAmount());
+                order.setOutstandingBalance(BigDecimal.ZERO);
+                order.setPaidAt(LocalDateTime.now());
+            } else {
+                order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
+                order.setPaidAt(LocalDateTime.now());
+            }
+            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
+        } else {
+            order.setPaymentMethod(paymentMethod);
+            order.setPaymentStatus(PaymentStatus.PAID);
+            order.setPaidAmount(order.getTotalAmount());
+            order.setOutstandingBalance(BigDecimal.ZERO);
+            order.setPaidAt(LocalDateTime.now());
+        }
+    }
+
+    @Transactional
+    @Override
+    public OrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
+        Order order = orderRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalArgumentException("Order is already fully paid");
+        }
+
+        if (request.amount().compareTo(order.getOutstandingBalance()) > 0) {
+            throw new IllegalArgumentException(
+                    "Payment amount cannot exceed outstanding balance of " + order.getOutstandingBalance());
+        }
+
+        boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;
+
+        BigDecimal newPaidAmount = order.getPaidAmount().add(request.amount());
+
+        if (newPaidAmount.compareTo(order.getTotalAmount()) >= 0) {
+            order.setPaymentStatus(PaymentStatus.PAID);
+            order.setPaidAmount(order.getTotalAmount());
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        } else {
+            order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+            order.setPaidAmount(newPaidAmount);
+            order.setOutstandingBalance(order.getTotalAmount().subtract(newPaidAmount));
+        }
+        order.setPaymentMethod(request.paymentMethod());
+        order.setPaidAt(LocalDateTime.now());
+
+        order = orderRepository.save(order);
+
+        if (isCreditOrder) {
+            updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
+        }
+
+        auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
+                "Payment recorded for order " + order.getOrderNumber()
+                + ": " + request.amount() + " via " + request.paymentMethod());
+
+        return orderMapper.toResponse(order);
+    }
+
+    private void updateCustomerOutstandingBalance(Customer customer, BigDecimal outstandingBalance, boolean isAdd) {
+        if (customer == null) return;
+        if (isAdd) {
+            customer.setOutstandingBalance(customer.getOutstandingBalance().add(outstandingBalance));
+        } else {
+            customer.setOutstandingBalance(customer.getOutstandingBalance().subtract(outstandingBalance));
+            if (customer.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
+                customer.setOutstandingBalance(BigDecimal.ZERO);
+            }
+        }
     }
 
     private java.util.Map<String, Object> toMap(Object record) {

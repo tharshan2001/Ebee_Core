@@ -10,6 +10,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -43,6 +44,14 @@ public class Customer {
     @Column(name = "total_orders", nullable = false)
     @Builder.Default
     private Integer totalOrders = 0;
+
+    @Column(name = "credit_limit", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal creditLimit = BigDecimal.ZERO;
+
+    @Column(name = "outstanding_balance", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal outstandingBalance = BigDecimal.ZERO;
 
     @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true, optional = false)
     private Address address;

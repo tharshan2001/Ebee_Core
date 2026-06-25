@@ -210,6 +210,8 @@ public class CustomerService {
         response.setPhoneNumber(customer.getPhoneNumber());
         response.setEmail(customer.getEmail());
         response.setTotalOrders(customer.getTotalOrders());
+        response.setCreditLimit(customer.getCreditLimit());
+        response.setOutstandingBalance(customer.getOutstandingBalance());
         if (customer.getAddress() != null) {
             AddressResponse addrResponse = new AddressResponse();
             addrResponse.setId(customer.getAddress().getId());

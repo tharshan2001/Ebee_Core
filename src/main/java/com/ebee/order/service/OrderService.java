@@ -2,6 +2,7 @@ package com.ebee.order.service;
 
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,4 +39,6 @@ public interface OrderService {
     byte[] generateReceiptPdf(UUID id);
 
     byte[] generateShippingLabelPdf(UUID id);
+
+    OrderResponse recordPayment(UUID id, RecordPaymentRequest request);
 }

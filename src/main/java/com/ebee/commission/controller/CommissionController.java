@@ -96,10 +96,10 @@ public class CommissionController {
         return ResponseEntity.ok(ApiResponse.success("Commissions retrieved successfully", PageResponse.from(commissionPage)));
     }
 
-    @GetMapping("/pending-payment/{agentId}")
+    @GetMapping("/pending-payment")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PendingPaymentSummary>> getPendingPaymentSummary(
-            @PathVariable UUID agentId) {
+            @RequestParam UUID agentId) {
         PendingPaymentSummary response = queryService.getPendingPaymentSummary(agentId);
         return ResponseEntity.ok(ApiResponse.success("Pending payment summary retrieved successfully", response));
     }

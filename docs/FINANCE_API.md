@@ -38,9 +38,11 @@ Retrieves a summary of revenue, commissions, expenses, and net profit for a give
   "message": "Finance summary retrieved successfully",
   "data": {
     "totalRevenue": 990890.85,
+    "collectedRevenue": 800000.00,
+    "outstandingRevenue": 190890.85,
     "totalCommissions": 52133.11,
     "totalExpenses": 17200.00,
-    "netProfit": 921557.74,
+    "netProfit": 730666.89,
     "period": {
       "start": "2026-01-01",
       "end": "2026-12-31"
@@ -55,6 +57,9 @@ Retrieves a summary of revenue, commissions, expenses, and net profit for a give
 ```
 
 **Formulas:**
-- `netProfit = totalRevenue - totalCommissions - totalExpenses`
+- `collectedRevenue` = sum of `paidAmount` from orders with `paymentStatus = PAID`
+- `outstandingRevenue` = sum of `outstandingBalance` from pending orders (orders not CANCELLED/RETURNED)
+- `totalRevenue = collectedRevenue + outstandingRevenue`
+- `netProfit = collectedRevenue - totalCommissions - totalExpenses`
 - Only `APPROVED` expenses are included in the totals
 - Revenue is calculated from completed orders within the date range

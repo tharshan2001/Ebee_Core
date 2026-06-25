@@ -23,6 +23,7 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -153,6 +154,7 @@ class OrderServiceTest {
         orderRequest = new OrderRequest();
         orderRequest.setAgentCode("JF-008");
         orderRequest.setCustomerPhoneNumber("0771234567");
+        orderRequest.setPaymentMethod(PaymentMethod.CASH);
         orderRequest.setNotes("Test order");
         orderRequest.setItems(List.of(item1, item2));
 
@@ -541,6 +543,7 @@ class OrderServiceTest {
         OrderRequest discountedRequest = new OrderRequest();
         discountedRequest.setAgentCode("JF-008");
         discountedRequest.setCustomerPhoneNumber("0771234567");
+        discountedRequest.setPaymentMethod(PaymentMethod.CASH);
         discountedRequest.setItems(List.of(discountedItem));
 
         when(securityService.isAdmin()).thenReturn(true);
@@ -601,6 +604,7 @@ class OrderServiceTest {
         OrderRequest req = new OrderRequest();
         req.setAgentCode("JF-008");
         req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
         req.setItems(List.of(item));
 
         when(securityService.isAdmin()).thenReturn(true);
@@ -648,6 +652,7 @@ class OrderServiceTest {
         OrderRequest req = new OrderRequest();
         req.setAgentCode("JF-008");
         req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
         req.setItems(List.of(item));
 
         when(securityService.isAdmin()).thenReturn(true);
@@ -685,6 +690,7 @@ class OrderServiceTest {
         OrderRequest req = new OrderRequest();
         req.setAgentCode("JF-008");
         req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
         req.setItems(List.of(item));
 
         when(securityService.isAdmin()).thenReturn(true);
@@ -723,6 +729,7 @@ class OrderServiceTest {
         OrderRequest req = new OrderRequest();
         req.setAgentCode("JF-008");
         req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
         req.setItems(List.of(item));
 
         when(securityService.isAdmin()).thenReturn(true);

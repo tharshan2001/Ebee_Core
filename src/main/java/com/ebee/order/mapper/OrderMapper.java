@@ -27,6 +27,11 @@ public interface OrderMapper {
     @Mapping(target = "deliveryScheduledDate", source = "deliveryScheduledDate")
     @Mapping(target = "deliveryNotes", source = "deliveryNotes")
     @Mapping(target = "orderSource", source = "orderSource")
+    @Mapping(target = "paymentMethod", source = "paymentMethod")
+    @Mapping(target = "paymentStatus", source = "paymentStatus")
+    @Mapping(target = "paidAmount", source = "paidAmount")
+    @Mapping(target = "paidAt", source = "paidAt")
+    @Mapping(target = "outstandingBalance", source = "outstandingBalance")
     OrderResponse toResponse(Order order);
 
     List<OrderResponse> toResponseList(List<Order> orders);

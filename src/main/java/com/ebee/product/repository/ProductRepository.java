@@ -73,4 +73,16 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT COUNT(p) FROM Product p WHERE p.inventory IS NOT NULL AND p.inventory.quantity <= COALESCE(p.inventory.reorderLevel, 0)")
     long countLowStockProducts();
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.featured = true ORDER BY p.createdAt DESC")
+    Page<UUID> findFeaturedProductIds(Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.discountType IS NOT NULL AND p.discountValue > 0 ORDER BY p.createdAt DESC")
+    Page<UUID> findDealProductIds(Pageable pageable);
+
+    @Query("SELECT oi.product.id FROM OrderItem oi WHERE oi.order.status NOT IN ('CANCELLED', 'RETURNED') AND oi.product.isActive = true GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
+    Page<UUID> findBestSellerProductIds(Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true ORDER BY p.createdAt DESC")
+    Page<UUID> findNewArrivalProductIds(Pageable pageable);
 }

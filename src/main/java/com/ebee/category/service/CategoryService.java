@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,8 +40,12 @@ public class CategoryService {
     }
 
     public List<CategoryResponse> getAllCategories() {
+        Map<String, Long> productCounts = categoryRepository.countActiveProductsByCategory().stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((Number) row[1]).longValue()));
         return categoryRepository.findByIsActiveTrueOrderByName().stream()
-                .map(this::toResponse)
+                .map(c -> toResponse(c, productCounts.getOrDefault(c.getName(), 0L)))
                 .toList();
     }
 
@@ -85,10 +91,15 @@ public class CategoryService {
     }
 
     private CategoryResponse toResponse(Category category) {
+        return toResponse(category, 0L);
+    }
+
+    private CategoryResponse toResponse(Category category, long productCount) {
         CategoryResponse response = new CategoryResponse();
         response.setId(category.getId());
         response.setName(category.getName());
         response.setActive(Boolean.TRUE.equals(category.getIsActive()));
+        response.setProductCount(productCount);
         return response;
     }
 }

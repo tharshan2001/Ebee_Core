@@ -45,4 +45,12 @@ public interface ProductService {
     void deleteProductImage(UUID productId, UUID imageId);
 
     byte[] generateProductLabelPdf(UUID id);
+
+    Page<ProductResponse> getFeaturedProducts(Pageable pageable);
+
+    Page<ProductResponse> getDealProducts(Pageable pageable);
+
+    Page<ProductResponse> getBestSellerProducts(Pageable pageable);
+
+    Page<ProductResponse> getNewArrivals(Pageable pageable);
 }

@@ -142,6 +142,42 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Active products retrieved successfully", response));
     }
 
+    @GetMapping("/featured")
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getFeaturedProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "8") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        PageResponse<ProductResponse> response = PageResponse.from(productService.getFeaturedProducts(pageable));
+        return ResponseEntity.ok(ApiResponse.success("Featured products retrieved successfully", response));
+    }
+
+    @GetMapping("/deals")
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getDealProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "4") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        PageResponse<ProductResponse> response = PageResponse.from(productService.getDealProducts(pageable));
+        return ResponseEntity.ok(ApiResponse.success("Deal products retrieved successfully", response));
+    }
+
+    @GetMapping("/best-sellers")
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getBestSellerProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "9") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        PageResponse<ProductResponse> response = PageResponse.from(productService.getBestSellerProducts(pageable));
+        return ResponseEntity.ok(ApiResponse.success("Best seller products retrieved successfully", response));
+    }
+
+    @GetMapping("/new-arrivals")
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getNewArrivals(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "8") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        PageResponse<ProductResponse> response = PageResponse.from(productService.getNewArrivals(pageable));
+        return ResponseEntity.ok(ApiResponse.success("New arrivals retrieved successfully", response));
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<java.util.Map<String, Long>>> getProductStats() {
         return ResponseEntity.ok(ApiResponse.success("Product stats retrieved successfully", productService.getProductStats()));

@@ -76,6 +76,10 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String tags;
 
+    @Column(name = "featured")
+    @Builder.Default
+    private Boolean featured = false;
+
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private Inventory inventory;
 

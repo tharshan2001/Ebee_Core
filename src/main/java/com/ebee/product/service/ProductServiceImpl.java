@@ -167,6 +167,26 @@ public class ProductServiceImpl implements ProductService {
         return toProductResponsePage(idPage, pageable);
     }
 
+    @Override
+    public Page<ProductResponse> getFeaturedProducts(Pageable pageable) {
+        return toProductResponsePage(productRepository.findFeaturedProductIds(pageable), pageable);
+    }
+
+    @Override
+    public Page<ProductResponse> getDealProducts(Pageable pageable) {
+        return toProductResponsePage(productRepository.findDealProductIds(pageable), pageable);
+    }
+
+    @Override
+    public Page<ProductResponse> getBestSellerProducts(Pageable pageable) {
+        return toProductResponsePage(productRepository.findBestSellerProductIds(pageable), pageable);
+    }
+
+    @Override
+    public Page<ProductResponse> getNewArrivals(Pageable pageable) {
+        return toProductResponsePage(productRepository.findNewArrivalProductIds(pageable), pageable);
+    }
+
     private Page<ProductResponse> toProductResponsePage(Page<UUID> idPage, Pageable pageable) {
         if (!idPage.hasContent()) {
             return Page.empty();

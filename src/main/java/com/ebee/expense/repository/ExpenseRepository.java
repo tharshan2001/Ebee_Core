@@ -26,9 +26,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     long countByStatus(ExpenseStatus status);
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred < :end")
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred <= :end")
     BigDecimal sumApprovedByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    @Query("SELECT e.category, COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred < :end GROUP BY e.category")
+    @Query("SELECT e.category, COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred <= :end GROUP BY e.category")
     List<Object[]> sumApprovedGroupByCategory(@Param("start") LocalDate start, @Param("end") LocalDate end);
 }

@@ -1,0 +1,135 @@
+package com.ebee.driver.controller;
+
+import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortUtils;
+import com.ebee.common.util.SortableFields;
+import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.driver.dto.*;
+import com.ebee.driver.enums.DriverAvailability;
+import com.ebee.driver.service.DriverAppService;
+import com.ebee.expense.dto.ExpenseRequest;
+import com.ebee.expense.dto.ExpenseResponse;
+import com.ebee.expense.enums.ExpenseStatus;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/driver")
+@RequiredArgsConstructor
+@PreAuthorize("hasRole('DRIVER')")
+public class DriverAppController {
+
+    private final DriverAppService driverAppService;
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<ApiResponse<DriverDashboardResponse>> getDashboard() {
+        DriverDashboardResponse response = driverAppService.getDashboard();
+        return ResponseEntity.ok(ApiResponse.success("Dashboard retrieved successfully", response));
+    }
+
+    @GetMapping("/deliveries")
+    public ResponseEntity<ApiResponse<PageResponse<DriverDeliveryResponse>>> getMyDeliveries(
+            @RequestParam(required = false) DeliveryStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "updatedAt,desc") String sort) {
+        int safeSize = PaginationUtils.safeSize(size);
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), safeSize,
+                SortUtils.parse(sort, SortableFields.AllowedFor.DRIVER_DELIVERY));
+        Page<DriverDeliveryResponse> responses = driverAppService.getMyDeliveries(status, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Deliveries retrieved successfully", PageResponse.from(responses)));
+    }
+
+    @GetMapping("/deliveries/{orderId}")
+    public ResponseEntity<ApiResponse<DriverDeliveryResponse>> getDeliveryDetail(@PathVariable UUID orderId) {
+        DriverDeliveryResponse response = driverAppService.getDeliveryDetail(orderId);
+        return ResponseEntity.ok(ApiResponse.success("Delivery retrieved successfully", response));
+    }
+
+    @PatchMapping("/deliveries/{orderId}/status")
+    public ResponseEntity<ApiResponse<DriverDeliveryResponse>> updateDeliveryStatus(
+            @PathVariable UUID orderId,
+            @Valid @RequestBody DriverDeliveryStatusRequest request) {
+        DriverDeliveryResponse response = driverAppService.updateDeliveryStatus(orderId, request);
+        return ResponseEntity.ok(ApiResponse.success("Delivery status updated successfully", response));
+    }
+
+    @PostMapping(value = "/deliveries/{orderId}/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<DriverDeliveryResponse>> completeDelivery(
+            @PathVariable UUID orderId,
+            @RequestParam(value = "photo", required = false) MultipartFile photo,
+            @RequestParam(value = "signature", required = false) MultipartFile signature,
+            @RequestParam(value = "driverNotes", required = false) String driverNotes) {
+        DriverDeliveryResponse response = driverAppService.completeDelivery(orderId, photo, signature, driverNotes);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Delivery completed successfully", response));
+    }
+
+    @PatchMapping("/availability")
+    public ResponseEntity<ApiResponse<com.ebee.driver.dto.DriverResponse>> updateAvailability(
+            @Valid @RequestBody AvailabilityRequest request) {
+        com.ebee.driver.dto.DriverResponse response = driverAppService.updateMyAvailability(request.getAvailability());
+        return ResponseEntity.ok(ApiResponse.success("Availability updated successfully", response));
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<DriverProfileResponse>> getProfile() {
+        DriverProfileResponse response = driverAppService.getMyProfile();
+        return ResponseEntity.ok(ApiResponse.success("Profile retrieved successfully", response));
+    }
+
+    @PatchMapping("/profile")
+    public ResponseEntity<ApiResponse<DriverProfileResponse>> updateProfile(
+            @Valid @RequestBody DriverProfileRequest request) {
+        DriverProfileResponse response = driverAppService.updateMyProfile(request);
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", response));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<DriverStatsResponse>> getStats() {
+        DriverStatsResponse response = driverAppService.getMyStats();
+        return ResponseEntity.ok(ApiResponse.success("Stats retrieved successfully", response));
+    }
+
+    @PostMapping("/expenses")
+    public ResponseEntity<ApiResponse<ExpenseResponse>> createExpense(
+            @RequestPart("expense") @Valid ExpenseRequest request,
+            @RequestParam(value = "receipt", required = false) MultipartFile receipt) {
+        ExpenseResponse response = driverAppService.createExpense(request, receipt);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Expense created successfully", response));
+    }
+
+    @GetMapping("/expenses")
+    public ResponseEntity<ApiResponse<List<ExpenseResponse>>> getMyExpenses(
+            @RequestParam(required = false) ExpenseStatus status) {
+        List<ExpenseResponse> responses = driverAppService.getMyExpenses(status);
+        return ResponseEntity.ok(ApiResponse.success("Expenses retrieved successfully", responses));
+    }
+
+    @PostMapping("/device-token")
+    public ResponseEntity<ApiResponse<Void>> registerDeviceToken(
+            @Valid @RequestBody Map<String, String> body) {
+        String fcmToken = body.get("fcmToken");
+        if (fcmToken == null || fcmToken.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("fcmToken is required"));
+        }
+        driverAppService.registerDeviceToken(fcmToken);
+        return ResponseEntity.ok(ApiResponse.success("Device token registered successfully"));
+    }
+}

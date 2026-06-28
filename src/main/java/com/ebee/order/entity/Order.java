@@ -129,6 +129,15 @@ public class Order {
     @Column(name = "delivery_failure_reason", columnDefinition = "TEXT")
     private String deliveryFailureReason;
 
+    @Column(name = "delivery_photo_url", length = 500)
+    private String deliveryPhotoUrl;
+
+    @Column(name = "delivery_signature_url", length = 500)
+    private String deliverySignatureUrl;
+
+    @Column(name = "driver_notes", columnDefinition = "TEXT")
+    private String driverNotes;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_source", nullable = false)
     @Builder.Default

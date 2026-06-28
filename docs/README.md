@@ -60,6 +60,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Commission Configs | [COMMISSION_API.md](COMMISSION_API.md#commission-configs) | ADMIN (CRUD), SUPER_ADMIN (default only) |
 | Delivery | [DELIVERY_API.md](DELIVERY_API.md) | ADMIN, DRIVER |
 | Drivers | [DRIVER_API.md](DRIVER_API.md) | ADMIN, DRIVER |
+| Driver App | [DRIVER_APP_API.md](DRIVER_APP_API.md) | DRIVER (mobile app endpoints) |
 | Expenses | [EXPENSE_API.md](EXPENSE_API.md) | ADMIN, AGENT, DRIVER |
 | Finance | [FINANCE_API.md](FINANCE_API.md) | ADMIN |
 | Alerts | [ALERT_API.md](ALERT_API.md) | ADMIN, AGENT |

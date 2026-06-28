@@ -245,6 +245,10 @@ public class DeliveryService {
         return response;
     }
 
+    public void sendDeliveryStatusNotification(Order order, DeliveryStatus newStatus) {
+        sendDeliveryNotifications(order, newStatus);
+    }
+
     private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
         if (order.getCustomer() != null) {
             String statusLabel = switch (newStatus) {

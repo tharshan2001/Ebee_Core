@@ -42,6 +42,9 @@ public class Driver {
     @Builder.Default
     private DriverAvailability availability = DriverAvailability.AVAILABLE;
 
+    @Column(name = "fcm_token", length = 500)
+    private String fcmToken;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;

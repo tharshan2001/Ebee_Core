@@ -105,6 +105,9 @@ public class AuthServiceImpl implements AuthService {
         String token = jwtService.generateToken(authentication);
         String refreshToken = jwtService.generateRefreshToken(authentication);
 
+        user.setRefreshTokenHash(sha256Hex(refreshToken));
+        userRepository.save(user);
+
         sendLoginAlert(user);
 
         auditLogService.record(AuditAction.LOGIN, "User", user.getId(),

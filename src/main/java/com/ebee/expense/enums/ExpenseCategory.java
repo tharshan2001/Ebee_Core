@@ -6,5 +6,7 @@ public enum ExpenseCategory {
     OFFICE_SUPPLIES,
     UTILITIES,
     MAINTENANCE,
+    PARKING,
+    TOLL,
     OTHER
 }

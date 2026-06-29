@@ -73,15 +73,22 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
             HttpServletRequest request,
-            HttpServletResponse response) {
-        Cookie[] cookies = request.getCookies();
+            HttpServletResponse response,
+            @RequestBody(required = false) Map<String, String> body) {
         String refreshToken = null;
 
-        if (cookies != null) {
-            for (Cookie cookie : cookies) {
-                if ("refresh_token".equals(cookie.getName())) {
-                    refreshToken = cookie.getValue();
-                    break;
+        if (body != null && body.containsKey("refreshToken")) {
+            refreshToken = body.get("refreshToken");
+        }
+
+        if (refreshToken == null) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if ("refresh_token".equals(cookie.getName())) {
+                        refreshToken = cookie.getValue();
+                        break;
+                    }
                 }
             }
         }

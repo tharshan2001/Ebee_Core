@@ -41,7 +41,7 @@ public class DriverDeliveryResponse {
     private PaymentStatus paymentStatus;
     private LocalDateTime createdAt;
     private List<OrderItemInfo> items;
-    private List<StatusTimelineEntry> timeline;
+    private List<StatusTimelineEntry> timeline = List.of();
 
     @JsonProperty("status")
     public String getStatus() {

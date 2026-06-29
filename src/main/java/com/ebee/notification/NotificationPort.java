@@ -4,6 +4,7 @@ import com.ebee.agent.entity.Agent;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.customer.entity.Customer;
 import com.ebee.notification.model.EmailRequest;
+import com.ebee.notification.model.PushRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.user.entity.User;
 
@@ -33,4 +34,6 @@ public interface NotificationPort {
 
     void createInternalAlert(User recipient, String title, String message,
                              AlertType alertType, UUID referenceId, String referenceType);
+
+    void sendPush(PushRequest request);
 }

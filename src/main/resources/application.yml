@@ -85,6 +85,10 @@ jwt:
   refreshExpiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 notification:
+  push:
+    enabled: ${NOTIFICATION_PUSH_ENABLED:false}
+    project-id: ${FCM_PROJECT_ID:}
+    config-path: ${FIREBASE_CONFIG_PATH:}
   sms:
     api-base-url: ${DIALOG_SMS_API_URL:}
     username: ${DIALOG_SMS_USERNAME:}

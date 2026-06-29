@@ -313,4 +313,42 @@ class DeliveryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Delivery");
     }
+
+    @Test
+    void assignDelivery_withFcmToken_sendsPush() {
+        driverProfile.setFcmToken("ExponentPushToken[test-token-12345]");
+        order.setDeliveryStatus(DeliveryStatus.PENDING);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
+        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
+
+        var result = deliveryService.assignDelivery(orderId, driverUserId);
+
+        assertThat(result).isNotNull();
+        verify(notificationPort).sendPush(argThat(push ->
+                push.token().equals("ExponentPushToken[test-token-12345]")
+                        && push.title().contains("New Delivery")
+                        && "delivery_assigned".equals(push.data().get("type"))
+                        && orderId.toString().equals(push.data().get("orderId"))
+        ));
+    }
+
+    @Test
+    void assignDelivery_withoutFcmToken_doesNotSendPush() {
+        driverProfile.setFcmToken(null);
+        order.setDeliveryStatus(DeliveryStatus.PENDING);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
+        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
+
+        deliveryService.assignDelivery(orderId, driverUserId);
+
+        verify(notificationPort, never()).sendPush(any());
+    }
 }

@@ -1,12 +1,13 @@
 package com.ebee.notification.config;
 
+import com.ebee.notification.sender.push.FcmProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
-@EnableConfigurationProperties(NotificationProperties.class)
+@EnableConfigurationProperties({NotificationProperties.class, FcmProperties.class})
 public class NotificationConfig {
 
     @Bean

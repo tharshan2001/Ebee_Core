@@ -9,6 +9,7 @@ import com.ebee.commission.service.CommissionLifecycleService;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.notification.NotificationPort;
+import com.ebee.notification.model.PushRequest;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.repository.DeliveryRepository;
@@ -91,6 +92,18 @@ public class DeliveryService {
         String subject = "Delivery Assigned – " + savedOrder.getOrderNumber();
         notificationPort.notifyUser(driver, subject, "delivery-assigned-driver", driverP, Set.of());
 
+        if (driverProfile.getFcmToken() != null) {
+            notificationPort.sendPush(new PushRequest(
+                    driverProfile.getFcmToken(),
+                    "New Delivery #" + savedOrder.getOrderNumber(),
+                    "You have been assigned to deliver order " + savedOrder.getOrderNumber()
+                            + " in " + savedOrder.getDistrict(),
+                    Map.of("type", "delivery_assigned",
+                            "orderId", savedOrder.getId().toString(),
+                            "orderNumber", savedOrder.getOrderNumber())
+            ));
+        }
+
         notificationPort.createInternalAlert(driver, subject, driverP.get("driverName")
                 + ", you have been assigned to deliver order " + savedOrder.getOrderNumber()
                 + " in " + savedOrder.getDistrict() + ".",
@@ -161,6 +174,10 @@ public class DeliveryService {
                         + result.previousStatus() + " to " + newStatus);
 
         sendDeliveryNotifications(savedOrder, newStatus);
+
+        if (securityService.isAdmin() && previousDriver != null) {
+            sendDriverStatusPush(previousDriver.getId(), savedOrder, previousStatus, newStatus);
+        }
 
         return toDeliveryResponse(savedOrder);
     }
@@ -249,6 +266,45 @@ public class DeliveryService {
         sendDeliveryNotifications(order, newStatus);
     }
 
+    private void sendDriverStatusPush(UUID driverUserId, Order order,
+                                       DeliveryStatus previousStatus, DeliveryStatus newStatus) {
+        driverRepository.findByUserId(driverUserId)
+                .filter(d -> d.getFcmToken() != null)
+                .ifPresent(d -> {
+                    String title;
+                    String body;
+                    String type;
+
+                    if (previousStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.PENDING) {
+                        title = "Delivery #" + order.getOrderNumber() + " Reopened";
+                        body = "Delivery " + order.getOrderNumber() + " has been reopened. You can retry now.";
+                        type = "delivery_retry";
+                    } else if (newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT) {
+                        return;
+                    } else {
+                        String statusLabel = switch (newStatus) {
+                            case PICKED_UP -> "Picked Up";
+                            case IN_TRANSIT -> "In Transit";
+                            case DELIVERED -> "Delivered";
+                            case PENDING -> "Pending";
+                            default -> null;
+                        };
+                        if (statusLabel == null) return;
+                        title = "Delivery #" + order.getOrderNumber() + " " + statusLabel;
+                        body = "Your delivery " + order.getOrderNumber() + " has been updated to " + statusLabel + ".";
+                        type = "delivery_status";
+                    }
+
+                    notificationPort.sendPush(new PushRequest(
+                            d.getFcmToken(), title, body,
+                            Map.of("type", type,
+                                    "orderId", order.getId().toString(),
+                                    "orderNumber", order.getOrderNumber(),
+                                    "status", newStatus.name())
+                    ));
+                });
+    }
+
     private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
         if (order.getCustomer() != null) {
             String statusLabel = switch (newStatus) {
@@ -311,6 +367,35 @@ public class DeliveryService {
                             newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
             notificationPort.createInternalAlert(order.getCreatedBy(), subject, msg,
                     AlertType.DELIVERY_FAILED, order.getId(), "order");
+
+            if (order.getDeliveryAssignedTo() != null) {
+                driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())
+                        .filter(d -> d.getFcmToken() != null)
+                        .ifPresent(d -> {
+                            String title;
+                            String body;
+                            String type;
+                            if (newStatus == DeliveryStatus.FAILED_PERMANENT) {
+                                title = "Delivery #" + order.getOrderNumber() + " Permanently Failed";
+                                body = reason != null
+                                        ? "Your delivery has been permanently failed. Reason: " + reason
+                                        : "Your delivery has been permanently failed.";
+                                type = "delivery_failed_permanent";
+                            } else {
+                                title = "Delivery #" + order.getOrderNumber() + " Failed";
+                                body = reason != null
+                                        ? "Your delivery attempt failed. Reason: " + reason
+                                        : "Your delivery attempt failed. Tap to retry.";
+                                type = "delivery_failed";
+                            }
+                            notificationPort.sendPush(new PushRequest(
+                                    d.getFcmToken(), title, body,
+                                    Map.of("type", type,
+                                            "orderId", order.getId().toString(),
+                                            "orderNumber", order.getOrderNumber())
+                            ));
+                        });
+            }
         }
     }
 }

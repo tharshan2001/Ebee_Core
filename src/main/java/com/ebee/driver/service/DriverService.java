@@ -7,6 +7,7 @@ import com.ebee.common.security.SecurityService;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
+import com.ebee.notification.model.PushRequest;
 import com.ebee.driver.dto.AvailabilityRequest;
 import com.ebee.driver.dto.DriverRequest;
 import com.ebee.driver.dto.DriverResponse;
@@ -149,11 +150,24 @@ public class DriverService {
             throw new AccessDeniedException("You can only update your own availability");
         }
 
+        DriverAvailability previousAvailability = driver.getAvailability();
         driver.setAvailability(request.getAvailability());
         Driver savedDriver = driverRepository.save(driver);
         auditLogService.record(AuditAction.DRIVER_AVAILABILITY_CHANGE, "Driver", id,
-                "Driver " + driver.getUser().getEmail() + " availability changed to "
-                + request.getAvailability());
+                "Driver " + driver.getUser().getEmail() + " availability changed from "
+                + previousAvailability + " to " + request.getAvailability());
+
+        if (securityService.isAdmin()
+                && driver.getFcmToken() != null
+                && request.getAvailability() == DriverAvailability.SUSPENDED) {
+            notificationPort.sendPush(new PushRequest(
+                    driver.getFcmToken(),
+                    "Account Suspended",
+                    "Your driver account has been suspended. Please contact support.",
+                    Map.of("type", "driver_suspended")
+            ));
+        }
+
         return toResponse(savedDriver);
     }
 

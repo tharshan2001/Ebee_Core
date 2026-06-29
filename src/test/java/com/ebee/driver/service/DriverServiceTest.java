@@ -8,10 +8,12 @@ import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.notification.NotificationPort;
+import com.ebee.notification.model.PushRequest;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -109,5 +111,79 @@ class DriverServiceTest {
                 .hasMessageContaining("own availability");
 
         verify(driverRepository, never()).save(any(Driver.class));
+    }
+
+    @Test
+    void updateAvailability_adminSuspendsDriverWithFcmToken_sendsPush() {
+        UUID driverId = UUID.randomUUID();
+        UUID driverUserId = UUID.randomUUID();
+        User driverUser = User.builder().id(driverUserId).email("driver@ebee.com").build();
+        Driver driver = Driver.builder()
+                .id(driverId)
+                .user(driverUser)
+                .availability(DriverAvailability.AVAILABLE)
+                .fcmToken("ExponentPushToken[suspend-test-123]")
+                .build();
+        when(driverRepository.findById(driverId)).thenReturn(Optional.of(driver));
+        when(securityService.isAdmin()).thenReturn(true);
+        when(driverRepository.save(any(Driver.class))).thenReturn(driver);
+
+        AvailabilityRequest request = new AvailabilityRequest();
+        request.setAvailability(DriverAvailability.SUSPENDED);
+
+        driverService.updateAvailability(driverId, request);
+
+        ArgumentCaptor<PushRequest> captor = ArgumentCaptor.forClass(PushRequest.class);
+        verify(notificationPort).sendPush(captor.capture());
+        PushRequest push = captor.getValue();
+        assertThat(push.token()).isEqualTo("ExponentPushToken[suspend-test-123]");
+        assertThat(push.title()).isEqualTo("Account Suspended");
+        assertThat(push.data()).containsEntry("type", "driver_suspended");
+    }
+
+    @Test
+    void updateAvailability_adminSuspendsDriverWithoutFcmToken_doesNotSendPush() {
+        UUID driverId = UUID.randomUUID();
+        UUID driverUserId = UUID.randomUUID();
+        User driverUser = User.builder().id(driverUserId).email("driver@ebee.com").build();
+        Driver driver = Driver.builder()
+                .id(driverId)
+                .user(driverUser)
+                .availability(DriverAvailability.AVAILABLE)
+                .fcmToken(null)
+                .build();
+        when(driverRepository.findById(driverId)).thenReturn(Optional.of(driver));
+        when(securityService.isAdmin()).thenReturn(true);
+        when(driverRepository.save(any(Driver.class))).thenReturn(driver);
+
+        AvailabilityRequest request = new AvailabilityRequest();
+        request.setAvailability(DriverAvailability.SUSPENDED);
+
+        driverService.updateAvailability(driverId, request);
+
+        verify(notificationPort, never()).sendPush(any());
+    }
+
+    @Test
+    void updateAvailability_adminSetsOnTripWithFcmToken_doesNotSendPush() {
+        UUID driverId = UUID.randomUUID();
+        UUID driverUserId = UUID.randomUUID();
+        User driverUser = User.builder().id(driverUserId).email("driver@ebee.com").build();
+        Driver driver = Driver.builder()
+                .id(driverId)
+                .user(driverUser)
+                .availability(DriverAvailability.AVAILABLE)
+                .fcmToken("ExponentPushToken[test-token]")
+                .build();
+        when(driverRepository.findById(driverId)).thenReturn(Optional.of(driver));
+        when(securityService.isAdmin()).thenReturn(true);
+        when(driverRepository.save(any(Driver.class))).thenReturn(driver);
+
+        AvailabilityRequest request = new AvailabilityRequest();
+        request.setAvailability(DriverAvailability.ON_TRIP);
+
+        driverService.updateAvailability(driverId, request);
+
+        verify(notificationPort, never()).sendPush(any());
     }
 }

@@ -6,8 +6,10 @@ import com.ebee.alert.enums.AlertType;
 import com.ebee.alert.repository.AlertRepository;
 import com.ebee.customer.entity.Customer;
 import com.ebee.notification.model.EmailRequest;
+import com.ebee.notification.model.PushRequest;
 import com.ebee.notification.model.SmsRequest;
 import com.ebee.notification.sender.EmailSender;
+import com.ebee.notification.sender.PushSender;
 import com.ebee.notification.sender.SmsSender;
 import com.ebee.notification.template.NotificationChannel;
 import com.ebee.notification.template.NotificationTemplateService;
@@ -30,6 +32,7 @@ public class NotificationService implements NotificationPort {
 
     private final EmailSender emailSender;
     private final SmsSender smsSender;
+    private final PushSender pushSender;
     private final NotificationTemplateService templateService;
     private final AlertRepository alertRepository;
 
@@ -52,6 +55,16 @@ public class NotificationService implements NotificationPort {
             smsSender.send(request);
         } catch (Exception e) {
             log.warn("Failed to send SMS to {}: {}", request.getPhoneNumbers(), e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendPush(PushRequest request) {
+        try {
+            pushSender.send(request);
+        } catch (Exception e) {
+            log.warn("Failed to send push to {}: {}", request.token(), e.getMessage());
         }
     }
 

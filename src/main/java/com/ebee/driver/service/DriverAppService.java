@@ -119,6 +119,7 @@ public class DriverAppService {
         response.setCompletedTodayCount(completedToday);
         response.setFailedTodayCount(failedToday);
         response.setUnreadAlertsCount(unreadAlertsCount);
+        response.setDriverName(driver.getUser().getFirstName() + " " + driver.getUser().getLastName());
         response.setRecentDeliveries(recentOrders.stream().map(this::toDriverDeliveryResponse).toList());
         return response;
     }
@@ -399,6 +400,18 @@ public class DriverAppService {
     }
 
     @Transactional
+    public DriverProfileResponse uploadProfilePhoto(MultipartFile photo) {
+        User user = getCurrentUser();
+        if (photo != null && !photo.isEmpty()) {
+            String photoUrl = s3Service.uploadFile(photo, "profiles");
+            user.setProfilePictureUrl(photoUrl);
+            user.setProfilePictureName(photo.getOriginalFilename());
+            userRepository.save(user);
+        }
+        return getMyProfile();
+    }
+
+    @Transactional
     public void registerDeviceToken(String fcmToken) {
         Driver driver = getCurrentDriver();
         driver.setFcmToken(fcmToken);
@@ -446,6 +459,7 @@ public class DriverAppService {
         response.setOutstandingBalance(order.getOutstandingBalance());
         response.setPaymentStatus(order.getPaymentStatus());
         response.setScheduledDate(order.getDeliveryScheduledDate());
+        response.setCreatedAt(order.getCreatedAt());
 
         if (order.getDeliveryAssignedTo() != null) {
             response.setDriverId(order.getDeliveryAssignedTo().getId());

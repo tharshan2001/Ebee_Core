@@ -82,8 +82,17 @@ public class DriverAppController {
 
     @PatchMapping("/availability")
     public ResponseEntity<ApiResponse<com.ebee.driver.dto.DriverResponse>> updateAvailability(
-            @Valid @RequestBody AvailabilityRequest request) {
-        com.ebee.driver.dto.DriverResponse response = driverAppService.updateMyAvailability(request.getAvailability());
+            @RequestBody Map<String, Object> body) {
+        Object availValue = body.get("availability");
+        DriverAvailability availability;
+        if (availValue instanceof Boolean) {
+            availability = Boolean.TRUE.equals(availValue) ? DriverAvailability.AVAILABLE : DriverAvailability.OFFLINE;
+        } else if (availValue instanceof String s) {
+            availability = DriverAvailability.valueOf(s);
+        } else {
+            return ResponseEntity.badRequest().body(ApiResponse.error("availability must be a boolean or string"));
+        }
+        com.ebee.driver.dto.DriverResponse response = driverAppService.updateMyAvailability(availability);
         return ResponseEntity.ok(ApiResponse.success("Availability updated successfully", response));
     }
 
@@ -120,6 +129,13 @@ public class DriverAppController {
             @RequestParam(required = false) ExpenseStatus status) {
         List<ExpenseResponse> responses = driverAppService.getMyExpenses(status);
         return ResponseEntity.ok(ApiResponse.success("Expenses retrieved successfully", responses));
+    }
+
+    @PostMapping(value = "/profile/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<DriverProfileResponse>> uploadProfilePhoto(
+            @RequestParam("photo") MultipartFile photo) {
+        DriverProfileResponse response = driverAppService.uploadProfilePhoto(photo);
+        return ResponseEntity.ok(ApiResponse.success("Profile photo updated successfully", response));
     }
 
     @PostMapping("/device-token")

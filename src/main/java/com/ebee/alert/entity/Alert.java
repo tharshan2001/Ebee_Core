@@ -3,6 +3,7 @@ package com.ebee.alert.entity;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.user.entity.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
@@ -70,4 +71,18 @@ public class Alert {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @JsonProperty("type")
+    public AlertType getType() {
+        return alertType;
+    }
+
+    @JsonProperty("read")
+    public boolean isRead() {
+        return isRead != null && isRead;
+    }
+
+    public void setRead(boolean read) {
+        this.isRead = read;
+    }
 }

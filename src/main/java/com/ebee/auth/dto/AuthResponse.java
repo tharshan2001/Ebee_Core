@@ -1,6 +1,7 @@
 package com.ebee.auth.dto;
 
 import com.ebee.user.enums.RoleType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,4 +24,9 @@ public class AuthResponse {
     private UUID driverId;
     private String licenseNumber;
     private String driverAvailability;
+
+    @JsonProperty("availability")
+    public boolean isAvailability() {
+        return "AVAILABLE".equals(driverAvailability);
+    }
 }

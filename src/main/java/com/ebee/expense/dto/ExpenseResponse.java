@@ -2,6 +2,7 @@ package com.ebee.expense.dto;
 
 import com.ebee.expense.enums.ExpenseCategory;
 import com.ebee.expense.enums.ExpenseStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -19,6 +20,11 @@ public class ExpenseResponse {
     private String receiptUrl;
     private LocalDate dateIncurred;
     private ExpenseStatus status;
+
+    @JsonProperty("date")
+    public LocalDate getDate() {
+        return dateIncurred;
+    }
 
     private UUID createdById;
     private String createdByEmail;

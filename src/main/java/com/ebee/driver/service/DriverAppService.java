@@ -68,10 +68,16 @@ public class DriverAppService {
     private final S3Service s3Service;
     private final NotificationPort notificationPort;
 
-    private Driver getCurrentDriver() {
+    public Driver getCurrentDriver() {
         UUID userId = securityService.getCurrentUserId();
         return driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", userId));
+    }
+
+    @Transactional(readOnly = true)
+    public String getCurrentDriverName() {
+        Driver driver = getCurrentDriver();
+        return driver.getUser().getFirstName() + " " + driver.getUser().getLastName();
     }
 
     private User getCurrentUser() {

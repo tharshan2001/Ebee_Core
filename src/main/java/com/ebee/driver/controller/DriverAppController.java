@@ -7,8 +7,10 @@ import com.ebee.common.util.SortUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.driver.dto.*;
+import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.service.DriverAppService;
+import com.ebee.driver.service.DriverLocationService;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
 import com.ebee.expense.enums.ExpenseStatus;
@@ -26,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -35,6 +38,7 @@ import java.util.UUID;
 public class DriverAppController {
 
     private final DriverAppService driverAppService;
+    private final DriverLocationService driverLocationService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<ApiResponse<DriverDashboardResponse>> getDashboard() {
@@ -147,5 +151,23 @@ public class DriverAppController {
         }
         driverAppService.registerDeviceToken(fcmToken);
         return ResponseEntity.ok(ApiResponse.success("Device token registered successfully"));
+    }
+
+    @PostMapping("/location")
+    public ResponseEntity<ApiResponse<DriverLocationResponse>> updateLocation(
+            @Valid @RequestBody DriverLocationRequest request) {
+        Driver driver = driverAppService.getCurrentDriver();
+        String driverName = driverAppService.getCurrentDriverName();
+        DriverLocationResponse response = driverLocationService.updateLocation(driver.getId(), driverName, request);
+        return ResponseEntity.ok(ApiResponse.success("Location updated", response));
+    }
+
+    @GetMapping("/location")
+    public ResponseEntity<ApiResponse<DriverLocationResponse>> getMyLocation() {
+        Driver driver = driverAppService.getCurrentDriver();
+        Optional<DriverLocationResponse> location = driverLocationService.getCurrentLocation(driver.getId());
+        return location
+                .map(loc -> ResponseEntity.ok(ApiResponse.success("Location retrieved", loc)))
+                .orElse(ResponseEntity.ok(ApiResponse.success("No location data available")));
     }
 }

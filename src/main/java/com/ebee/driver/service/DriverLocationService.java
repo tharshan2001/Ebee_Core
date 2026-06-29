@@ -2,12 +2,14 @@ package com.ebee.driver.service;
 
 import com.ebee.driver.dto.DriverLocationRequest;
 import com.ebee.driver.dto.DriverLocationResponse;
+import com.ebee.driver.repository.DriverRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DriverLocationService {
 
     private static final String LOCATION_KEY_PREFIX = "driver:location:";
@@ -27,8 +30,12 @@ public class DriverLocationService {
     private final StringRedisTemplate stringRedisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
+    private final DriverRepository driverRepository;
 
     public DriverLocationResponse updateLocation(UUID driverId, String driverName, DriverLocationRequest request) {
+        String photoUrl = driverRepository.findById(driverId)
+            .map(driver -> driver.getUser().getProfilePictureUrl())
+            .orElse(null);
         var response = new DriverLocationResponse(
             driverId,
             driverName,
@@ -37,7 +44,8 @@ public class DriverLocationService {
             request.accuracy(),
             request.bearing(),
             request.speed(),
-            Instant.now()
+            Instant.now(),
+            photoUrl
         );
 
         try {
@@ -61,7 +69,8 @@ public class DriverLocationService {
         String json = stringRedisTemplate.opsForValue().get(LOCATION_KEY_PREFIX + driverId);
         if (json == null) return Optional.empty();
         try {
-            return Optional.of(objectMapper.readValue(json, DriverLocationResponse.class));
+            DriverLocationResponse loc = objectMapper.readValue(json, DriverLocationResponse.class);
+            return Optional.of(enrichPhotoUrl(driverId, loc));
         } catch (JsonProcessingException e) {
             return Optional.empty();
         }
@@ -76,12 +85,32 @@ public class DriverLocationService {
             String json = stringRedisTemplate.opsForValue().get(key);
             if (json != null) {
                 try {
-                    locations.add(objectMapper.readValue(json, DriverLocationResponse.class));
+                    DriverLocationResponse loc = objectMapper.readValue(json, DriverLocationResponse.class);
+                    locations.add(enrichPhotoUrl(loc.driverId(), loc));
                 } catch (JsonProcessingException ignored) {
                 }
             }
         }
         return locations;
+    }
+
+    private DriverLocationResponse enrichPhotoUrl(UUID driverId, DriverLocationResponse loc) {
+        if (loc.photoUrl() != null) return loc;
+        String photoUrl = driverRepository.findById(driverId)
+            .map(driver -> driver.getUser().getProfilePictureUrl())
+            .orElse(null);
+        if (photoUrl == null) return loc;
+        return new DriverLocationResponse(
+            loc.driverId(),
+            loc.driverName(),
+            loc.latitude(),
+            loc.longitude(),
+            loc.accuracy(),
+            loc.bearing(),
+            loc.speed(),
+            loc.recordedAt(),
+            photoUrl
+        );
     }
 
     public void removeLocation(UUID driverId) {

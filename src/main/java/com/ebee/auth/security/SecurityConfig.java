@@ -60,6 +60,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/agent-applications").permitAll()
                 .requestMatchers("/api/whatsapp/webhook").permitAll()
+                .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )

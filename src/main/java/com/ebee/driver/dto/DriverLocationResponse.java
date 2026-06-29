@@ -11,5 +11,6 @@ public record DriverLocationResponse(
     Float accuracy,
     Float bearing,
     Float speed,
-    Instant recordedAt
+    Instant recordedAt,
+    String photoUrl
 ) {}

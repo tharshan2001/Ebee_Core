@@ -20,7 +20,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.stream.StreamSupport;
@@ -37,14 +38,19 @@ public class RichCommunicationSmsSender implements SmsSender {
     @Override
     public NotificationResult send(SmsRequest request) {
         try {
-            String digest = sha256(properties.getSms().getPassword());
-            String created = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+            String digest = md5(properties.getSms().getPassword());
+            String created = ZonedDateTime.now(ZoneId.of("Asia/Colombo"))
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("USER", properties.getSms().getUsername());
             headers.set("DIGEST", digest);
             headers.set("CREATED", created);
+            String authString = properties.getSms().getAuthString();
+            if (authString != null && !authString.isBlank()) {
+                headers.set("API-AUTH-STRING", authString);
+            }
 
             ObjectNode root = objectMapper.createObjectNode();
             ArrayNode messages = root.putArray("messages");
@@ -108,13 +114,13 @@ public class RichCommunicationSmsSender implements SmsSender {
         return PhoneUtils.forSms(phone);
     }
 
-    private String sha256(String value) {
+    private String md5(String value) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] digest = md.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest).toLowerCase();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+            throw new RuntimeException("MD5 algorithm not available", e);
         }
     }
 }

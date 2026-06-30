@@ -14,6 +14,7 @@ public class NotificationProperties {
         private String apiBaseUrl;
         private String username;
         private String password;
+        private String authString;
         private String defaultMask;
         private String defaultCampaign;
     }

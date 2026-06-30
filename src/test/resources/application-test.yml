@@ -55,5 +55,6 @@ notification:
     api-base-url: http://localhost:9999
     username: test
     password: test
+    auth-string: test-auth
     default-mask: TEST
     default-campaign: Test

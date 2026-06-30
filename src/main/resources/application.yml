@@ -93,6 +93,7 @@ notification:
     api-base-url: ${DIALOG_SMS_API_URL:}
     username: ${DIALOG_SMS_USERNAME:}
     password: ${DIALOG_SMS_PASSWORD:}
+    auth-string: ${DIALOG_SMS_AUTH_STRING:}
     default-mask: ${DIALOG_SMS_MASK:KISMET PLUS}
     default-campaign: ${DIALOG_SMS_CAMPAIGN:Notification}
 

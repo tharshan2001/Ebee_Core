@@ -29,7 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         // Keep in sync with public endpoints in SecurityConfig.
         // The filter skips JWT parsing for public paths; SecurityConfig still enforces method-level authorization.
-        return path.startsWith("/api/auth/login")
+        return path.startsWith("/actuator/health")
+                || path.startsWith("/api/auth/login")
                 || path.startsWith("/api/auth/refresh")
                 || path.startsWith("/api/auth/forgot-password")
                 || path.startsWith("/api/auth/verify-otp")

@@ -138,6 +138,16 @@ public class DriverService {
         Driver savedDriver = driverRepository.save(driver);
         auditLogService.record(AuditAction.DRIVER_UPDATE, "Driver", id,
                 "Driver " + driver.getUser().getEmail() + " updated");
+
+        if (securityService.isAdmin() && driver.getFcmToken() != null) {
+            notificationPort.sendPush(new PushRequest(
+                    driver.getFcmToken(),
+                    "Profile Updated",
+                    "Your driver profile has been updated by an admin.",
+                    Map.of("type", "driver_profile_updated")
+            ));
+        }
+
         return toResponse(savedDriver);
     }
 

@@ -33,6 +33,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+!.env.sample
 .firebase-service-account.json
 application-local.yml
 application-dev.yml

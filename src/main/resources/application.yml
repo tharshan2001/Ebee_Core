@@ -135,6 +135,20 @@ rate-limiting:
     max-requests: 200
     window-minutes: 1
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+    jmx:
+      exposure:
+        exclude: "*"
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %X{correlationId} %logger{36} - %msg%n"

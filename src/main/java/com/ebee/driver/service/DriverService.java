@@ -1,5 +1,6 @@
 package com.ebee.driver.service;
 
+import com.ebee.alert.enums.AlertType;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -139,13 +140,23 @@ public class DriverService {
         auditLogService.record(AuditAction.DRIVER_UPDATE, "Driver", id,
                 "Driver " + driver.getUser().getEmail() + " updated");
 
-        if (securityService.isAdmin() && driver.getFcmToken() != null) {
-            notificationPort.sendPush(new PushRequest(
-                    driver.getFcmToken(),
+        if (securityService.isAdmin()) {
+            notificationPort.createInternalAlert(
+                    driver.getUser(),
                     "Profile Updated",
                     "Your driver profile has been updated by an admin.",
-                    Map.of("type", "driver_profile_updated")
-            ));
+                    AlertType.DRIVER_PROFILE_UPDATED,
+                    id,
+                    "DRIVER"
+            );
+            if (driver.getFcmToken() != null) {
+                notificationPort.sendPush(new PushRequest(
+                        driver.getFcmToken(),
+                        "Profile Updated",
+                        "Your driver profile has been updated by an admin.",
+                        Map.of("type", "driver_profile_updated")
+                ));
+            }
         }
 
         return toResponse(savedDriver);
@@ -167,22 +178,42 @@ public class DriverService {
                 "Driver " + driver.getUser().getEmail() + " availability changed from "
                 + previousAvailability + " to " + request.getAvailability());
 
-        if (securityService.isAdmin() && driver.getFcmToken() != null) {
+        if (securityService.isAdmin()) {
             if (request.getAvailability() == DriverAvailability.SUSPENDED) {
-                notificationPort.sendPush(new PushRequest(
-                        driver.getFcmToken(),
+                notificationPort.createInternalAlert(
+                        driver.getUser(),
                         "Account Suspended",
                         "Your driver account has been suspended. Please contact support.",
-                        Map.of("type", "driver_suspended")
-                ));
+                        AlertType.DRIVER_SUSPENDED,
+                        id,
+                        "DRIVER"
+                );
+                if (driver.getFcmToken() != null) {
+                    notificationPort.sendPush(new PushRequest(
+                            driver.getFcmToken(),
+                            "Account Suspended",
+                            "Your driver account has been suspended. Please contact support.",
+                            Map.of("type", "driver_suspended")
+                    ));
+                }
             } else if (previousAvailability == DriverAvailability.SUSPENDED
                     && request.getAvailability() == DriverAvailability.AVAILABLE) {
-                notificationPort.sendPush(new PushRequest(
-                        driver.getFcmToken(),
+                notificationPort.createInternalAlert(
+                        driver.getUser(),
                         "Account Reactivated",
                         "Your driver account has been reactivated. You can now log in and accept deliveries.",
-                        Map.of("type", "driver_unsuspended")
-                ));
+                        AlertType.DRIVER_UNSUSPENDED,
+                        id,
+                        "DRIVER"
+                );
+                if (driver.getFcmToken() != null) {
+                    notificationPort.sendPush(new PushRequest(
+                            driver.getFcmToken(),
+                            "Account Reactivated",
+                            "Your driver account has been reactivated. You can now log in and accept deliveries.",
+                            Map.of("type", "driver_unsuspended")
+                    ));
+                }
             }
         }
 

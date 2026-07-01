@@ -157,15 +157,23 @@ public class DriverService {
                 "Driver " + driver.getUser().getEmail() + " availability changed from "
                 + previousAvailability + " to " + request.getAvailability());
 
-        if (securityService.isAdmin()
-                && driver.getFcmToken() != null
-                && request.getAvailability() == DriverAvailability.SUSPENDED) {
-            notificationPort.sendPush(new PushRequest(
-                    driver.getFcmToken(),
-                    "Account Suspended",
-                    "Your driver account has been suspended. Please contact support.",
-                    Map.of("type", "driver_suspended")
-            ));
+        if (securityService.isAdmin() && driver.getFcmToken() != null) {
+            if (request.getAvailability() == DriverAvailability.SUSPENDED) {
+                notificationPort.sendPush(new PushRequest(
+                        driver.getFcmToken(),
+                        "Account Suspended",
+                        "Your driver account has been suspended. Please contact support.",
+                        Map.of("type", "driver_suspended")
+                ));
+            } else if (previousAvailability == DriverAvailability.SUSPENDED
+                    && request.getAvailability() == DriverAvailability.AVAILABLE) {
+                notificationPort.sendPush(new PushRequest(
+                        driver.getFcmToken(),
+                        "Account Reactivated",
+                        "Your driver account has been reactivated. You can now log in and accept deliveries.",
+                        Map.of("type", "driver_unsuspended")
+                ));
+            }
         }
 
         return toResponse(savedDriver);

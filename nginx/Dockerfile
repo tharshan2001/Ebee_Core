@@ -1,6 +1,6 @@
 FROM nginx:alpine
 
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx.https.conf /etc/nginx/nginx.https.conf
 COPY nginx.http.conf /etc/nginx/nginx.http.conf
 COPY entrypoint.sh /entrypoint.sh
 

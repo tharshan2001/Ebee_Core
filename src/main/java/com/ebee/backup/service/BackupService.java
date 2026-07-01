@@ -6,6 +6,7 @@ import com.ebee.common.config.AppProperties;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -179,8 +180,16 @@ public class BackupService {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("restoredFrom", filename);
             result.put("preRestoreBackup", preBackup.get("name"));
-            auditLogService.record(BackupAction.RESTORE, filename,
-                    "Pre-restore backup: " + preBackup.get("name"));
+
+            try {
+                auditLogService.record(BackupAction.RESTORE, filename,
+                        "Pre-restore backup: " + preBackup.get("name"));
+            } catch (Exception e) {
+                log.warn("Audit log failed after restore (user may need to re-login): {}", e.getMessage());
+            }
+
+            SecurityContextHolder.clearContext();
+
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Restore failed: " + e.getMessage(), e);

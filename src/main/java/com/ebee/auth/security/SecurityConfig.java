@@ -3,6 +3,8 @@ package com.ebee.auth.security;
 import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
 import com.ebee.common.config.AppProperties;
+import com.ebee.common.filter.ApiVersionFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -27,7 +29,6 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -39,6 +40,7 @@ public class SecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtService jwtService;
+    private final ApiVersionFilter apiVersionFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final IpWhitelistFilter ipWhitelistFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -66,6 +68,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .userDetailsService(userDetailsService)
+            .addFilterBefore(apiVersionFilter, JwtAuthenticationFilter.class)
             .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(ipWhitelistFilter, JwtAuthenticationFilter.class)
@@ -98,6 +101,13 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public FilterRegistrationBean<ApiVersionFilter> disableApiVersionFilterRegistration(ApiVersionFilter filter) {
+        FilterRegistrationBean<ApiVersionFilter> bean = new FilterRegistrationBean<>(filter);
+        bean.setEnabled(false);
+        return bean;
     }
 
     @Bean

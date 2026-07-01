@@ -4,33 +4,49 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
 
-@Component
-public class ApiVersionFilter implements Filter {
+@Configuration
+public class ApiVersionFilter {
 
-    private static final String NEW_PREFIX = "/api/v1/";
-    private static final String LEGACY_PREFIX = "/api/";
-    private static final int NEW_PREFIX_LEN = NEW_PREFIX.length() - 1;
+    private static final int SPRING_SECURITY_FILTER_ORDER = -100;
 
-    @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain)
-            throws IOException, ServletException {
+    @Bean
+    public FilterRegistrationBean<Filter> apiVersionFilterRegistration() {
+        FilterRegistrationBean<Filter> bean = new FilterRegistrationBean<>();
+        bean.setFilter(new Filter() {
+            @Override
+            public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain)
+                    throws IOException, ServletException {
+                HttpServletRequest request = (HttpServletRequest) servletRequest;
+                HttpServletResponse response = (HttpServletResponse) servletResponse;
+                String path = request.getServletPath();
 
-        HttpServletRequest request = (HttpServletRequest) servletRequest;
-        HttpServletResponse response = (HttpServletResponse) servletResponse;
-        String path = request.getServletPath();
+                if (path.startsWith("/api/v1/")) {
+                    String rewritten = "/api" + path.substring(7);
+                    chain.doFilter(new RewrittenPathWrapper(request, rewritten), response);
+                } else if (path.equals("/api/v1")) {
+                    response.sendRedirect("/api/v1/");
+                } else {
+                    chain.doFilter(request, response);
+                }
+            }
 
-        if (path.startsWith(NEW_PREFIX)) {
-            String rewritten = LEGACY_PREFIX + path.substring(NEW_PREFIX_LEN);
-            chain.doFilter(new RewrittenPathWrapper(request, rewritten), response);
-        } else if (path.equals("/api/v1")) {
-            response.sendRedirect("/api/v1/");
-        } else {
-            chain.doFilter(request, response);
-        }
+            @Override
+            public void init(FilterConfig filterConfig) {
+            }
+
+            @Override
+            public void destroy() {
+            }
+        });
+        bean.setOrder(SPRING_SECURITY_FILTER_ORDER - 100);
+        bean.addUrlPatterns("/*");
+        return bean;
     }
 
     private static class RewrittenPathWrapper extends HttpServletRequestWrapper {

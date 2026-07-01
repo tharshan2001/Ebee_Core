@@ -25,6 +25,8 @@ services:
     environment:
       DB_URL: jdbc:postgresql://db:5432/ebee_db
       REDIS_HOST: redis
+    volumes:
+      - ./.firebase-service-account.json:/app/.firebase-service-account.json
     depends_on:
       db:
         condition: service_healthy

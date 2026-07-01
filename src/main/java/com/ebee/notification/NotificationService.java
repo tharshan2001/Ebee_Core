@@ -284,7 +284,7 @@ public class NotificationService implements NotificationPort {
 
     @Override
     @Async
-    @Transactional(readOnly = true)
+    @Transactional
     public void createInternalAlert(User recipient, String title, String message,
                                      AlertType alertType, UUID referenceId, String referenceType) {
         try {

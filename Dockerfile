@@ -8,7 +8,7 @@ RUN mvn package -DskipTests -B
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
-RUN apk --no-cache add curl && \
+RUN apk --no-cache add curl postgresql16-client && \
     addgroup -S app && \
     adduser -S app -G app
 USER app

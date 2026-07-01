@@ -113,7 +113,8 @@ public class IpWhitelistService {
     private boolean matchesAny(String ip, String csv) {
         String normalized = ip.replace("0:0:0:0:0:0:0:1", "::1");
         for (String allowed : csv.split(",")) {
-            if (allowed.trim().equals(ip) || allowed.trim().equals(normalized)) {
+            String trimmed = allowed.trim();
+            if (trimmed.equals("*") || trimmed.equals(ip) || trimmed.equals(normalized)) {
                 return true;
             }
         }

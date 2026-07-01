@@ -61,7 +61,7 @@ public class FcmSender implements PushSender {
     @Override
     public void send(PushRequest request) {
         if (!fcmProperties.isEnabled()) {
-            log.debug("Push notifications disabled — skipping");
+            log.warn("Push notifications disabled — skipping");
             return;
         }
         if (request.token() != null && request.token().startsWith("ExponentPushToken[")) {
@@ -91,12 +91,25 @@ public class FcmSender implements PushSender {
             );
 
             if (response.getBody() != null) {
-                JsonNode result = response.getBody().path("data").get(0);
+                JsonNode data = response.getBody().path("data");
+                JsonNode result;
+                if (data.isArray()) {
+                    result = data.get(0);
+                } else if (data.isObject() && !data.isMissingNode()) {
+                    result = data;
+                } else {
+                    log.warn("Expo push response has no data field: {}", response.getBody());
+                    return;
+                }
+                if (result == null) {
+                    log.warn("Expo push response data is empty: {}", response.getBody());
+                    return;
+                }
                 String status = result.path("status").asText();
                 if ("ok".equals(status)) {
-                    log.debug("Expo push sent OK: {}", result.path("id").asText());
+                    log.info("Expo push sent OK: id={}, token={}", result.path("id").asText(), maskToken(request.token()));
                 } else {
-                    log.warn("Expo push failed: {} — {}", status, result.path("message").asText());
+                    log.warn("Expo push failed: {} — {} | response: {}", status, result.path("message").asText(), response.getBody());
                 }
             }
         } catch (Exception e) {
@@ -105,6 +118,7 @@ public class FcmSender implements PushSender {
     }
 
     private void sendFcmPush(PushRequest request) {
+        log.info("FCM push start: token={}", maskToken(request.token()));
         String accessToken = getAccessToken();
         if (accessToken == null) {
             log.warn("Cannot send FCM push — no access token available");
@@ -138,7 +152,7 @@ public class FcmSender implements PushSender {
             );
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.debug("FCM push sent OK to token={}: {}", maskToken(request.token()), response.getBody());
+                log.info("FCM push sent OK to token={}: {}", maskToken(request.token()), response.getBody());
             } else {
                 JsonNode error = objectMapper.readTree(response.getBody());
                 String status = error.path("error").path("status").asText();
@@ -221,6 +235,8 @@ public class FcmSender implements PushSender {
         String base64 = pem
                 .replace("-----BEGIN RSA PRIVATE KEY-----", "")
                 .replace("-----END RSA PRIVATE KEY-----", "")
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
         byte[] keyBytes = Base64.getDecoder().decode(base64);
         PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);

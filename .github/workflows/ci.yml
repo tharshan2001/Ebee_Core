@@ -56,6 +56,20 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 16379
 
+      - name: Print test reports
+        if: failure()
+        run: |
+          find target/surefire-reports -name "*.txt" 2>/dev/null | while read f; do
+            echo "=== $(basename $f) ==="
+            head -50 "$f"
+          done
+          find target/surefire-reports -name "*.xml" 2>/dev/null | while read f; do
+            if grep -q 'failures="[1-9]\|errors="[1-9]' "$f" 2>/dev/null; then
+              echo "=== FAILED: $(basename $f) ==="
+              grep -A2 '<failure\|<error' "$f" | head -30
+            fi
+          done
+
       - name: Upload surefire reports
         if: failure()
         uses: actions/upload-artifact@v4

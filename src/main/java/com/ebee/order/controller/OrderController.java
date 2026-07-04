@@ -116,6 +116,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Order cancelled successfully", response));
     }
 
+    @PostMapping("/{id}/return")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> returnOrder(@PathVariable UUID id) {
+        OrderResponse response = orderService.returnOrder(id);
+        return ResponseEntity.ok(ApiResponse.success("Order returned successfully", response));
+    }
+
     @PostMapping("/{id}/payment")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<OrderResponse>> recordPayment(

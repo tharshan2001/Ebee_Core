@@ -24,6 +24,7 @@ import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -461,7 +462,11 @@ class OrderServiceTest {
         orderService.cancelOrder(orderId);
 
         verify(orderRepository).save(orderCaptor.capture());
-        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
         verify(inventoryService).recordOrderStocks(
                 anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
@@ -518,6 +523,104 @@ class OrderServiceTest {
         verify(inventoryService, never()).recordOrderStocks(
                 anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+    }
+
+    @Test
+    void cancelOrder_paidCash_setsRefunded() {
+        order.setPaymentMethod(PaymentMethod.CASH);
+        order.setPaidAmount(new BigDecimal("6500.00"));
+        order.setOutstandingBalance(BigDecimal.ZERO);
+        order.setPaymentStatus(PaymentStatus.PAID);
+
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.cancelOrder(orderId);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId),
+                contains("refunded 6500.00"));
+    }
+
+    @Test
+    void cancelOrder_creditOrder_reversesCustomerBalance() {
+        customer.setOutstandingBalance(new BigDecimal("6500.00"));
+        order.setPaymentMethod(PaymentMethod.CREDIT);
+        order.setPaidAmount(BigDecimal.ZERO);
+        order.setOutstandingBalance(new BigDecimal("6500.00"));
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.cancelOrder(order.getId());
+
+        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void cancelOrder_partiallyPaidCredit_reversesCustomerBalanceAndSetsRefunded() {
+        customer.setOutstandingBalance(new BigDecimal("4000.00"));
+        order.setPaymentMethod(PaymentMethod.CREDIT);
+        order.setPaidAmount(new BigDecimal("2500.00"));
+        order.setOutstandingBalance(new BigDecimal("4000.00"));
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.cancelOrder(order.getId());
+
+        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void returnOrder_success() {
+        order.setStatus(OrderStatus.DELIVERED);
+        order.setPaymentMethod(PaymentMethod.CASH);
+        order.setPaidAmount(new BigDecimal("6500.00"));
+        order.setOutstandingBalance(BigDecimal.ZERO);
+        order.setPaymentStatus(PaymentStatus.PAID);
+
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.returnOrder(orderId);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(inventoryService).recordOrderStocks(
+                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
+        verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
+        verify(orderNotificationService).sendOrderStatus(any());
+    }
+
+    @Test
+    void returnOrder_notDelivered_throws() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only delivered orders can be returned");
     }
 
     @Test

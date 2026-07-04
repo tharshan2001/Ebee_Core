@@ -34,6 +34,8 @@ public interface OrderService {
 
     OrderResponse cancelOrder(UUID id);
 
+    OrderResponse returnOrder(UUID id);
+
     byte[] generateInvoicePdf(UUID id);
 
     byte[] generateReceiptPdf(UUID id);

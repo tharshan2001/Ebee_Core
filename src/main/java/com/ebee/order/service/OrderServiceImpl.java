@@ -347,13 +347,83 @@ public class OrderServiceImpl implements OrderService {
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 
+        // Handle payments on cancellation
+        BigDecimal refundAmount = order.getPaidAmount();
+        boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
+
+        if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
+            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), false);
+        }
+
+        if (hasRefund) {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setPaidAmount(BigDecimal.ZERO);
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        } else {
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        }
+
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
 
         auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " cancelled");
+                "Order " + updatedOrder.getOrderNumber() + " cancelled"
+                        + (hasRefund ? " - refunded " + refundAmount : ""));
 
         orderNotificationService.sendOrderCancelled(updatedOrder);
+
+        return orderMapper.toResponse(updatedOrder);
+    }
+
+    @Transactional
+    @Override
+    public OrderResponse returnOrder(UUID id) {
+        Order order = orderRepository.findByIdWithDetails(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new IllegalArgumentException("Only delivered orders can be returned");
+        }
+
+        // Restore stock
+        List<UUID> stockProductIds = order.getItems().stream()
+                .map(item -> item.getProduct().getId())
+                .toList();
+        List<Integer> stockQuantities = order.getItems().stream()
+                .map(OrderItem::getQuantity)
+                .toList();
+        List<String> stockNotes = order.getItems().stream()
+                .map(item -> "Order " + order.getOrderNumber() + " returned - Item restored")
+                .toList();
+        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+
+        // Cancel commissions
+        commissionLifecycleService.cancelCommissionForOrder(id);
+
+        // Handle payments on return
+        BigDecimal refundAmount = order.getPaidAmount();
+        boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
+
+        if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
+            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), false);
+        }
+
+        if (hasRefund) {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setPaidAmount(BigDecimal.ZERO);
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        } else {
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        }
+
+        order.setStatus(OrderStatus.RETURNED);
+        Order updatedOrder = orderRepository.save(order);
+
+        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
+                "Order " + updatedOrder.getOrderNumber() + " returned"
+                        + (hasRefund ? " - refunded " + refundAmount : ""));
+
+        orderNotificationService.sendOrderStatus(updatedOrder);
 
         return orderMapper.toResponse(updatedOrder);
     }
@@ -536,6 +606,10 @@ public class OrderServiceImpl implements OrderService {
         if (request.amount().compareTo(order.getOutstandingBalance()) > 0) {
             throw new IllegalArgumentException(
                     "Payment amount cannot exceed outstanding balance of " + order.getOutstandingBalance());
+        }
+
+        if (request.paymentMethod() == PaymentMethod.CREDIT) {
+            throw new IllegalArgumentException("Credit cannot be used to record a payment");
         }
 
         boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;

@@ -320,7 +320,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CREDIT);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
         orderService.recordPayment(order.getId(), request);
 
         verify(orderRepository).save(orderCaptor.capture());
@@ -349,7 +349,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CREDIT);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
         orderService.recordPayment(order.getId(), request);
 
         assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);

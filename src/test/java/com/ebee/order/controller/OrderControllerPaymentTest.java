@@ -10,6 +10,7 @@ import com.ebee.common.config.CommonPropertiesConfig;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.service.OrderService;
@@ -97,11 +98,11 @@ class OrderControllerPaymentTest {
     @WithMockUser(roles = "ADMIN")
     void recordPayment_partialPayment_shouldReturnUpdatedOrder() throws Exception {
         UUID orderId = UUID.randomUUID();
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CREDIT);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
 
         OrderResponse response = new OrderResponse();
         response.setId(orderId);
-        response.setPaymentMethod(PaymentMethod.CREDIT);
+        response.setPaymentMethod(PaymentMethod.CASH);
         response.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
         response.setPaidAmount(new BigDecimal("800.00"));
         response.setOutstandingBalance(new BigDecimal("1200.00"));
@@ -173,5 +174,23 @@ class OrderControllerPaymentTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidJson))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void returnOrder_shouldReturnSuccess() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        OrderResponse response = new OrderResponse();
+        response.setId(orderId);
+        response.setStatus(OrderStatus.RETURNED);
+        response.setPaymentStatus(PaymentStatus.REFUNDED);
+
+        when(orderService.returnOrder(orderId)).thenReturn(response);
+
+        mockMvc.perform(post("/api/orders/{id}/return", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Order returned successfully"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("REFUNDED"));
     }
 }

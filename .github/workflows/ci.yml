@@ -45,17 +45,17 @@ jobs:
 
       - name: Debug connections
         run: |
-          echo "=== Postgres connection test ==="
-          apt-get update -qq && apt-get install -y -qq postgresql-client 2>/dev/null || true
-          PGPASSWORD=ebee_test_pass psql -h localhost -U ebee -d ebee_test -c "SELECT 1 AS connected;" 2>&1 || echo "Postgres connection failed"
-          echo "=== Redis connection test ==="
-          redis-cli -h localhost -p 16379 PING 2>&1 || echo "Redis connection failed"
+          echo "=== Postgres ==="
+          which psql || apt-get update -qq && apt-get install -y -qq postgresql-client 2>/dev/null
+          PGPASSWORD=ebee_test_pass psql -h localhost -U ebee -d ebee_test -c "SELECT 1 AS connected;" 2>&1 || echo "FAIL"
+          echo "=== Redis ==="
+          redis-cli -h localhost -p 16379 PING 2>&1 || echo "FAIL"
 
       - name: Compile
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
-        run: ./mvnw test --batch-mode --no-transfer-progress
+        run: ./mvnw test -e --batch-mode --no-transfer-progress
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ebee_test
           SPRING_DATASOURCE_USERNAME: ebee
@@ -70,6 +70,10 @@ jobs:
           find target/surefire-reports -name "*.txt" 2>/dev/null | while read f; do
             echo "=== $(basename $f) ==="
             head -100 "$f"
+          done
+          find target/surefire-reports -name "*.xml" 2>/dev/null | while read f; do
+            echo "=== XML: $(basename $f) ==="
+            head -50 "$f"
           done
 
       - name: Upload JaCoCo report

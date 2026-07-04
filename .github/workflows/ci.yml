@@ -47,16 +47,15 @@ jobs:
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
-        run: ./mvnw test --batch-mode --no-transfer-progress
+        run: ./mvnw test --batch-mode --no-transfer-progress \
+          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/ebee_test \
+          -Dspring.datasource.username=ebee \
+          -Dspring.datasource.password=ebee_test_pass \
+          -Dspring.datasource.driver-class-name=org.postgresql.Driver \
+          -Dspring.profiles.active=test
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ebee_test
-          SPRING_DATASOURCE_USERNAME: ebee
-          SPRING_DATASOURCE_PASSWORD: ebee_test_pass
-          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
           REDIS_HOST: localhost
           REDIS_PORT: 16379
-          JWT_SECRET: test-ci-jwt-secret-that-is-at-least-256-bits-long-for-hs256
-          JWT_RESET_SECRET: test-ci-reset-secret-that-is-at-least-256-bits-long
 
       - name: Upload surefire reports
         if: failure()

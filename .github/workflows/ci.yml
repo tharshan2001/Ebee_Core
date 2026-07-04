@@ -43,19 +43,11 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Debug connections
-        run: |
-          echo "=== Postgres ==="
-          which psql || apt-get update -qq && apt-get install -y -qq postgresql-client 2>/dev/null
-          PGPASSWORD=ebee_test_pass psql -h localhost -U ebee -d ebee_test -c "SELECT 1 AS connected;" 2>&1 || echo "FAIL"
-          echo "=== Redis ==="
-          redis-cli -h localhost -p 16379 PING 2>&1 || echo "FAIL"
-
       - name: Compile
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
-        run: ./mvnw test -e --batch-mode --no-transfer-progress
+        run: ./mvnw test --batch-mode --no-transfer-progress
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ebee_test
           SPRING_DATASOURCE_USERNAME: ebee
@@ -63,18 +55,15 @@ jobs:
           SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
           REDIS_HOST: localhost
           REDIS_PORT: 16379
+          JWT_SECRET: test-ci-jwt-secret-that-is-at-least-256-bits-long-for-hs256
+          JWT_RESET_SECRET: test-ci-reset-secret-that-is-at-least-256-bits-long
 
-      - name: Print test reports
+      - name: Upload surefire reports
         if: failure()
-        run: |
-          find target/surefire-reports -name "*.txt" 2>/dev/null | while read f; do
-            echo "=== $(basename $f) ==="
-            head -100 "$f"
-          done
-          find target/surefire-reports -name "*.xml" 2>/dev/null | while read f; do
-            echo "=== XML: $(basename $f) ==="
-            head -50 "$f"
-          done
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
 
       - name: Upload JaCoCo report
         if: success() || failure()

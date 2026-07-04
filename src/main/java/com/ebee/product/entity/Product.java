@@ -2,6 +2,8 @@ package com.ebee.product.entity;
 
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.order.entity.OrderItem;
+import com.ebee.product.convert.SpecificationsConverter;
+import com.ebee.product.dto.ProductSpecification;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -75,6 +77,11 @@ public class Product {
 
     @Column(columnDefinition = "TEXT")
     private String tags;
+
+    @Column(columnDefinition = "jsonb")
+    @Convert(converter = SpecificationsConverter.class)
+    @Builder.Default
+    private List<ProductSpecification> specifications = new ArrayList<>();
 
     @Column(name = "featured")
     @Builder.Default

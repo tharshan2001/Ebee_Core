@@ -88,6 +88,7 @@ public class DriverDeliveryResponse {
         private UUID productId;
         private String productName;
         private String productItemCode;
+        private String imageUrl;
         private int quantity;
         private BigDecimal unitPrice;
         private BigDecimal subtotal;

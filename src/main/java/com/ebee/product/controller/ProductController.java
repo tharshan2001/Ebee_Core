@@ -5,7 +5,10 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
+import com.ebee.product.dto.ProductSpecification;
 import com.ebee.product.service.ProductService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +43,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final Validator validator;
+    private final ObjectMapper objectMapper;
 
     @PostMapping(consumes = "multipart/form-data")
     @PreAuthorize("hasRole('ADMIN')")
@@ -56,7 +60,8 @@ public class ProductController {
             @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
-            @RequestParam(value = "tags", required = false) String tags) {
+            @RequestParam(value = "tags", required = false) String tags,
+            @RequestParam(value = "specifications", required = false) String specificationsJson) {
 
         ProductRequest request = new ProductRequest();
         request.setName(name);
@@ -71,6 +76,13 @@ public class ProductController {
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
+        if (specificationsJson != null && !specificationsJson.isBlank()) {
+            try {
+                request.setSpecifications(objectMapper.readValue(specificationsJson, new TypeReference<List<ProductSpecification>>() {}));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getMessage());
+            }
+        }
         if (images != null) {
             request.setImages(Arrays.asList(images));
         }
@@ -200,6 +212,7 @@ public class ProductController {
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
             @RequestParam(value = "tags", required = false) String tags,
+            @RequestParam(value = "specifications", required = false) String specificationsJson,
             @RequestParam(value = "removeImageUrls", required = false) List<String> removeImageUrls) {
 
         ProductRequest request = new ProductRequest();
@@ -215,6 +228,13 @@ public class ProductController {
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTags(tags);
+        if (specificationsJson != null && !specificationsJson.isBlank()) {
+            try {
+                request.setSpecifications(objectMapper.readValue(specificationsJson, new TypeReference<List<ProductSpecification>>() {}));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getMessage());
+            }
+        }
         request.setRemoveImageUrls(removeImageUrls);
         if (images != null) {
             request.setImages(Arrays.asList(images));

@@ -25,6 +25,7 @@ public class ProductResponse {
     private BigDecimal maxDiscountValue;
     private String brand;
     private String tags;
+    private List<ProductSpecification> specifications;
     private Boolean featured;
     private Long totalSold;
     private BigDecimal effectivePrice;

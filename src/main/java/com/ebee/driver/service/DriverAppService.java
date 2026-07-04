@@ -498,6 +498,9 @@ public class DriverAppService {
         info.setProductId(item.getProduct().getId());
         info.setProductName(item.getProduct().getName());
         info.setProductItemCode(item.getProduct().getItemCode());
+        info.setImageUrl(item.getProduct().getImages().isEmpty()
+                ? null
+                : item.getProduct().getImages().getFirst().getImageUrl());
         info.setQuantity(item.getQuantity());
         info.setUnitPrice(item.getUnitPrice());
         info.setSubtotal(item.getSubtotal());

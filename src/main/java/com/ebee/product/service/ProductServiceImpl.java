@@ -279,6 +279,9 @@ public class ProductServiceImpl implements ProductService {
         if (request.getTags() != null) {
             product.setTags(request.getTags());
         }
+        if (request.getSpecifications() != null) {
+            product.setSpecifications(request.getSpecifications());
+        }
 
         boolean imagesChanged = false;
         if (request.getRemoveImageUrls() != null && !request.getRemoveImageUrls().isEmpty()) {

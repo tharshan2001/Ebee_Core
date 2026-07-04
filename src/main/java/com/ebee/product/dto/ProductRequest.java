@@ -50,4 +50,6 @@ public class ProductRequest {
     private String brand;
 
     private String tags;
+
+    private List<ProductSpecification> specifications;
 }

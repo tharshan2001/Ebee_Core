@@ -30,11 +30,17 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Verify Docker & Testcontainers
+        run: |
+          docker ps
+          docker info | head 5
+          docker pull postgres:16-alpine
+
       - name: Compile
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
-        run: ./mvnw test --batch-mode --no-transfer-progress -Dtestcontainers.debug=true
+        run: ./mvnw test --batch-mode --no-transfer-progress
 
       - name: Upload surefire reports
         if: failure()

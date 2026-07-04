@@ -43,6 +43,14 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Debug connections
+        run: |
+          echo "=== Postgres connection test ==="
+          apt-get update -qq && apt-get install -y -qq postgresql-client 2>/dev/null || true
+          PGPASSWORD=ebee_test_pass psql -h localhost -U ebee -d ebee_test -c "SELECT 1 AS connected;" 2>&1 || echo "Postgres connection failed"
+          echo "=== Redis connection test ==="
+          redis-cli -h localhost -p 16379 PING 2>&1 || echo "Redis connection failed"
+
       - name: Compile
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
@@ -61,21 +69,8 @@ jobs:
         run: |
           find target/surefire-reports -name "*.txt" 2>/dev/null | while read f; do
             echo "=== $(basename $f) ==="
-            head -50 "$f"
+            head -100 "$f"
           done
-          find target/surefire-reports -name "*.xml" 2>/dev/null | while read f; do
-            if grep -q 'failures="[1-9]\|errors="[1-9]' "$f" 2>/dev/null; then
-              echo "=== FAILED: $(basename $f) ==="
-              grep -A2 '<failure\|<error' "$f" | head -30
-            fi
-          done
-
-      - name: Upload surefire reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: surefire-reports
-          path: target/surefire-reports/
 
       - name: Upload JaCoCo report
         if: success() || failure()

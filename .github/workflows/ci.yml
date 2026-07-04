@@ -10,6 +10,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ebee_test
+          POSTGRES_USER: ebee
+          POSTGRES_PASSWORD: ebee_test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:7-alpine
         ports:
@@ -30,17 +43,18 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Verify Docker & Testcontainers
-        run: |
-          docker ps
-          docker info | head 5
-          docker pull postgres:16-alpine
-
       - name: Compile
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
         run: ./mvnw test --batch-mode --no-transfer-progress
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ebee_test
+          SPRING_DATASOURCE_USERNAME: ebee
+          SPRING_DATASOURCE_PASSWORD: ebee_test_pass
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          REDIS_HOST: localhost
+          REDIS_PORT: 16379
 
       - name: Upload surefire reports
         if: failure()

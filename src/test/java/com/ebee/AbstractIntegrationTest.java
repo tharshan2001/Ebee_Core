@@ -17,9 +17,12 @@ public abstract class AbstractIntegrationTest {
             .withReuse(true);
 
     static {
-        postgres.start();
-        System.setProperty("spring.datasource.url", postgres.getJdbcUrl());
-        System.setProperty("spring.datasource.username", postgres.getUsername());
-        System.setProperty("spring.datasource.password", postgres.getPassword());
+        if (System.getProperty("spring.datasource.url") == null
+                && System.getenv("SPRING_DATASOURCE_URL") == null) {
+            postgres.start();
+            System.setProperty("spring.datasource.url", postgres.getJdbcUrl());
+            System.setProperty("spring.datasource.username", postgres.getUsername());
+            System.setProperty("spring.datasource.password", postgres.getPassword());
+        }
     }
 }

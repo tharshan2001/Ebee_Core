@@ -26,6 +26,7 @@ public interface OrderMapper {
     @Mapping(target = "deliveryAssignedToName", expression = "java(order.getDeliveryAssignedTo() != null ? order.getDeliveryAssignedTo().getFirstName() + \" \" + order.getDeliveryAssignedTo().getLastName() : null)")
     @Mapping(target = "deliveryScheduledDate", source = "deliveryScheduledDate")
     @Mapping(target = "deliveryNotes", source = "deliveryNotes")
+    @Mapping(target = "deliveryFailureReason", source = "deliveryFailureReason")
     @Mapping(target = "orderSource", source = "orderSource")
     @Mapping(target = "paymentMethod", source = "paymentMethod")
     @Mapping(target = "paymentStatus", source = "paymentStatus")

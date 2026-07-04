@@ -44,5 +44,6 @@ public class OrderResponse {
     private String deliveryAssignedToName;
     private LocalDate deliveryScheduledDate;
     private String deliveryNotes;
+    private String deliveryFailureReason;
     private OrderSource orderSource;
 }

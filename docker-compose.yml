@@ -23,6 +23,8 @@ services:
   app:
     build: .
     env_file: .env
+    ports:
+      - "8085:8085"
     environment:
       DB_URL: jdbc:postgresql://db:5432/ebee_db
       REDIS_HOST: redis

@@ -7,18 +7,6 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.enums.District;
-import com.ebee.common.service.PrintTemplateService;
-import com.ebee.order.dto.InvoiceData;
-import com.ebee.order.dto.ShippingLabelData;
-import com.ebee.order.exception.DuplicateOrderNumberException;
-import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.common.security.SecurityService;
-import com.ebee.order.util.OrderItemSummaryBuilder;
-import com.ebee.customer.entity.Customer;
-import com.ebee.customer.service.CustomerService;
-import com.ebee.delivery.enums.DeliveryStatus;
-import com.ebee.inventory.service.InventoryService;
-import com.ebee.commission.entity.Commission;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
@@ -29,8 +17,17 @@ import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.exception.DuplicateOrderNumberException;
+import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.util.OrderItemSummaryBuilder;
+import com.ebee.customer.entity.Customer;
+import com.ebee.customer.service.CustomerService;
+import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.inventory.service.InventoryService;
+import com.ebee.commission.entity.Commission;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
 import com.ebee.stock.enums.StockMovementType;
@@ -48,7 +45,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -71,7 +67,8 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerService customerService;
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
-    private final PrintTemplateService printTemplateService;
+    private final OrderPaymentService orderPaymentService;
+    private final OrderPdfService orderPdfService;
 
     @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
@@ -147,10 +144,6 @@ public class OrderServiceImpl implements OrderService {
             OrderItemRequest itemRequest = request.getItems().get(i);
             Product product = productMap.get(itemRequest.getProductItemCode());
 
-            // Admin can apply an optional per-item discount at order time, capped
-            // by the product's maxDiscount (set at product creation/update).
-            // getPriceWithDiscount() throws IllegalArgumentException if the
-            // discount exceeds the cap, so we let it bubble up to a 400.
             BigDecimal originalUnitPrice = product.getPrice();
             String discountType = itemRequest.getDiscountType() != null
                     ? itemRequest.getDiscountType().name()
@@ -182,7 +175,7 @@ public class OrderServiceImpl implements OrderService {
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
 
         order.setTotalAmount(totalAmount);
-        initPayment(order, request.getPaymentMethod(), request.getPaidAmount());
+        orderPaymentService.initPayment(order, request.getPaymentMethod(), request.getPaidAmount());
         Order savedOrder;
         try {
             savedOrder = orderRepository.save(order);
@@ -326,10 +319,6 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Cannot cancel a " + order.getStatus().name().toLowerCase() + " order");
         }
 
-        // If the delivery has already been marked FAILED_PERMANENT, stock was
-        // already restored by DeliveryService. Skip the restoration here to
-        // avoid double-adding stock (which would let a customer inflate
-        // inventory by repeatedly cancelling and re-ordering).
         boolean stockAlreadyRestored = order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT;
 
         if (!stockAlreadyRestored) {
@@ -347,21 +336,10 @@ public class OrderServiceImpl implements OrderService {
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 
-        // Handle payments on cancellation
         BigDecimal refundAmount = order.getPaidAmount();
         boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
 
-        if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), false);
-        }
-
-        if (hasRefund) {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order.setPaidAmount(BigDecimal.ZERO);
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        } else {
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
+        orderPaymentService.handlePaymentRefund(order);
 
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
@@ -385,7 +363,6 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Only delivered orders can be returned");
         }
 
-        // Restore stock
         List<UUID> stockProductIds = order.getItems().stream()
                 .map(item -> item.getProduct().getId())
                 .toList();
@@ -397,24 +374,12 @@ public class OrderServiceImpl implements OrderService {
                 .toList();
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
 
-        // Cancel commissions
         commissionLifecycleService.cancelCommissionForOrder(id);
 
-        // Handle payments on return
         BigDecimal refundAmount = order.getPaidAmount();
         boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
 
-        if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), false);
-        }
-
-        if (hasRefund) {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order.setPaidAmount(BigDecimal.ZERO);
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        } else {
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
+        orderPaymentService.handlePaymentRefund(order);
 
         order.setStatus(OrderStatus.RETURNED);
         Order updatedOrder = orderRepository.save(order);
@@ -431,238 +396,25 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     @Override
     public byte[] generateInvoicePdf(UUID id) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        String address = null;
-        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
-            var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
-        }
-
-        BigDecimal subtotal = BigDecimal.ZERO;
-        BigDecimal discountTotal = BigDecimal.ZERO;
-        var lineItems = new java.util.ArrayList<InvoiceData.LineItem>();
-        for (var item : order.getItems()) {
-            BigDecimal itemSubtotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            BigDecimal discount = BigDecimal.ZERO;
-            if (item.getOriginalUnitPrice() != null && item.getOriginalUnitPrice().compareTo(item.getUnitPrice()) > 0) {
-                discount = item.getOriginalUnitPrice().subtract(item.getUnitPrice()).multiply(BigDecimal.valueOf(item.getQuantity()));
-            }
-            subtotal = subtotal.add(itemSubtotal);
-            discountTotal = discountTotal.add(discount);
-            lineItems.add(new InvoiceData.LineItem(
-                    item.getProduct().getName(),
-                    item.getProduct().getItemCode(),
-                    item.getQuantity(),
-                    item.getUnitPrice(),
-                    itemSubtotal,
-                    discount.compareTo(BigDecimal.ZERO) > 0 ? discount.toString() : null
-            ));
-        }
-
-        var data = new InvoiceData(
-                "INVOICE",
-                order.getOrderNumber(),
-                order.getCreatedAt(),
-                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
-                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
-                address,
-                order.getAgent() != null ? order.getAgent().getUser().getFirstName() + " " + order.getAgent().getUser().getLastName() : null,
-                order.getAgent() != null ? order.getAgent().getAgentCode() : null,
-                lineItems,
-                subtotal,
-                discountTotal,
-                order.getTotalAmount(),
-                order.getNotes()
-        );
-
-        return printTemplateService.renderToPdf("invoice", toMap(data));
+        return orderPdfService.generateInvoicePdf(id);
     }
 
     @Transactional(readOnly = true)
     @Override
     public byte[] generateReceiptPdf(UUID id) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        String address = null;
-        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
-            var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
-        }
-
-        BigDecimal subtotal = BigDecimal.ZERO;
-        BigDecimal discountTotal = BigDecimal.ZERO;
-        var lineItems = new java.util.ArrayList<InvoiceData.LineItem>();
-        for (var item : order.getItems()) {
-            BigDecimal itemSubtotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            BigDecimal discount = BigDecimal.ZERO;
-            if (item.getOriginalUnitPrice() != null && item.getOriginalUnitPrice().compareTo(item.getUnitPrice()) > 0) {
-                discount = item.getOriginalUnitPrice().subtract(item.getUnitPrice()).multiply(BigDecimal.valueOf(item.getQuantity()));
-            }
-            subtotal = subtotal.add(itemSubtotal);
-            discountTotal = discountTotal.add(discount);
-            lineItems.add(new InvoiceData.LineItem(
-                    item.getProduct().getName(),
-                    item.getProduct().getItemCode(),
-                    item.getQuantity(),
-                    item.getUnitPrice(),
-                    itemSubtotal,
-                    discount.compareTo(BigDecimal.ZERO) > 0 ? discount.toString() : null
-            ));
-        }
-
-        var data = new com.ebee.order.dto.ReceiptData(
-                "RECEIPT",
-                order.getOrderNumber(),
-                order.getCreatedAt(),
-                order.getPaidAt() != null ? order.getPaidAt() : java.time.LocalDateTime.now(),
-                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
-                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
-                address,
-                order.getAgent() != null ? order.getAgent().getUser().getFirstName() + " " + order.getAgent().getUser().getLastName() : null,
-                order.getAgent() != null ? order.getAgent().getAgentCode() : null,
-                order.getPaymentMethod() != null ? order.getPaymentMethod().name() : "Cash",
-                order.getPaymentStatus() != null ? order.getPaymentStatus().name() : "PAID",
-                order.getOutstandingBalance(),
-                lineItems,
-                subtotal,
-                discountTotal,
-                order.getTotalAmount(),
-                order.getNotes()
-        );
-
-        return printTemplateService.renderToPdf("receipt", toMap(data));
+        return orderPdfService.generateReceiptPdf(id);
     }
 
     @Transactional(readOnly = true)
     @Override
     public byte[] generateShippingLabelPdf(UUID id) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        String address = null;
-        if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
-            var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
-        }
-
-        var data = new ShippingLabelData(
-                order.getOrderNumber(),
-                order.getCustomer() != null ? order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName() : null,
-                order.getCustomer() != null ? order.getCustomer().getPhoneNumber() : null,
-                address,
-                order.getItems().size(),
-                order.getDeliveryNotes()
-        );
-
-        return printTemplateService.renderToPdf("shipping-label", toMap(data));
-    }
-
-    private void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount) {
-        if (paymentMethod == PaymentMethod.COD) {
-            order.setPaymentMethod(PaymentMethod.COD);
-            order.setPaymentStatus(PaymentStatus.UNPAID);
-            order.setPaidAmount(BigDecimal.ZERO);
-            order.setOutstandingBalance(order.getTotalAmount());
-        } else if (paymentMethod == PaymentMethod.CREDIT) {
-            order.setPaymentMethod(PaymentMethod.CREDIT);
-            BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
-            order.setPaidAmount(paid);
-            if (paid.compareTo(BigDecimal.ZERO) <= 0) {
-                order.setPaymentStatus(PaymentStatus.UNPAID);
-                order.setOutstandingBalance(order.getTotalAmount());
-            } else if (paid.compareTo(order.getTotalAmount()) >= 0) {
-                order.setPaymentStatus(PaymentStatus.PAID);
-                order.setPaidAmount(order.getTotalAmount());
-                order.setOutstandingBalance(BigDecimal.ZERO);
-                order.setPaidAt(LocalDateTime.now());
-            } else {
-                order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-                order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
-                order.setPaidAt(LocalDateTime.now());
-            }
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
-        } else {
-            order.setPaymentMethod(paymentMethod);
-            order.setPaymentStatus(PaymentStatus.PAID);
-            order.setPaidAmount(order.getTotalAmount());
-            order.setOutstandingBalance(BigDecimal.ZERO);
-            order.setPaidAt(LocalDateTime.now());
-        }
+        return orderPdfService.generateShippingLabelPdf(id);
     }
 
     @Transactional
     @Override
     public OrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new IllegalArgumentException("Order is already fully paid");
-        }
-
-        if (request.amount().compareTo(order.getOutstandingBalance()) > 0) {
-            throw new IllegalArgumentException(
-                    "Payment amount cannot exceed outstanding balance of " + order.getOutstandingBalance());
-        }
-
-        if (request.paymentMethod() == PaymentMethod.CREDIT) {
-            throw new IllegalArgumentException("Credit cannot be used to record a payment");
-        }
-
-        boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;
-
-        BigDecimal newPaidAmount = order.getPaidAmount().add(request.amount());
-
-        if (newPaidAmount.compareTo(order.getTotalAmount()) >= 0) {
-            order.setPaymentStatus(PaymentStatus.PAID);
-            order.setPaidAmount(order.getTotalAmount());
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        } else {
-            order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-            order.setPaidAmount(newPaidAmount);
-            order.setOutstandingBalance(order.getTotalAmount().subtract(newPaidAmount));
-        }
-        order.setPaymentMethod(request.paymentMethod());
-        order.setPaidAt(LocalDateTime.now());
-
-        order = orderRepository.save(order);
-
-        if (isCreditOrder) {
-            updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
-        }
-
-        auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
-                "Payment recorded for order " + order.getOrderNumber()
-                + ": " + request.amount() + " via " + request.paymentMethod());
-
-        return orderMapper.toResponse(order);
-    }
-
-    private void updateCustomerOutstandingBalance(Customer customer, BigDecimal outstandingBalance, boolean isAdd) {
-        if (customer == null) return;
-        if (isAdd) {
-            customer.setOutstandingBalance(customer.getOutstandingBalance().add(outstandingBalance));
-        } else {
-            customer.setOutstandingBalance(customer.getOutstandingBalance().subtract(outstandingBalance));
-            if (customer.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
-                customer.setOutstandingBalance(BigDecimal.ZERO);
-            }
-        }
-    }
-
-    private java.util.Map<String, Object> toMap(Object record) {
-        java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
-        try {
-            for (var method : record.getClass().getRecordComponents()) {
-                map.put(method.getName(), method.getAccessor().invoke(record));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert record to map", e);
-        }
-        return map;
+        return orderPaymentService.recordPayment(id, request);
     }
 
     @Recover
@@ -671,18 +423,10 @@ public class OrderServiceImpl implements OrderService {
         throw new IllegalStateException("Unable to generate unique order number. Please try again.", ex);
     }
 
-    /**
-     * Check whether a {@link DataIntegrityViolationException} was
-     * caused by the {@code uk_orders_order_number} unique constraint.
-     * The precise constraint name is database-specific (PostgreSQL
-     * reports it via the SQL exception chain), so we compare against
-     * the most specific substring we control.
-     */
     private static boolean isDuplicateOrderNumber(DataIntegrityViolationException ex) {
         Throwable cause = ex.getMostSpecificCause();
         if (cause == null) return false;
         String msg = cause.getMessage();
         return msg != null && (msg.contains("uk_orders_order_number") || msg.contains("orders_order_number_key"));
     }
-
 }

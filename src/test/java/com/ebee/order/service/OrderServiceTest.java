@@ -43,6 +43,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -68,6 +70,8 @@ class OrderServiceTest {
     @Mock private CustomerService customerService;
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;
+    @Mock private OrderPaymentService orderPaymentService;
+    @Mock private OrderPdfService orderPdfService;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -126,6 +130,8 @@ class OrderServiceTest {
                 .lastName("Doe")
                 .phoneNumber("0771234567")
                 .address(address)
+                .outstandingBalance(BigDecimal.ZERO)
+                .creditLimit(BigDecimal.ZERO)
                 .build();
 
         product1 = Product.builder()
@@ -184,6 +190,73 @@ class OrderServiceTest {
                 ))
                 .totalAmount(new BigDecimal("6500.00"))
                 .build();
+
+        configureOrderPaymentServiceMock();
+    }
+
+    private void configureOrderPaymentServiceMock() {
+        lenient().doAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            PaymentMethod paymentMethod = invocation.getArgument(1);
+            BigDecimal paidAmount = invocation.getArgument(2);
+            if (paymentMethod == PaymentMethod.COD) {
+                order.setPaymentMethod(PaymentMethod.COD);
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+                order.setPaidAmount(BigDecimal.ZERO);
+                order.setOutstandingBalance(order.getTotalAmount());
+            } else if (paymentMethod == PaymentMethod.CREDIT) {
+                order.setPaymentMethod(PaymentMethod.CREDIT);
+                BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
+                order.setPaidAmount(paid);
+                if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+                    order.setPaymentStatus(PaymentStatus.UNPAID);
+                    order.setOutstandingBalance(order.getTotalAmount());
+                } else if (paid.compareTo(order.getTotalAmount()) >= 0) {
+                    order.setPaymentStatus(PaymentStatus.PAID);
+                    order.setPaidAmount(order.getTotalAmount());
+                    order.setOutstandingBalance(BigDecimal.ZERO);
+                    order.setPaidAt(LocalDateTime.now());
+                } else {
+                    order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                    order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
+                    order.setPaidAt(LocalDateTime.now());
+                }
+            } else {
+                order.setPaymentMethod(paymentMethod);
+                order.setPaymentStatus(PaymentStatus.PAID);
+                order.setPaidAmount(order.getTotalAmount());
+                order.setOutstandingBalance(BigDecimal.ZERO);
+                order.setPaidAt(LocalDateTime.now());
+            }
+            return null;
+        }).when(orderPaymentService).initPayment(any(), any(), any());
+
+        lenient().doAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            BigDecimal refundAmount = order.getPaidAmount();
+            boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
+
+            if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
+                Customer customer = order.getCustomer();
+                if (customer != null) {
+                    BigDecimal newBalance = customer.getOutstandingBalance()
+                            .subtract(order.getOutstandingBalance());
+                    if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                        newBalance = BigDecimal.ZERO;
+                    }
+                    customer.setOutstandingBalance(newBalance);
+                }
+            }
+
+            if (hasRefund) {
+                order.setPaymentStatus(PaymentStatus.REFUNDED);
+                order.setPaidAmount(BigDecimal.ZERO);
+                order.setOutstandingBalance(BigDecimal.ZERO);
+            } else {
+                order.setOutstandingBalance(BigDecimal.ZERO);
+            }
+            return null;
+        }).when(orderPaymentService).handlePaymentRefund(any());
     }
 
     @Test
@@ -315,6 +388,143 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(orderRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no district on file");
+    }
+
+    // --- Payment-method-specific createOrder tests ---
+
+    private Product paymentProduct;
+    private OrderRequest singleItemRequest;
+
+    private void setupSingleItemCreateMocks(OrderRequest request) {
+        paymentProduct = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("PROD-PAY")
+                .name("Payment Product")
+                .price(new BigDecimal("1000.00"))
+                .isActive(true)
+                .build();
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20260617-001");
+        when(productRepository.findByItemCodeIn(anyList())).thenReturn(List.of(paymentProduct));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(null);
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+    }
+
+    private OrderRequest createSingleItemRequest(PaymentMethod paymentMethod) {
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("PROD-PAY");
+        item.setQuantity(2);
+        OrderRequest request = new OrderRequest();
+        request.setAgentCode("JF-008");
+        request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(paymentMethod);
+        request.setItems(List.of(item));
+        return request;
+    }
+
+    @Test
+    void createOrder_withCash_setsPaymentStatusToPaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CASH);
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void createOrder_withCardPayment_setsPaymentStatusToPaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CARD_PAYMENT);
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CARD_PAYMENT);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void createOrder_withBankTransfer_setsPaymentStatusToPaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.BANK_TRANSFER);
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
+    }
+
+    @Test
+    void createOrder_withCod_setsPaymentStatusToUnpaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD);
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.COD);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(saved.getPaidAt()).isNull();
+    }
+
+    @Test
+    void createOrder_withCreditFullPayment_setsPaymentStatusToPaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CREDIT);
+        request.setPaidAmount(new BigDecimal("2000.00"));
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CREDIT);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void createOrder_withCreditHalfPaid_setsPaymentStatusToPartiallyPaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CREDIT);
+        request.setPaidAmount(new BigDecimal("1000.00"));
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CREDIT);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PARTIALLY_PAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(saved.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void createOrder_withCreditNoPayment_setsPaymentStatusToUnpaid() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CREDIT);
+        setupSingleItemCreateMocks(request);
+        orderService.createOrder(request);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CREDIT);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(saved.getPaidAt()).isNull();
     }
 
     @Test

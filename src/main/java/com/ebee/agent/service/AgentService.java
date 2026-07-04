@@ -4,6 +4,7 @@ import com.ebee.agent.dto.AgentRequest;
 import com.ebee.agent.dto.AgentResponse;
 import com.ebee.agent.dto.AgentUpdateRequest;
 import com.ebee.agent.dto.AgentWithCredentialsResponse;
+import com.ebee.agent.enums.AgentCommissionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -40,7 +41,7 @@ public interface AgentService {
 
     void deleteAgent(UUID id);
 
-    AgentResponse updateCommissionRate(UUID id, Double commissionRate);
+    AgentResponse updateCommissionRate(UUID id, Double commissionRate, AgentCommissionType commissionType);
 
     void resetPassword(UUID id);
 }

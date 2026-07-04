@@ -191,8 +191,9 @@ public class AgentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateCommissionRate(
             @PathVariable UUID id,
-            @RequestParam Double commissionRate) {
-        AgentResponse response = agentService.updateCommissionRate(id, commissionRate);
+            @RequestParam Double commissionRate,
+            @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType) {
+        AgentResponse response = agentService.updateCommissionRate(id, commissionRate, commissionType);
         return ResponseEntity.ok(ApiResponse.success("Commission rate updated successfully", response));
     }
 

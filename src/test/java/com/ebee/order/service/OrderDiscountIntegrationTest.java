@@ -21,6 +21,7 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.entity.Product;
@@ -39,6 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,6 +65,8 @@ class OrderDiscountIntegrationTest {
     @Mock private CustomerService customerService;
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;
+    @Mock private OrderPaymentService orderPaymentService;
+    @Mock private OrderPdfService orderPdfService;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -132,6 +136,45 @@ class OrderDiscountIntegrationTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(commissionCalculationService.calculateCommissionForOrder(any())).thenReturn(commission);
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        configureOrderPaymentMock();
+    }
+
+    private void configureOrderPaymentMock() {
+        lenient().doAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            PaymentMethod paymentMethod = invocation.getArgument(1);
+            BigDecimal paidAmount = invocation.getArgument(2);
+            if (paymentMethod == PaymentMethod.COD) {
+                order.setPaymentMethod(PaymentMethod.COD);
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+                order.setPaidAmount(BigDecimal.ZERO);
+                order.setOutstandingBalance(order.getTotalAmount());
+            } else if (paymentMethod == PaymentMethod.CREDIT) {
+                order.setPaymentMethod(PaymentMethod.CREDIT);
+                BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
+                order.setPaidAmount(paid);
+                if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+                    order.setPaymentStatus(PaymentStatus.UNPAID);
+                    order.setOutstandingBalance(order.getTotalAmount());
+                } else if (paid.compareTo(order.getTotalAmount()) >= 0) {
+                    order.setPaymentStatus(PaymentStatus.PAID);
+                    order.setPaidAmount(order.getTotalAmount());
+                    order.setOutstandingBalance(BigDecimal.ZERO);
+                    order.setPaidAt(LocalDateTime.now());
+                } else {
+                    order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+                    order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
+                    order.setPaidAt(LocalDateTime.now());
+                }
+            } else {
+                order.setPaymentMethod(paymentMethod);
+                order.setPaymentStatus(PaymentStatus.PAID);
+                order.setPaidAmount(order.getTotalAmount());
+                order.setOutstandingBalance(BigDecimal.ZERO);
+                order.setPaidAt(LocalDateTime.now());
+            }
+            return null;
+        }).when(orderPaymentService).initPayment(any(), any(), any());
     }
 
     @Test

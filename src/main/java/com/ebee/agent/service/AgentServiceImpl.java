@@ -20,6 +20,7 @@ import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
 import com.ebee.commission.repository.CommissionConfigRepository;
+import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.notification.NotificationPort;
 import com.ebee.user.entity.User;
@@ -54,6 +55,7 @@ public class AgentServiceImpl implements AgentService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationPort notificationPort;
     private final CommissionConfigRepository commissionConfigRepository;
+    private final CommissionRepository commissionRepository;
     private final AuditLogService auditLogService;
     private final AgentCodeSequenceRepository agentCodeSequenceRepository;
     private final SecurityService securityService;
@@ -161,7 +163,7 @@ public class AgentServiceImpl implements AgentService {
                 "Congratulations! Your agent application has been approved. You can now log in and start selling.",
                 true);
 
-        return agentMapper.toResponse(savedAgent);
+        return toAgentResponse(savedAgent);
     }
 
     @Transactional
@@ -184,7 +186,7 @@ public class AgentServiceImpl implements AgentService {
                 "Your agent application has been rejected. Please contact support for more information.",
                 false);
 
-        return agentMapper.toResponse(savedAgent);
+        return toAgentResponse(savedAgent);
     }
 
     @Transactional
@@ -208,7 +210,7 @@ public class AgentServiceImpl implements AgentService {
                 "Your account has been activated. You can now log in and access the system.",
                 true);
 
-        return agentMapper.toResponse(savedAgent);
+        return toAgentResponse(savedAgent);
     }
 
     @Transactional
@@ -232,7 +234,7 @@ public class AgentServiceImpl implements AgentService {
                 "Your account has been deactivated. If you believe this is an error, please contact support.",
                 true);
 
-        return agentMapper.toResponse(savedAgent);
+        return toAgentResponse(savedAgent);
     }
 
     @Transactional(readOnly = true)
@@ -240,7 +242,7 @@ public class AgentServiceImpl implements AgentService {
     public AgentResponse getAgentById(UUID id) {
         assertCanAccessAgent(id);
         Agent agent = findAgentById(id);
-        return agentMapper.toResponse(agent);
+        return toAgentResponse(agent);
     }
 
     @Override
@@ -253,7 +255,7 @@ public class AgentServiceImpl implements AgentService {
         }
         Agent agent = agentRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
-        return agentMapper.toResponse(agent);
+        return toAgentResponse(agent);
     }
 
     @Override
@@ -261,11 +263,11 @@ public class AgentServiceImpl implements AgentService {
         if (!securityService.isAdmin()) {
             UUID currentUserId = securityService.getCurrentUserId();
             return agentRepository.findByUserId(currentUserId)
-                    .map(agent -> List.of(agentMapper.toResponse(agent)))
+                    .map(agent -> List.of(toAgentResponse(agent)))
                     .orElse(List.of());
         }
         return agentRepository.findAllWithUser().stream()
-                .map(agentMapper::toResponse)
+                .map(this::toAgentResponse)
                 .toList();
     }
 
@@ -277,10 +279,10 @@ public class AgentServiceImpl implements AgentService {
             if (agent == null) {
                 return Page.empty();
             }
-            return new PageImpl<>(List.of(agentMapper.toResponse(agent)), pageable, 1);
+            return new PageImpl<>(List.of(toAgentResponse(agent)), pageable, 1);
         }
         Page<Agent> agents = agentRepository.findAllWithUser(pageable);
-        return agents.map(agentMapper::toResponse);
+        return agents.map(this::toAgentResponse);
     }
 
     @Override
@@ -294,10 +296,10 @@ public class AgentServiceImpl implements AgentService {
             boolean matches = agent.getAgentCode().toLowerCase().contains(search.toLowerCase())
                     || agent.getUser().getFirstName().toLowerCase().contains(search.toLowerCase())
                     || agent.getUser().getLastName().toLowerCase().contains(search.toLowerCase());
-            return matches ? new PageImpl<>(List.of(agentMapper.toResponse(agent)), pageable, 1) : Page.empty();
+            return matches ? new PageImpl<>(List.of(toAgentResponse(agent)), pageable, 1) : Page.empty();
         }
         Page<Agent> agents = agentRepository.findBySearchTerm(search, pageable);
-        return agents.map(agentMapper::toResponse);
+        return agents.map(this::toAgentResponse);
     }
 
     @Transactional(readOnly = true)
@@ -312,10 +314,10 @@ public class AgentServiceImpl implements AgentService {
             boolean matches = agent.getAgentCode().toLowerCase().contains(search.toLowerCase())
                     || agent.getUser().getFirstName().toLowerCase().contains(search.toLowerCase())
                     || agent.getUser().getLastName().toLowerCase().contains(search.toLowerCase());
-            return matches ? List.of(agentMapper.toResponse(agent)) : List.of();
+            return matches ? List.of(toAgentResponse(agent)) : List.of();
         }
         List<Agent> agents = agentRepository.findBySearchTerm(search);
-        return agents.stream().map(agentMapper::toResponse).toList();
+        return agents.stream().map(this::toAgentResponse).toList();
     }
 
     @Transactional
@@ -360,7 +362,7 @@ public class AgentServiceImpl implements AgentService {
         Agent savedAgent = agentRepository.save(agent);
         agentDocumentService.replaceDocuments(savedAgent, request.getNicDocument(), request.getBankPassbookDocument());
 
-        return agentMapper.toResponse(savedAgent);
+        return toAgentResponse(savedAgent);
     }
 
     @Transactional(readOnly = true)
@@ -374,7 +376,7 @@ public class AgentServiceImpl implements AgentService {
                 throw new IllegalArgumentException("Access denied: you can only access your own agent record");
             }
         }
-        return agentMapper.toResponse(agent);
+        return toAgentResponse(agent);
     }
 
     @Transactional
@@ -396,11 +398,14 @@ public class AgentServiceImpl implements AgentService {
 
     @Transactional
     @Override
-    public AgentResponse updateCommissionRate(UUID id, Double commissionRate) {
+    public AgentResponse updateCommissionRate(UUID id, Double commissionRate, AgentCommissionType commissionType) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
         agent.setCommissionRate(BigDecimal.valueOf(commissionRate));
-        return agentMapper.toResponse(agentRepository.save(agent));
+        if (commissionType != null) {
+            agent.setCommissionType(commissionType);
+        }
+        return toAgentResponse(agentRepository.save(agent));
     }
 
     @Transactional
@@ -496,6 +501,25 @@ public class AgentServiceImpl implements AgentService {
     private Agent findAgentById(UUID id) {
         return agentRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
+    }
+
+    private AgentResponse toAgentResponse(Agent agent) {
+        AgentResponse response = toAgentResponse(agent);
+        BigDecimal totalCommission = commissionRepository.sumCommissionAmountByAgentId(agent.getId());
+        response.setTotalCommission(totalCommission != null ? totalCommission.doubleValue() : 0.0);
+        if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
+            response.setEffectiveCommissionRate(agent.getCommissionRate().doubleValue());
+        } else {
+            CommissionConfig config = commissionConfigRepository
+                    .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                    .orElse(null);
+            response.setEffectiveCommissionRate(config != null ? config.getCommissionRate().doubleValue() : agent.getCommissionRate().doubleValue());
+        }
+        return response;
+    }
+
+    private List<AgentResponse> toAgentResponseList(List<Agent> agents) {
+        return agents.stream().map(this::toAgentResponse).toList();
     }
 
     private String generateAgentCode(District district) {

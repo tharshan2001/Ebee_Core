@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -23,15 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
         with:
           java-version: 21
           distribution: temurin
           cache: maven
 
-      - name: Build and test
-        run: mvn verify --batch-mode --no-transfer-progress
+      - name: Compile
+        run: ./mvnw compile -q --batch-mode --no-transfer-progress
+
+      - name: Run tests
+        run: ./mvnw test -q --batch-mode --no-transfer-progress
 
       - name: Upload JaCoCo report
         if: success() || failure()

@@ -47,12 +47,7 @@ jobs:
         run: ./mvnw compile -q --batch-mode --no-transfer-progress
 
       - name: Run tests
-        run: ./mvnw test --batch-mode --no-transfer-progress \
-          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/ebee_test \
-          -Dspring.datasource.username=ebee \
-          -Dspring.datasource.password=ebee_test_pass \
-          -Dspring.datasource.driver-class-name=org.postgresql.Driver \
-          -Dspring.profiles.active=test
+        run: ./mvnw test --batch-mode --no-transfer-progress -Dspring.datasource.url=jdbc:postgresql://localhost:5432/ebee_test -Dspring.datasource.username=ebee -Dspring.datasource.password=ebee_test_pass -Dspring.datasource.driver-class-name=org.postgresql.Driver -Dspring.profiles.active=test
         env:
           REDIS_HOST: localhost
           REDIS_PORT: 16379

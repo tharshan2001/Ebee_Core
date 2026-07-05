@@ -69,6 +69,8 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Sales & Dashboard | [SALES_API.md](SALES_API.md) | ADMIN (most), AGENT (leaderboard) |
 | Reports | [REPORTS_API.md](REPORTS_API.md) | ADMIN |
 | Audit Logs | [ADMIN_AUDIT_API.md](ADMIN_AUDIT_API.md) | ADMIN |
+| Suppliers | [SUPPLIER_API.md](SUPPLIER_API.md) | ADMIN |
+| Purchase Orders | [PURCHASE_API.md](PURCHASE_API.md) | ADMIN |
 | Database Backup | [ADMIN_BACKUP_API.md](ADMIN_BACKUP_API.md) | ADMIN |
 
 ---

@@ -52,8 +52,8 @@ public class ProductController {
             @RequestParam("itemCode") String itemCode,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("category") String category,
-            @RequestParam("price") BigDecimal price,
-            @RequestParam("costPrice") BigDecimal costPrice,
+            @RequestParam(value = "price", required = false) BigDecimal price,
+            @RequestParam(value = "costPrice", required = false) BigDecimal costPrice,
             @RequestParam(value = "images", required = false) MultipartFile[] images,
             @RequestParam(value = "discountType", required = false) String discountType,
             @RequestParam(value = "discountValue", required = false) BigDecimal discountValue,
@@ -68,8 +68,8 @@ public class ProductController {
         request.setItemCode(itemCode);
         request.setDescription(description);
         request.setCategory(category);
-        request.setPrice(price);
-        request.setCostPrice(costPrice);
+        request.setPrice(price != null ? price : BigDecimal.ZERO);
+        request.setCostPrice(costPrice != null ? costPrice : BigDecimal.ZERO);
         request.setDiscountType(DiscountType.fromString(discountType));
         request.setDiscountValue(discountValue);
         request.setMaxDiscountType(DiscountType.fromString(maxDiscountType));

@@ -504,7 +504,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private AgentResponse toAgentResponse(Agent agent) {
-        AgentResponse response = toAgentResponse(agent);
+        AgentResponse response = agentMapper.toResponse(agent);
         BigDecimal totalCommission = commissionRepository.sumCommissionAmountByAgentId(agent.getId());
         response.setTotalCommission(totalCommission != null ? totalCommission.doubleValue() : 0.0);
         if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {

@@ -3,7 +3,6 @@ package com.ebee.report.service;
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.inventory.repository.InventoryRepository;
 import com.ebee.product.entity.Product;
-import com.ebee.product.repository.ProductRepository;
 import com.ebee.report.dto.InventorySummaryReport;
 import com.ebee.report.dto.LowStockReport;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import java.util.List;
 public class InventoryReportService {
 
     private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
 
     public InventorySummaryReport getSummary() {
         List<Inventory> all = inventoryRepository.findAll();
@@ -33,9 +31,9 @@ public class InventoryReportService {
             int qty = inv.getQuantity() != null ? inv.getQuantity() : 0;
             totalQty += qty;
 
-            Product product = inv.getProduct();
-            if (product != null && product.getCostPrice() != null) {
-                totalValue = totalValue.add(product.getCostPrice().multiply(BigDecimal.valueOf(qty)));
+            BigDecimal avgCost = inv.getAverageCost();
+            if (avgCost != null) {
+                totalValue = totalValue.add(avgCost.multiply(BigDecimal.valueOf(qty)));
             }
 
             if (inv.getReorderLevel() != null && qty <= inv.getReorderLevel()) {

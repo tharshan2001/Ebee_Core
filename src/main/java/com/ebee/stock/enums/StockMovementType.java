@@ -5,5 +5,6 @@ public enum StockMovementType {
     OUT,
     ADJUSTMENT,
     RETURN,
-    DAMAGE
+    DAMAGE,
+    PURCHASE
 }

@@ -18,4 +18,5 @@ public class OrderItemResponse {
     private BigDecimal subtotal;
     private String discountType;
     private BigDecimal discountValue;
+    private BigDecimal costPrice;
 }

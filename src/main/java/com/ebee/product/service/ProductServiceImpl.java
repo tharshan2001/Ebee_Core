@@ -61,6 +61,12 @@ public class ProductServiceImpl implements ProductService {
         validateDiscount(request);
 
         Product product = productMapper.toEntity(request);
+        if (product.getPrice() == null) {
+            product.setPrice(BigDecimal.ZERO);
+        }
+        if (product.getCostPrice() == null) {
+            product.setCostPrice(BigDecimal.ZERO);
+        }
         Product savedProduct = productRepository.save(product);
         productRepository.flush();
         UUID productId = savedProduct.getId();

@@ -56,6 +56,7 @@ Authorization: Bearer <JWT_TOKEN>
 | `reservedQuantity` | `Integer` | Quantity reserved for pending orders |
 | `availableQuantity` | `Integer` | Quantity available for sale (quantity - reservedQuantity) |
 | `reorderLevel` | `Integer` | Threshold below which stock is considered low |
+| `averageCost` | `BigDecimal` | Weighted average cost per unit (updated on PO receipt via WAC formula) |
 | `isLowStock` | `Boolean` | Whether current stock is below reorder level |
 | `createdAt` | `LocalDateTime` | Record creation timestamp |
 | `updatedAt` | `LocalDateTime` | Last update timestamp |

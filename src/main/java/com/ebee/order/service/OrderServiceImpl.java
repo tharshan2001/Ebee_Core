@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -170,6 +171,15 @@ public class OrderServiceImpl implements OrderService {
             stockProductIds.add(product.getId());
             stockQuantities.add(itemRequest.getQuantity());
             stockNotes.add("Order " + orderNumber + " - Item " + (i + 1));
+        }
+
+        Map<UUID, BigDecimal> avgCosts = inventoryService.getAverageCosts(stockProductIds);
+        for (OrderItem item : order.getItems()) {
+            BigDecimal avgCost = avgCosts.get(item.getProduct().getId());
+            if (avgCost != null && avgCost.compareTo(BigDecimal.ZERO) > 0) {
+                item.setCostPrice(avgCost.multiply(BigDecimal.valueOf(item.getQuantity()))
+                        .setScale(2, RoundingMode.HALF_UP));
+            }
         }
 
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);

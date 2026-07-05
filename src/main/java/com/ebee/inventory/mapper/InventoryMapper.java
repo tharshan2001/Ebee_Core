@@ -24,6 +24,7 @@ public class InventoryMapper {
                 .reservedQuantity(inventory.getReservedQuantity())
                 .availableQuantity(availableQty)
                 .reorderLevel(inventory.getReorderLevel())
+                .averageCost(inventory.getAverageCost())
                 .isLowStock(isLowStock)
                 .createdAt(inventory.getCreatedAt())
                 .updatedAt(inventory.getUpdatedAt())

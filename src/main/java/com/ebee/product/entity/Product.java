@@ -2,7 +2,6 @@ package com.ebee.product.entity;
 
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.order.entity.OrderItem;
-import com.ebee.product.convert.SpecificationsConverter;
 import com.ebee.product.dto.ProductSpecification;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -12,7 +11,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -79,7 +80,7 @@ public class Product {
     private String tags;
 
     @Column(columnDefinition = "jsonb")
-    @Convert(converter = SpecificationsConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Builder.Default
     private List<ProductSpecification> specifications = new ArrayList<>();
 

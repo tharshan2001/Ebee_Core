@@ -13,6 +13,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,10 @@ public class Inventory {
 
     @Column(name = "reorder_level")
     private Integer reorderLevel;
+
+    @Column(name = "average_cost", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal averageCost = BigDecimal.ZERO;
 
     @OneToMany(mappedBy = "inventory", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore

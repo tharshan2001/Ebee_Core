@@ -650,11 +650,14 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
       "originalUnitPrice": "BigDecimal",
       "subtotal": "BigDecimal",
       "discountType": "String or null",
-      "discountValue": "BigDecimal or null"
+      "discountValue": "BigDecimal or null",
+      "costPrice": "BigDecimal or null"
     }
   ]
 }
 ```
+
+**New field — `costPrice`:** Each `OrderItem` now includes a `costPrice` field capturing the **weighted average cost (COGS)** at the time of sale. This is calculated as `inventory.averageCost × quantity` and is set when the order is created. Use this to compute per-order profit: `subtotal - costPrice = gross profit`.
 
 ### ApiResponse (Standard Response Wrapper)
 ```json

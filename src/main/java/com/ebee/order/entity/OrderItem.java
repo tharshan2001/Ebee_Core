@@ -55,6 +55,9 @@ public class OrderItem {
     @Column(name = "discount_value", precision = 10, scale = 2)
     private BigDecimal discountValue;
 
+    @Column(name = "cost_price", precision = 12, scale = 2)
+    private BigDecimal costPrice;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -21,8 +21,9 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -250,6 +251,68 @@ public class InventoryService {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
         return inventory.hasSufficientStock(quantity);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> getAverageCosts(List<UUID> productIds) {
+        return inventoryRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        inv -> inv.getProduct().getId(),
+                        inv -> inv.getAverageCost() != null ? inv.getAverageCost() : BigDecimal.ZERO
+                ));
+    }
+
+    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
+    @Transactional
+    public List<StockResponse> recordPurchaseStocks(List<UUID> productIds, List<Integer> quantities,
+                                                     List<BigDecimal> unitCosts, List<String> notes) {
+        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+
+        for (int i = 0; i < productIds.size(); i++) {
+            Inventory inv = inventoryMap.get(productIds.get(i));
+            if (inv == null) {
+                throw new ResourceNotFoundException("Inventory", "productId", productIds.get(i));
+            }
+            int change = quantities.get(i);
+            int projectedQuantity = inv.getQuantity() + change;
+            if (projectedQuantity < 0) {
+                throw new IllegalArgumentException(
+                        (inv.getQuantity() == 0 ? "Out of stock: " : "Insufficient stock for product: ")
+                                + inv.getProduct().getName());
+            }
+            if (projectedQuantity < inv.getReservedQuantity()) {
+                throw new IllegalArgumentException(
+                        "Cannot reduce stock below reserved quantity for product: " + inv.getProduct().getName()
+                                + ". Reserved: " + inv.getReservedQuantity() + ", would leave: " + projectedQuantity);
+            }
+        }
+
+        List<StockResponse> results = new ArrayList<>();
+        for (int i = 0; i < productIds.size(); i++) {
+            Inventory inv = inventoryMap.get(productIds.get(i));
+            int qty = quantities.get(i);
+            int before = inv.getQuantity();
+            int after = before + qty;
+
+            BigDecimal unitCost = unitCosts.get(i);
+            BigDecimal currentTotal = inv.getAverageCost().multiply(BigDecimal.valueOf(before > 0 ? before : 0));
+            BigDecimal newTotal = unitCost.multiply(BigDecimal.valueOf(qty));
+            BigDecimal combinedTotal = currentTotal.add(newTotal);
+            int newQty = after > 0 ? after : 1;
+            BigDecimal newAvgCost = combinedTotal.divide(BigDecimal.valueOf(newQty), 2, RoundingMode.HALF_UP);
+
+            inv.setQuantity(after);
+            inv.setAverageCost(newAvgCost);
+
+            Stock stock = stockMovementRecorder.record(inv, qty, before, after, StockMovementType.PURCHASE, notes.get(i));
+            inventoryAlertService.checkAndNotify(inv);
+            results.add(stockMapper.toResponse(stock));
+        }
+        inventoryRepository.saveAll(inventoryMap.values());
+        return results;
     }
 
     @Transactional(readOnly = true)

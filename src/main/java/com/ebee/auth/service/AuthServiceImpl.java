@@ -13,6 +13,8 @@ import com.ebee.common.util.PhoneUtils;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.notification.NotificationPort;
 import com.ebee.user.dto.UserRequest;
@@ -189,7 +191,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse refreshToken(String refreshToken) {
-        String email = jwtService.extractEmailFromToken(refreshToken);
+        final String email;
+        try {
+            email = jwtService.extractEmailFromToken(refreshToken);
+        } catch (ExpiredJwtException e) {
+            throw new AccessDeniedException("Refresh token has expired");
+        } catch (JwtException e) {
+            throw new AccessDeniedException("Invalid refresh token");
+        }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));

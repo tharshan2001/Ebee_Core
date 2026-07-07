@@ -9,7 +9,6 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
-import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
 @Slf4j
 @Service
@@ -45,13 +44,12 @@ public class S3Service {
                     .bucket(awsProperties.getBucketName())
                     .key(fileName)
                     .contentType(file.getContentType())
-                    .serverSideEncryption(ServerSideEncryption.AES256)
                     .build();
 
             s3Client.putObject(putObjectRequest,
                     software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.getBytes()));
 
-            return "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/" + fileName;
+            return buildFileUrl(fileName);
 
         } catch (S3Exception e) {
             log.error("Failed to upload file to S3: {}", e.getMessage(), e);
@@ -81,8 +79,18 @@ public class S3Service {
         }
     }
 
+    private String buildFileUrl(String fileName) {
+        if (awsProperties.getPublicUrl() != null && !awsProperties.getPublicUrl().isBlank()) {
+            return awsProperties.getPublicUrl() + "/" + awsProperties.getBucketName() + "/" + fileName;
+        }
+        if (awsProperties.getEndpoint() != null && !awsProperties.getEndpoint().isBlank()) {
+            return awsProperties.getEndpoint() + "/" + awsProperties.getBucketName() + "/" + fileName;
+        }
+        return "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/" + fileName;
+    }
+
     private String extractKeyFromUrl(String fileUrl) {
-        String baseUrl = "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/";
+        String baseUrl = buildFileUrl("");
         return fileUrl.replace(baseUrl, "");
     }
 }

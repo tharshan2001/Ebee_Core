@@ -70,6 +70,8 @@ spring:
           min-idle: 2
 
 aws:
+  endpoint: ${AWS_ENDPOINT_URL:}
+  public-url: ${AWS_PUBLIC_URL:}
   access-key: ${AWS_ACCESS_KEY_ID:}
   secret-key: ${AWS_SECRET_ACCESS_KEY:}
   region: ${AWS_REGION:eu-north-1}
@@ -114,7 +116,7 @@ app:
     company-phone: ${PRINT_COMPANY_PHONE:}
     company-email: ${PRINT_COMPANY_EMAIL:}
     company-registration: ${PRINT_COMPANY_REGISTRATION:}
-    logo-url: ${PRINT_LOGO_URL:https://s3.eu-north-1.amazonaws.com/pathfinder-app-media/products/8bced4aa-90b9-4a5b-a609-4deaad146fe3/eeb6cb2f-dbc3-4aec-a9a2-cb43a899c673-Untitled_-_05_June_2026_at_19.30.26_copy.png}
+    logo-url: ${PRINT_LOGO_URL:https://storage.ebee.lk/ebee-store/products/8bced4aa-90b9-4a5b-a609-4deaad146fe3/eeb6cb2f-dbc3-4aec-a9a2-cb43a899c673-Untitled_-_05_June_2026_at_19.30.26_copy.png}
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:super@ebee.lk}
     phone-number: ${SUPER_ADMIN_PHONE:}

@@ -24,6 +24,7 @@ spring:
       port: 16379
 
 aws:
+  endpoint:
   access-key: test
   secret-key: test
   region: eu-north-1

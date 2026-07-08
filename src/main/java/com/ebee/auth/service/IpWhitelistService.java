@@ -4,7 +4,6 @@ import com.ebee.auth.dto.IpWhitelistRequest;
 import com.ebee.auth.dto.IpWhitelistResponse;
 import com.ebee.auth.entity.IpWhitelist;
 import com.ebee.auth.repository.IpWhitelistRepository;
-import com.ebee.common.config.AppProperties;
 import com.ebee.common.security.SecurityService;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
@@ -27,7 +26,6 @@ public class IpWhitelistService {
     private final IpWhitelistRepository ipWhitelistRepository;
     private final UserRepository userRepository;
     private final SecurityService securityService;
-    private final AppProperties appProperties;
 
     public boolean isAllowed(User user, String ip) {
         if (user.getRole() == RoleType.AGENT || user.getRole() == RoleType.DRIVER) {
@@ -35,11 +33,7 @@ public class IpWhitelistService {
         }
 
         if (user.getRole() == RoleType.SUPER_ADMIN) {
-            String superAdminIps = appProperties.getIpWhitelist().getSuperAdminIps();
-            if (superAdminIps == null || superAdminIps.isBlank()) {
-                return true;
-            }
-            return matchesAny(ip, superAdminIps);
+            return true;
         }
 
         if (user.getRole() == RoleType.ADMIN) {
@@ -74,7 +68,7 @@ public class IpWhitelistService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + request.getUserId()));
 
         if (user.getRole() == RoleType.SUPER_ADMIN) {
-            throw new IllegalArgumentException("Super admin IPs are managed via the SUPER_ADMIN_IPS environment variable");
+            throw new IllegalArgumentException("Super admins are not restricted by IP whitelist");
         }
 
         if (ipWhitelistRepository.existsByUserIdAndIpAddress(request.getUserId(), request.getIpAddress())) {
@@ -103,22 +97,11 @@ public class IpWhitelistService {
                 .orElseThrow(() -> new IllegalArgumentException("IP whitelist entry not found: " + id));
 
         if (entry.getUser().getRole() == RoleType.SUPER_ADMIN) {
-            throw new IllegalArgumentException("Super admin IPs are managed via the SUPER_ADMIN_IPS environment variable");
+            throw new IllegalArgumentException("Super admins are not restricted by IP whitelist");
         }
 
         ipWhitelistRepository.delete(entry);
         log.info("IP whitelist entry removed: user={} ip={}", entry.getUser().getEmail(), entry.getIpAddress());
-    }
-
-    private boolean matchesAny(String ip, String csv) {
-        String normalized = ip.replace("0:0:0:0:0:0:0:1", "::1");
-        for (String allowed : csv.split(",")) {
-            String trimmed = allowed.trim();
-            if (trimmed.equals("*") || trimmed.equals(ip) || trimmed.equals(normalized)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private IpWhitelistResponse toResponse(IpWhitelist entry) {

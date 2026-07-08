@@ -247,8 +247,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             unitCosts.add(item.getUnitPrice() != null ? item.getUnitPrice() : ZERO);
             notes.add("PO " + order.getPoNumber() + " - Item " + (i + 1));
 
+            Product product = item.getProduct();
+
+            if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(ZERO) > 0) {
+                product.setCostPrice(item.getUnitPrice());
+                productsToUpdate.add(product);
+            }
+
             if (item.getSellingPrice() != null && item.getSellingPrice().compareTo(ZERO) > 0) {
-                Product product = item.getProduct();
                 product.setPrice(item.getSellingPrice());
                 productsToUpdate.add(product);
             }

@@ -43,11 +43,33 @@ public class IpWhitelistService {
                         user.getEmail(), user.getId(), ip);
                 return false;
             }
-            String normalizedIp = ip.replace("0:0:0:0:0:0:0:1", "::1");
-            return entries.stream().anyMatch(e -> e.getIpAddress().equals(ip) || e.getIpAddress().equals(normalizedIp));
+            String normalizedIp = normalizeIp(ip);
+            return entries.stream().anyMatch(e -> ipMatches(e.getIpAddress(), normalizedIp));
         }
 
         return true;
+    }
+
+    private static String normalizeIp(String ip) {
+        if (ip == null) return "";
+        String normalized = ip.trim();
+        if (normalized.startsWith("::ffff:")) {
+            normalized = normalized.substring(7);
+        }
+        return normalized.replace("0:0:0:0:0:0:0:1", "::1");
+    }
+
+    private static boolean ipMatches(String stored, String detected) {
+        if (stored == null || detected == null) return false;
+        String s = stored.trim();
+        String d = detected.trim();
+        if (s.equals(d)) return true;
+        if (s.contains(",")) {
+            for (String part : s.split(",")) {
+                if (ipMatches(part.trim(), d)) return true;
+            }
+        }
+        return false;
     }
 
     @Transactional(readOnly = true)

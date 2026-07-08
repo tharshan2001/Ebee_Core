@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.SUPER_ADMIN) {
             if (!ipWhitelistService.isAllowed(user, clientIp)) {
                 log.warn("Login blocked by IP whitelist: user={} role={} ip={}", email, user.getRole(), clientIp);
-                throw new AccessDeniedException("Access denied.");
+                throw new AccessDeniedException("IP is not whitelisted. Your IP: " + clientIp);
             }
         }
 

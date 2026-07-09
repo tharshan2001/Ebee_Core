@@ -308,8 +308,6 @@ public class DeliveryService {
     private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
         if (order.getCustomer() != null) {
             String statusLabel = switch (newStatus) {
-                case PICKED_UP -> "Picked Up";
-                case IN_TRANSIT -> "In Transit";
                 case FAILED -> "Failed";
                 case FAILED_PERMANENT -> "Failed Permanently";
                 default -> null;
@@ -318,10 +316,6 @@ public class DeliveryService {
             if (statusLabel != null) {
                 String reason = order.getDeliveryFailureReason();
                 String messageHtml = switch (newStatus) {
-                    case PICKED_UP -> "<p>Your order <strong>" + order.getOrderNumber()
-                            + "</strong> has been picked up by the driver.</p>";
-                    case IN_TRANSIT -> "<p>Your order <strong>" + order.getOrderNumber()
-                            + "</strong> is on its way for delivery!</p>";
                     case FAILED -> "<p>Unfortunately, delivery of your order <strong>"
                             + order.getOrderNumber() + "</strong> has failed."
                             + (reason != null ? "</p><p>Reason: " + reason : "") + "</p>";
@@ -331,10 +325,6 @@ public class DeliveryService {
                     default -> "";
                 };
                 String messageTxt = switch (newStatus) {
-                    case PICKED_UP -> "Your order " + order.getOrderNumber()
-                            + " has been picked up by the driver.";
-                    case IN_TRANSIT -> "Your order " + order.getOrderNumber()
-                            + " is on its way for delivery!";
                     case FAILED -> "Unfortunately, delivery of your order " + order.getOrderNumber()
                             + " has failed." + (reason != null ? " Reason: " + reason : "");
                     case FAILED_PERMANENT -> "Delivery of your order " + order.getOrderNumber()
@@ -367,6 +357,11 @@ public class DeliveryService {
                             newStatus == DeliveryStatus.FAILED_PERMANENT ? "permanently " : "");
             notificationPort.createInternalAlert(order.getCreatedBy(), subject, msg,
                     AlertType.DELIVERY_FAILED, order.getId(), "order");
+
+            userRepository.findByRoleIn(List.of(RoleType.ADMIN, RoleType.SUPER_ADMIN)).stream()
+                    .filter(admin -> !admin.getId().equals(order.getCreatedBy().getId()))
+                    .forEach(admin -> notificationPort.createInternalAlert(admin, subject, msg,
+                            AlertType.DELIVERY_FAILED, order.getId(), "order"));
 
             if (order.getDeliveryAssignedTo() != null) {
                 driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())

@@ -8,7 +8,6 @@ import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
-import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.ebee.user.enums.RoleType.ADMIN;
+import static com.ebee.user.enums.RoleType.SUPER_ADMIN;
 
 @Slf4j
 @Service
@@ -45,9 +47,9 @@ public class AgentApplicationService {
         String alertTitle = "New Agent Application";
         String alertMessage = request.getFirstName() + " " + request.getLastName()
                 + " (" + request.getEmail() + ") has submitted an agent application.";
-        userRepository.findByRole(RoleType.ADMIN).forEach(admin ->
+        userRepository.findByRoleIn(List.of(ADMIN, SUPER_ADMIN)).forEach(admin ->
                 notificationPort.createInternalAlert(admin, alertTitle, alertMessage,
-                        AlertType.AGENT_APPROVED, saved.getId(), "agent_application"));
+                        AlertType.AGENT_APPLICATION_SUBMITTED, saved.getId(), "agent_application"));
 
         return mapToResponse(saved);
     }

@@ -466,7 +466,7 @@ public class AgentServiceImpl implements AgentService {
             notificationPort.notifyAgent(agent, subject, "agent-welcome", p, Set.of());
             String alertMsg = "Dear %s %s, welcome to Ebee! Agent code: %s".formatted(firstName, lastName, agentCode);
             notificationPort.createInternalAlert(agent.getUser(), subject, alertMsg,
-                    AlertType.AGENT_APPROVED, agent.getId(), "agent");
+                    AlertType.AGENT_ACTIVATED, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to agent {}: {}", agentCode, e.getMessage());
         }
@@ -482,7 +482,7 @@ public class AgentServiceImpl implements AgentService {
             notificationPort.notifyAgent(agent, subject, "agent-password-reset", p, Set.of());
             notificationPort.createInternalAlert(agent.getUser(), subject,
                     "Password reset for agent " + agent.getAgentCode(),
-                    AlertType.AGENT_ACTIVATED, agent.getId(), "agent");
+                    AlertType.AGENT_PASSWORD_RESET, agent.getId(), "agent");
         } catch (Exception e) {
             log.warn("Failed to send password reset notification to agent {}: {}", agent.getAgentCode(), e.getMessage());
         }

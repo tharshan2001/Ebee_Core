@@ -5,6 +5,7 @@ import com.ebee.commission.entity.Commission;
 import com.ebee.common.util.NumberUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
+import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.util.OrderItemSummaryBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -133,25 +134,18 @@ public class OrderNotificationService {
     }
 
     public void sendOrderStatus(Order order) {
-        if (order.getCustomer() != null) {
-            String statusLabel = switch (order.getStatus()) {
-                case CONFIRMED -> "Confirmed";
-                case PROCESSING -> "Processing";
-                case SHIPPED -> "Shipped";
-                case DELIVERED -> "Delivered";
-                case RETURNED -> "Returned";
-                default -> null;
-            };
+        boolean isMajor = order.getStatus() == OrderStatus.DELIVERED;
 
-            if (statusLabel != null) {
-                Map<String, String> p = new HashMap<>();
-                p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
-                p.put("orderNumber", order.getOrderNumber());
-                p.put("statusLabel", statusLabel);
-                notificationPort.notifyCustomer(order.getCustomer(),
-                        "Order " + statusLabel + " – " + order.getOrderNumber(),
-                        "order-status-customer", p, Set.of());
-            }
+        if (order.getCustomer() != null && isMajor) {
+            String statusLabel = "Delivered";
+
+            Map<String, String> p = new HashMap<>();
+            p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
+            p.put("orderNumber", order.getOrderNumber());
+            p.put("statusLabel", statusLabel);
+            notificationPort.notifyCustomer(order.getCustomer(),
+                    "Order " + statusLabel + " – " + order.getOrderNumber(),
+                    "order-status-customer", p, Set.of());
         }
 
         if (order.getAgent() != null) {
@@ -168,14 +162,17 @@ public class OrderNotificationService {
                 String customerName = order.getCustomer() != null
                         ? OrderItemSummaryBuilder.customerDisplayName(order.getCustomer())
                         : "Walk-in";
-                Map<String, String> p = new HashMap<>();
-                p.put("agentName", order.getAgent().getUser().getFirstName());
-                p.put("customerName", customerName);
-                p.put("orderNumber", order.getOrderNumber());
-                p.put("statusLabel", statusLabel);
-                notificationPort.notifyAgent(order.getAgent(),
-                        "Order " + statusLabel + " – " + order.getOrderNumber(),
-                        "order-status-agent", p, Set.of());
+
+                if (isMajor) {
+                    Map<String, String> p = new HashMap<>();
+                    p.put("agentName", order.getAgent().getUser().getFirstName());
+                    p.put("customerName", customerName);
+                    p.put("orderNumber", order.getOrderNumber());
+                    p.put("statusLabel", statusLabel);
+                    notificationPort.notifyAgent(order.getAgent(),
+                            "Order " + statusLabel + " – " + order.getOrderNumber(),
+                            "order-status-agent", p, Set.of());
+                }
 
                 String alertMsg = "Order " + order.getOrderNumber() + " for " + customerName
                         + " is now " + statusLabel + ".";

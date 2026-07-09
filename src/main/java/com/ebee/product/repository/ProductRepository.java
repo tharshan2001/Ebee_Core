@@ -46,7 +46,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
     Optional<Product> findByItemCodeWithRelations(@Param("itemCode") String itemCode);
 
-    List<Product> findByCategoryIgnoreCase(String category);
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE LOWER(p.category) = LOWER(:category)")
+    List<Product> findByCategoryIgnoreCase(@Param("category") String category);
 
     @Query("SELECT COUNT(DISTINCT p.category) FROM Product p WHERE p.category IS NOT NULL")
     Long countDistinctCategories();

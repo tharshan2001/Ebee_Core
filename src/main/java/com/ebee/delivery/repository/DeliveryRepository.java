@@ -16,9 +16,11 @@ public interface DeliveryRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.deliveryStatus = :status")
     List<Order> findByDeliveryStatus(@Param("status") DeliveryStatus status);
 
-    List<Order> findByDeliveryAssignedToId(UUID userId);
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy WHERE o.deliveryAssignedTo.id = :userId")
+    List<Order> findByDeliveryAssignedToId(@Param("userId") UUID userId);
 
-    List<Order> findByDeliveryStatusAndDeliveryAssignedToId(DeliveryStatus status, UUID userId);
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy WHERE o.deliveryStatus = :status AND o.deliveryAssignedTo.id = :userId")
+    List<Order> findByDeliveryStatusAndDeliveryAssignedToId(@Param("status") DeliveryStatus status, @Param("userId") UUID userId);
 
     long countByDeliveryAssignedToIdAndDeliveryStatusIn(UUID userId, List<DeliveryStatus> statuses);
 

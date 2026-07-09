@@ -34,6 +34,7 @@ import org.springframework.test.context.TestPropertySource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,10 +56,12 @@ class CommissionLockTest {
     private Agent agent;
     private Order order;
 
+    private final String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+
     @BeforeEach
     void setUp() {
         User adminUser = userRepository.save(User.builder()
-                .email("admin@ebee.com")
+                .email("admin-" + uniqueSuffix + "@ebee.com")
                 .password("encoded")
                 .firstName("Admin")
                 .lastName("User")
@@ -74,7 +77,7 @@ class CommissionLockTest {
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
 
         User agentUser = userRepository.save(User.builder()
-                .email("agent-mn001@ebee.com")
+                .email("agent-" + uniqueSuffix + "@ebee.com")
                 .password("encoded")
                 .firstName("Mannar")
                 .lastName("Agent")
@@ -86,7 +89,7 @@ class CommissionLockTest {
 
         agent = agentRepository.save(Agent.builder()
                 .user(agentUser)
-                .agentCode("MN-001")
+                .agentCode("MN-" + uniqueSuffix)
                 .phoneNumber("0771234567")
                 .commissionRate(BigDecimal.valueOf(7.5))
                 .isActive(true)
@@ -97,7 +100,7 @@ class CommissionLockTest {
         Customer customer = customerRepository.save(Customer.builder()
                 .firstName("Test")
                 .lastName("Customer")
-                .phoneNumber("0771234567")
+                .phoneNumber("077" + uniqueSuffix)
                 .build());
 
         Address address = Address.builder()
@@ -113,7 +116,7 @@ class CommissionLockTest {
                 .agent(agent)
                 .customer(customer)
                 .createdBy(adminUser)
-                .orderNumber("MN-A-20250101-001")
+                .orderNumber("MN-A-" + uniqueSuffix)
                 .totalAmount(new BigDecimal("10000.00"))
                 .status(OrderStatus.DELIVERED)
                 .orderSource(OrderSource.AGENT)

@@ -17,9 +17,12 @@ public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
     List<Inventory> findByProductIdIn(Collection<UUID> productIds);
 
-    @Query("SELECT i FROM Inventory i WHERE i.quantity - i.reservedQuantity <= i.reorderLevel AND i.reorderLevel IS NOT NULL")
+    @Query("SELECT i FROM Inventory i LEFT JOIN FETCH i.product WHERE i.quantity - i.reservedQuantity <= i.reorderLevel AND i.reorderLevel IS NOT NULL")
     List<Inventory> findLowStockInventories();
 
-    @Query("SELECT i FROM Inventory i WHERE i.reorderLevel IS NOT NULL AND i.quantity - i.reservedQuantity <= i.reorderLevel")
+    @Query("SELECT i FROM Inventory i LEFT JOIN FETCH i.product WHERE i.reorderLevel IS NOT NULL AND i.quantity - i.reservedQuantity <= i.reorderLevel")
     List<Inventory> findByQuantityLessThanOrEqualToReorderLevel();
+
+    @Query("SELECT i FROM Inventory i LEFT JOIN FETCH i.product")
+    List<Inventory> findAllWithProduct();
 }

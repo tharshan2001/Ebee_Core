@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -266,9 +267,7 @@ public class AgentServiceImpl implements AgentService {
                     .map(agent -> List.of(toAgentResponse(agent)))
                     .orElse(List.of());
         }
-        return agentRepository.findAllWithUser().stream()
-                .map(this::toAgentResponse)
-                .toList();
+        return toAgentResponseBatch(agentRepository.findAllWithUser());
     }
 
     @Override
@@ -282,7 +281,8 @@ public class AgentServiceImpl implements AgentService {
             return new PageImpl<>(List.of(toAgentResponse(agent)), pageable, 1);
         }
         Page<Agent> agents = agentRepository.findAllWithUser(pageable);
-        return agents.map(this::toAgentResponse);
+        List<AgentResponse> responses = toAgentResponseBatch(agents.getContent());
+        return new PageImpl<>(responses, pageable, agents.getTotalElements());
     }
 
     @Override
@@ -299,7 +299,8 @@ public class AgentServiceImpl implements AgentService {
             return matches ? new PageImpl<>(List.of(toAgentResponse(agent)), pageable, 1) : Page.empty();
         }
         Page<Agent> agents = agentRepository.findBySearchTerm(search, pageable);
-        return agents.map(this::toAgentResponse);
+        List<AgentResponse> responses = toAgentResponseBatch(agents.getContent());
+        return new PageImpl<>(responses, pageable, agents.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -317,7 +318,7 @@ public class AgentServiceImpl implements AgentService {
             return matches ? List.of(toAgentResponse(agent)) : List.of();
         }
         List<Agent> agents = agentRepository.findBySearchTerm(search);
-        return agents.stream().map(this::toAgentResponse).toList();
+        return toAgentResponseBatch(agents);
     }
 
     @Transactional
@@ -504,22 +505,47 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private AgentResponse toAgentResponse(Agent agent) {
+        return toAgentResponse(agent, commissionRepository.sumCommissionAmountByAgentId(agent.getId()));
+    }
+
+    private AgentResponse toAgentResponse(Agent agent, BigDecimal totalCommission) {
+        CommissionConfig defaultConfig = commissionConfigRepository
+                .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                .orElse(null);
+        return toAgentResponse(agent, totalCommission, defaultConfig);
+    }
+
+    private AgentResponse toAgentResponse(Agent agent, BigDecimal totalCommission, CommissionConfig defaultConfig) {
         AgentResponse response = agentMapper.toResponse(agent);
-        BigDecimal totalCommission = commissionRepository.sumCommissionAmountByAgentId(agent.getId());
         response.setTotalCommission(totalCommission != null ? totalCommission.doubleValue() : 0.0);
         if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
             response.setEffectiveCommissionRate(agent.getCommissionRate().doubleValue());
         } else {
-            CommissionConfig config = commissionConfigRepository
-                    .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
-                    .orElse(null);
-            response.setEffectiveCommissionRate(config != null ? config.getCommissionRate().doubleValue() : agent.getCommissionRate().doubleValue());
+            response.setEffectiveCommissionRate(defaultConfig != null ? defaultConfig.getCommissionRate().doubleValue() : agent.getCommissionRate().doubleValue());
         }
         return response;
     }
 
-    private List<AgentResponse> toAgentResponseList(List<Agent> agents) {
-        return agents.stream().map(this::toAgentResponse).toList();
+    private List<AgentResponse> toAgentResponseBatch(List<Agent> agents) {
+        if (agents.isEmpty()) return List.of();
+
+        List<UUID> agentIds = agents.stream().map(Agent::getId).toList();
+        Map<UUID, BigDecimal> commissionMap = commissionRepository.sumCommissionAmountByAgentIds(agentIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> (BigDecimal) row[1]
+                ));
+
+        CommissionConfig defaultConfig = commissionConfigRepository
+                .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
+                .orElse(null);
+
+        return agents.stream()
+                .map(agent -> toAgentResponse(agent,
+                        commissionMap.getOrDefault(agent.getId(), BigDecimal.ZERO),
+                        defaultConfig))
+                .toList();
     }
 
     private String generateAgentCode(District district) {

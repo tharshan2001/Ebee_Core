@@ -21,11 +21,17 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
     @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.attachments WHERE po.id = :id")
     Optional<PurchaseOrder> findByIdWithAttachments(@Param("id") UUID id);
 
-    Page<PurchaseOrder> findBySupplierId(UUID supplierId, Pageable pageable);
+    @Query("SELECT DISTINCT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy WHERE po.supplier.id = :supplierId")
+    Page<PurchaseOrder> findBySupplierId(@Param("supplierId") UUID supplierId, Pageable pageable);
 
-    Page<PurchaseOrder> findByPoNumberStartingWith(String prefix, Pageable pageable);
+    @Query("SELECT DISTINCT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy WHERE po.poNumber LIKE CONCAT(:prefix, '%')")
+    Page<PurchaseOrder> findByPoNumberStartingWith(@Param("prefix") String prefix, Pageable pageable);
 
-    Page<PurchaseOrder> findByStatus(PurchaseOrderStatus status, Pageable pageable);
+    @Query("SELECT DISTINCT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy WHERE po.status = :status")
+    Page<PurchaseOrder> findByStatus(@Param("status") PurchaseOrderStatus status, Pageable pageable);
+
+    @Query("SELECT DISTINCT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy")
+    Page<PurchaseOrder> findAllWithDetails(Pageable pageable);
 
     long countByPoNumberStartingWith(String prefix);
 

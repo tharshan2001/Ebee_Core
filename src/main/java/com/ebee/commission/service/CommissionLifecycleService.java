@@ -151,7 +151,7 @@ public class CommissionLifecycleService {
     }
 
     private Commission getCommissionEntity(UUID id) {
-        return commissionRepository.findById(id)
+        return commissionRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + id));
     }
 }

@@ -29,7 +29,7 @@ public class CommissionQueryService {
     private final CommissionMapper mapper;
 
     public PendingPaymentSummary getPendingPaymentSummary(UUID agentId) {
-        List<Commission> processing = commissionRepository.findByAgentIdAndStatus(agentId, CommissionStatus.PROCESSING);
+        List<Commission> processing = commissionRepository.findByAgentIdAndStatusWithDetails(agentId, CommissionStatus.PROCESSING);
         BigDecimal total = commissionRepository.sumCommissionAmountByAgentIdAndStatus(agentId, CommissionStatus.PROCESSING);
         processing.sort(Comparator.comparing(Commission::getApprovedAt,
                 Comparator.nullsLast(Comparator.naturalOrder())));

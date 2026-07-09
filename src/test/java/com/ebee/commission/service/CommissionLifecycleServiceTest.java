@@ -60,7 +60,7 @@ class CommissionLifecycleServiceTest {
 
     @Test
     void approveCommission_transitionsToApproved() {
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
         when(commissionRepository.save(any())).thenReturn(commission);
         when(mapper.toResponse(commission)).thenReturn(new CommissionResponse());
 
@@ -74,7 +74,7 @@ class CommissionLifecycleServiceTest {
 
     @Test
     void approveCommission_notFound_throws() {
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.empty());
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> commissionLifecycleService.approveCommission(commissionId))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -85,7 +85,7 @@ class CommissionLifecycleServiceTest {
     void markAsProcessing_transitionsToProcessing() {
         commission.setStatus(CommissionStatus.APPROVED);
         commission.setApprovedAt(LocalDateTime.now().minusDays(11));
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
         when(commissionRepository.save(any())).thenReturn(commission);
         when(mapper.toResponse(commission)).thenReturn(new CommissionResponse());
 
@@ -97,7 +97,7 @@ class CommissionLifecycleServiceTest {
     @Test
     void rejectCommission_transitionsToRejected() {
         commission.setStatus(CommissionStatus.APPROVED);
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
         when(commissionRepository.save(any())).thenReturn(commission);
         when(mapper.toResponse(commission)).thenReturn(new CommissionResponse());
 
@@ -110,7 +110,7 @@ class CommissionLifecycleServiceTest {
     @Test
     void approveCommission_whenNotCalculated_throws() {
         commission.setStatus(CommissionStatus.APPROVED);
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
 
         assertThatThrownBy(() -> commissionLifecycleService.approveCommission(commissionId))
                 .isInstanceOf(IllegalStateException.class)
@@ -119,7 +119,7 @@ class CommissionLifecycleServiceTest {
 
     @Test
     void markAsProcessing_whenNotApproved_throws() {
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
 
         assertThatThrownBy(() -> commissionLifecycleService.markAsProcessing(commissionId))
                 .isInstanceOf(IllegalStateException.class)
@@ -130,7 +130,7 @@ class CommissionLifecycleServiceTest {
     void markAsProcessing_whenWithinHoldingPeriod_throws() {
         commission.setStatus(CommissionStatus.APPROVED);
         commission.setApprovedAt(LocalDateTime.now().minusDays(5));
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
 
         assertThatThrownBy(() -> commissionLifecycleService.markAsProcessing(commissionId))
                 .isInstanceOf(IllegalStateException.class)
@@ -140,7 +140,7 @@ class CommissionLifecycleServiceTest {
     @Test
     void rejectCommission_whenTerminalStatus_throws() {
         commission.setStatus(CommissionStatus.PAID);
-        when(commissionRepository.findById(commissionId)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findByIdWithDetails(commissionId)).thenReturn(Optional.of(commission));
 
         assertThatThrownBy(() -> commissionLifecycleService.rejectCommission(commissionId, "reason"))
                 .isInstanceOf(IllegalStateException.class)

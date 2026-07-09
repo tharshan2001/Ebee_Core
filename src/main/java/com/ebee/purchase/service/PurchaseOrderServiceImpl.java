@@ -11,8 +11,10 @@ import com.ebee.purchase.dto.AttachmentResponse;
 import com.ebee.purchase.dto.PurchaseOrderItemRequest;
 import com.ebee.purchase.dto.PurchaseOrderItemResponse;
 import com.ebee.purchase.dto.PurchaseOrderRequest;
+import com.ebee.purchase.dto.PurchaseOrderItemResponse;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
+import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.entity.PurchaseOrderAttachment;
 import com.ebee.purchase.entity.PurchaseOrderItem;
@@ -152,6 +154,60 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
+    public PurchaseOrderResponse updateOrder(UUID id, PurchaseOrderUpdateRequest request) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+
+        if (order.getStatus() != PurchaseOrderStatus.DRAFT && order.getStatus() != PurchaseOrderStatus.PENDING) {
+            throw new IllegalStateException("Cannot edit purchase order in status: " + order.getStatus());
+        }
+
+        Supplier supplier = supplierRepository.findById(request.supplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.supplierId()));
+
+        List<UUID> productIds = request.items().stream()
+                .map(PurchaseOrderItemRequest::productId)
+                .toList();
+        Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        for (UUID pid : productIds) {
+            if (!productMap.containsKey(pid)) {
+                throw new ResourceNotFoundException("Product", "id", pid);
+            }
+        }
+
+        order.getItems().clear();
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<PurchaseOrderItem> newItems = new ArrayList<>();
+
+        for (PurchaseOrderItemRequest itemRequest : request.items()) {
+            Product product = productMap.get(itemRequest.productId());
+            BigDecimal subtotal = itemRequest.unitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
+
+            PurchaseOrderItem item = new PurchaseOrderItem();
+            item.setPurchaseOrder(order);
+            item.setProduct(product);
+            item.setQuantity(itemRequest.quantity());
+            item.setUnitPrice(itemRequest.unitPrice());
+            item.setSellingPrice(itemRequest.sellingPrice());
+            item.setSubtotal(subtotal);
+
+            newItems.add(item);
+            totalAmount = totalAmount.add(subtotal);
+        }
+
+        order.setSupplier(supplier);
+        order.setNotes(request.notes());
+        order.getItems().addAll(newItems);
+        order.setTotalAmount(totalAmount);
+
+        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        return purchaseOrderMapper.toFullResponse(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PurchaseOrderResponse getOrder(UUID id) {
         PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
@@ -166,7 +222,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         if (search != null && !search.isBlank()) {
             orders = purchaseOrderRepository.findByPoNumberStartingWith(search, pageable);
         } else {
-            orders = purchaseOrderRepository.findAll(pageable);
+            orders = purchaseOrderRepository.findAllWithDetails(pageable);
         }
         return orders.map(purchaseOrderMapper::toFullResponse);
     }

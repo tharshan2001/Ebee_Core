@@ -81,7 +81,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<InventoryResponse> getAllInventories() {
-        return inventoryRepository.findAll().stream()
+        return inventoryRepository.findAllWithProduct().stream()
                 .map(inventoryMapper::toResponse)
                 .toList();
     }

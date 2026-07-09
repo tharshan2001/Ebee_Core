@@ -34,6 +34,8 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     @Query("SELECT COALESCE(c.address.district, 'Unknown'), COUNT(c) FROM Customer c GROUP BY c.address.district ORDER BY COUNT(c) DESC")
     List<Object[]> findCustomerDistrictDistribution();
 
+    @Query(value = "SELECT c FROM Customer c LEFT JOIN FETCH c.address",
+           countQuery = "SELECT COUNT(c) FROM Customer c")
     Page<Customer> findAll(Pageable pageable);
 
     @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search%")

@@ -6,6 +6,7 @@ import com.ebee.common.security.SecurityService;
 import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
+import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
 import com.ebee.purchase.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,14 @@ public class PurchaseOrderController {
         PurchaseOrderResponse response = purchaseOrderService.createOrder(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Purchase order created successfully", response));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> updateOrder(
+            @PathVariable UUID id,
+            @Valid @RequestBody PurchaseOrderUpdateRequest request) {
+        PurchaseOrderResponse response = purchaseOrderService.updateOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Purchase order updated successfully", response));
     }
 
     @GetMapping("/{id}")

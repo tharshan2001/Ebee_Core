@@ -57,7 +57,7 @@ public class PayoutService {
 
     @Transactional
     public List<PayoutResponse> createBatchPayouts(List<UUID> agentIds) {
-        List<Commission> paidCommissions = commissionRepository.findByStatus(CommissionStatus.PAID);
+        List<Commission> paidCommissions = commissionRepository.findByStatusWithDetails(CommissionStatus.PAID);
 
         Map<UUID, List<Commission>> commissionsByAgent = paidCommissions.stream()
                 .filter(c -> agentIds.contains(c.getAgent().getId()))

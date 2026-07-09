@@ -3,6 +3,7 @@ package com.ebee.purchase.service;
 import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
+import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,8 @@ import java.util.UUID;
 public interface PurchaseOrderService {
 
     PurchaseOrderResponse createOrder(PurchaseOrderRequest request, UUID createdByUserId);
+
+    PurchaseOrderResponse updateOrder(UUID id, PurchaseOrderUpdateRequest request);
 
     PurchaseOrderResponse getOrder(UUID id);
 

@@ -18,10 +18,14 @@ import java.util.UUID;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
-    List<Expense> findByCreatedByIdOrderByCreatedAtDesc(UUID createdById);
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.createdBy LEFT JOIN FETCH e.driver d LEFT JOIN FETCH d.user LEFT JOIN FETCH e.approvedBy WHERE e.createdBy.id = :createdById ORDER BY e.createdAt DESC")
+    List<Expense> findByCreatedByIdOrderByCreatedAtDesc(@Param("createdById") UUID createdById);
 
-    List<Expense> findByDriverIdOrderByCreatedAtDesc(UUID driverId);
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.createdBy LEFT JOIN FETCH e.driver d LEFT JOIN FETCH d.user LEFT JOIN FETCH e.approvedBy WHERE e.driver.id = :driverId ORDER BY e.createdAt DESC")
+    List<Expense> findByDriverIdOrderByCreatedAtDesc(@Param("driverId") UUID driverId);
 
+    @Query(value = "SELECT e FROM Expense e LEFT JOIN FETCH e.createdBy LEFT JOIN FETCH e.driver d LEFT JOIN FETCH d.user LEFT JOIN FETCH e.approvedBy ORDER BY e.createdAt DESC",
+           countQuery = "SELECT COUNT(e) FROM Expense e")
     Page<Expense> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     long countByStatus(ExpenseStatus status);

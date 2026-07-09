@@ -2,6 +2,8 @@ package com.ebee.purchase.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.S3Service;
+import com.ebee.inventory.entity.Inventory;
+import com.ebee.inventory.repository.InventoryRepository;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
@@ -61,6 +63,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final UserRepository userRepository;
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final InventoryService inventoryService;
+    private final InventoryRepository inventoryRepository;
     private final S3Service s3Service;
 
     public PurchaseOrderServiceImpl(PurchaseOrderRepository purchaseOrderRepository,
@@ -70,6 +73,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                                     UserRepository userRepository,
                                     PurchaseOrderMapper purchaseOrderMapper,
                                     InventoryService inventoryService,
+                                    InventoryRepository inventoryRepository,
                                     S3Service s3Service) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.attachmentRepository = attachmentRepository;
@@ -78,6 +82,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         this.userRepository = userRepository;
         this.purchaseOrderMapper = purchaseOrderMapper;
         this.inventoryService = inventoryService;
+        this.inventoryRepository = inventoryRepository;
         this.s3Service = s3Service;
     }
 
@@ -238,7 +243,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         List<Integer> quantities = new ArrayList<>();
         List<BigDecimal> unitCosts = new ArrayList<>();
         List<String> notes = new ArrayList<>();
-        List<Product> productsToUpdate = new ArrayList<>();
 
         for (int i = 0; i < order.getItems().size(); i++) {
             PurchaseOrderItem item = order.getItems().get(i);
@@ -246,25 +250,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             quantities.add(item.getQuantity());
             unitCosts.add(item.getUnitPrice() != null ? item.getUnitPrice() : ZERO);
             notes.add("PO " + order.getPoNumber() + " - Item " + (i + 1));
-
-            Product product = item.getProduct();
-
-            if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(ZERO) > 0) {
-                product.setCostPrice(item.getUnitPrice());
-                productsToUpdate.add(product);
-            }
-
-            if (item.getSellingPrice() != null && item.getSellingPrice().compareTo(ZERO) > 0) {
-                product.setPrice(item.getSellingPrice());
-                productsToUpdate.add(product);
-            }
         }
 
         inventoryService.recordPurchaseStocks(productIds, quantities, unitCosts, notes);
 
-        if (!productsToUpdate.isEmpty()) {
-            productRepository.saveAll(productsToUpdate);
+        List<Inventory> inventories = inventoryRepository.findByProductIdIn(productIds);
+        List<Product> productsToUpdate = new ArrayList<>();
+        for (Inventory inv : inventories) {
+            Product product = inv.getProduct();
+            product.setCostPrice(inv.getAverageCost());
+            productsToUpdate.add(product);
         }
+        productRepository.saveAll(productsToUpdate);
     }
 
     private void validateTransition(PurchaseOrderStatus current, PurchaseOrderStatus target) {

@@ -87,6 +87,26 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - CORS origins are configured via `app.cors.allowed-origins`
 - IP whitelisting reads `X-Forwarded-For`/`X-Real-IP`; ensure the app runs behind a trusted reverse proxy
 
+## Current State (July 9, 2026)
+
+### FIFO-Layered WAC Implemented
+- New `inventory_layers` table (V79 migration) stores per-receipt cost layers: `quantity`, `remaining_quantity`, `unit_cost`, `received_at`
+- `InventoryLayer` entity + `InventoryLayerRepository` with queries for FIFO consumption ordering by `received_at ASC`
+- `recordPurchaseStocks()` inserts a new layer with the received quantity and unit cost, recalculates WAC from all remaining layers
+- `recordOrderStock(s)` with OUT consumes from oldest layers first (FIFO), recalcs WAC
+- `recordOrderStock(s)` with RETURN adds a new layer at current WAC
+- `confirmOrderStock()` also consumes FIFO layers
+- Private helpers: `consumeFifoLayers()`, `recalculateWac()`
+- The `stock` table remains a quantity-only audit log (no cost stored)
+- `order_items.cost_price` snapshots the WAC at order time (before FIFO consumption), giving a reasonable COGS approximation
+
+### Curl-Verified
+- Two receipts at different costs (100, 200) → two layers with correct remaining qty
+- WAC correctly calculated from layers: (10×100 + 10×200)/20 = 150
+- FIFO consumption: selling 5 consumes from oldest layer (10→5 remaining), WAC recalculates to 166.67
+- Further sale of 6 exhausts layer 1 (5→0) and consumes 1 from layer 2 (10→9), WAC = 200
+- 308 tests pass
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

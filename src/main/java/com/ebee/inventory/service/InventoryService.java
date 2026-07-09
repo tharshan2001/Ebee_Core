@@ -1,6 +1,7 @@
 package com.ebee.inventory.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.inventory.dto.InventoryLayerResponse;
 import com.ebee.inventory.dto.InventoryResponse;
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.inventory.entity.InventoryLayer;
@@ -359,6 +360,24 @@ public class InventoryService {
         
         List<Stock> stocks = stockRepository.findByInventoryIdOrderByCreatedAtDesc(inventory.getId());
         return stockMapper.toResponseList(stocks);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryLayerResponse> getLayersByProductId(UUID productId) {
+        Inventory inventory = inventoryRepository.findByProductId(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+
+        return inventoryLayerRepository
+                .findByInventoryIdOrderByReceivedAtAsc(inventory.getId())
+                .stream()
+                .map(layer -> new InventoryLayerResponse(
+                        layer.getId(),
+                        layer.getInventory().getId(),
+                        layer.getQuantity(),
+                        layer.getRemainingQuantity(),
+                        layer.getUnitCost(),
+                        layer.getReceivedAt()))
+                .toList();
     }
 
     private void consumeFifoLayers(Inventory inventory, int quantity) {

@@ -1,6 +1,7 @@
 package com.ebee.inventory.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.inventory.dto.InventoryLayerResponse;
 import com.ebee.inventory.dto.InventoryResponse;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.stock.dto.StockRequest;
@@ -83,6 +84,13 @@ public class InventoryController {
     public ResponseEntity<ApiResponse<List<StockResponse>>> getStockHistoryByProductId(@PathVariable UUID productId) {
         List<StockResponse> response = inventoryService.getStockHistoryByProductId(productId);
         return ResponseEntity.ok(ApiResponse.success("Stock history retrieved successfully", response));
+    }
+
+    @GetMapping("/product/{productId}/layers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<List<InventoryLayerResponse>>> getLayersByProductId(@PathVariable UUID productId) {
+        List<InventoryLayerResponse> response = inventoryService.getLayersByProductId(productId);
+        return ResponseEntity.ok(ApiResponse.success("Inventory layers retrieved successfully", response));
     }
 
     @PostMapping("/order-stock")

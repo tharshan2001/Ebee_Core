@@ -21,6 +21,7 @@ services:
       - ./nginx/certbot/www:/var/www/certbot
 
   app:
+    image: ghcr.io/tharshan2001/ebee_core:latest
     build: .
     env_file: .env
     ports:

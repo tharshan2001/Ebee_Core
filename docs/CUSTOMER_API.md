@@ -356,6 +356,148 @@ curl "http://localhost:8085/api/customers?search=Arun&size=10"
 
 ---
 
+### 7. List Customers with Dues
+
+**GET** `/api/customers/with-dues`
+
+Returns all customers with `outstandingBalance > 0`, sorted by highest balance first. Useful for collections and payment follow-up.
+
+**Access:** ADMIN only
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Customers with dues retrieved successfully",
+  "data": [
+    {
+      "id": "uuid-1",
+      "firstName": "Kamal",
+      "lastName": "Perera",
+      "phoneNumber": "+94771234567",
+      "totalOrders": 12,
+      "creditLimit": 50000.00,
+      "outstandingBalance": 25000.00,
+      "address": { ... },
+      "createdAt": "2026-01-15T10:30:00",
+      "updatedAt": "2026-07-09T14:00:00"
+    },
+    {
+      "id": "uuid-2",
+      "firstName": "Nimal",
+      "lastName": "Silva",
+      "phoneNumber": "+94776543210",
+      "totalOrders": 5,
+      "creditLimit": null,
+      "outstandingBalance": 8500.00,
+      "address": null,
+      "createdAt": "2026-03-20T09:15:00",
+      "updatedAt": "2026-07-08T11:00:00"
+    }
+  ]
+}
+```
+
+---
+
+### 8. Update Credit Limit
+
+**PATCH** `/api/customers/{id}/credit-limit`
+
+Updates a customer's credit limit. This is an informational/tracking field — no validation is enforced at order creation.
+
+**Access:** ADMIN only
+
+**Request Body:**
+```json
+{
+  "creditLimit": 75000.00
+}
+```
+
+**Validation:**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| creditLimit | BigDecimal | Yes | Must be zero or positive |
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Credit limit updated successfully",
+  "data": {
+    "id": "uuid",
+    "firstName": "Kamal",
+    "lastName": "Perera",
+    "creditLimit": 75000.00,
+    "outstandingBalance": 25000.00,
+    ...
+  }
+}
+```
+
+**Error Responses:**
+- `400` — Negative credit limit
+- `404` — Customer not found
+
+---
+
+### 9. Record Customer Payment (Bulk)
+
+**POST** `/api/customers/{id}/payment`
+
+Records a payment against a customer's outstanding orders. The payment is distributed across unpaid/partially-paid orders **oldest first**. Each order is settled via the same per-order payment logic.
+
+**Access:** ADMIN only
+
+**Request Body:**
+```json
+{
+  "amount": 20000.00,
+  "paymentMethod": "CASH"
+}
+```
+
+**Validation:**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| amount | BigDecimal | Yes | Must be positive |
+| paymentMethod | PaymentMethod | Yes | `CASH`, `COD`, `BANK_TRANSFER`, `CARD_PAYMENT` (not `CREDIT`) |
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Payment recorded successfully",
+  "data": {
+    "customerId": "uuid",
+    "customerName": "Kamal Perera",
+    "amountPaid": 20000.00,
+    "ordersSettled": 2,
+    "customerRemainingBalance": 5000.00
+  }
+}
+```
+
+**Response Fields (CustomerPaymentResponse):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| customerId | UUID | Customer ID |
+| customerName | String | Full name |
+| amountPaid | BigDecimal | Total amount actually paid across all orders |
+| ordersSettled | int | Number of orders that received payment |
+| customerRemainingBalance | BigDecimal | Remaining outstanding balance after payment |
+
+**Error Responses:**
+- `400` — Customer has no outstanding orders / Payment amount exceeds outstanding balance
+- `400` — Invalid payment method (CREDIT not allowed for recording payments)
+- `404` — Customer not found
+
+---
+
 ## Data Models
 
 ### AddressRequest

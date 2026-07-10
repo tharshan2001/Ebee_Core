@@ -4,6 +4,7 @@ import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -23,6 +24,8 @@ public interface OrderService {
     List<OrderResponse> getMyOrders();
 
     List<OrderResponse> getOrdersByCustomerId(UUID customerId);
+
+    List<OrderResponse> getOrdersByCustomerId(UUID customerId, PaymentStatus paymentStatus);
 
     List<OrderResponse> getAllOrders();
 

@@ -312,7 +312,7 @@ Retrieves all orders for a specific agent.
 
 **GET** `/api/orders/customer/{customerId}`
 
-Retrieves all orders for a specific customer.
+Retrieves all orders for a specific customer. Optionally filter by payment status.
 
 **Access:** ADMIN, AGENT
 
@@ -321,6 +321,12 @@ Retrieves all orders for a specific customer.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | customerId | UUID | Customer ID (e.g., `555ec919-b289-4e31-92e7-bf5b0594041b`) |
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| paymentStatus | PaymentStatus | No | Filter by payment status: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `REFUNDED` |
 
 **Success Response (200 OK):**
 ```json

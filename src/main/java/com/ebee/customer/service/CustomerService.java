@@ -5,19 +5,28 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
+import com.ebee.customer.dto.CreditLimitRequest;
+import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.notification.NotificationPort;
+import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.entity.Order;
+import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.service.OrderPaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +40,8 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final NotificationPort notificationPort;
+    private final OrderPaymentService orderPaymentService;
+    private final OrderRepository orderRepository;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -160,6 +171,60 @@ public class CustomerService {
     @Transactional
     public void incrementTotalOrders(UUID customerId) {
         customerRepository.incrementTotalOrders(customerId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> getCustomersWithDues() {
+        return customerRepository
+                .findByOutstandingBalanceGreaterThan(BigDecimal.ZERO, Sort.by(Sort.Direction.DESC, "outstandingBalance"))
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public CustomerResponse updateCreditLimit(UUID id, CreditLimitRequest request) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+        customer.setCreditLimit(request.creditLimit());
+        customer = customerRepository.save(customer);
+        return toResponse(customer);
+    }
+
+    @Transactional
+    public CustomerPaymentResponse recordCustomerPayment(UUID customerId, RecordPaymentRequest request) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        List<Order> unpaidOrders = orderRepository.findByCustomerIdAndPaymentStatusInWithDetails(
+                customerId, List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID));
+
+        if (unpaidOrders.isEmpty()) {
+            throw new IllegalArgumentException("Customer has no outstanding orders");
+        }
+
+        BigDecimal remaining = request.amount();
+        int settledCount = 0;
+
+        for (Order order : unpaidOrders) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            BigDecimal payAmount = remaining.min(order.getOutstandingBalance());
+            orderPaymentService.recordPayment(order.getId(),
+                    new RecordPaymentRequest(payAmount, request.paymentMethod()));
+            remaining = remaining.subtract(payAmount);
+            settledCount++;
+        }
+
+        customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        return new CustomerPaymentResponse(
+                customer.getId(),
+                customer.getFirstName() + " " + customer.getLastName(),
+                request.amount().subtract(remaining),
+                settledCount,
+                customer.getOutstandingBalance()
+        );
     }
 
     private Address buildAddress(AddressRequest request, Customer customer) {

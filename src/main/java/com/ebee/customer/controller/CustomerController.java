@@ -4,9 +4,12 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
+import com.ebee.customer.dto.CreditLimitRequest;
+import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.service.CustomerService;
+import com.ebee.order.dto.RecordPaymentRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -87,5 +90,30 @@ public class CustomerController {
         PageResponse<CustomerResponse> response = PageResponse.from(customersPage);
 
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved successfully", response));
+    }
+
+    @GetMapping("/with-dues")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CustomerResponse>>> getCustomersWithDues() {
+        List<CustomerResponse> response = customerService.getCustomersWithDues();
+        return ResponseEntity.ok(ApiResponse.success("Customers with dues retrieved successfully", response));
+    }
+
+    @PatchMapping("/{id}/credit-limit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCreditLimit(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreditLimitRequest request) {
+        CustomerResponse response = customerService.updateCreditLimit(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Credit limit updated successfully", response));
+    }
+
+    @PostMapping("/{id}/payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerPaymentResponse>> recordCustomerPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecordPaymentRequest request) {
+        CustomerPaymentResponse response = customerService.recordCustomerPayment(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
     }
 }

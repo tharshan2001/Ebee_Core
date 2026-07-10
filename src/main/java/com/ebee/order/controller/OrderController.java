@@ -8,6 +8,7 @@ import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -73,8 +74,10 @@ public class OrderController {
 
     @GetMapping("/customer/{customerId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getOrdersByCustomerId(@PathVariable UUID customerId) {
-        List<OrderResponse> response = orderService.getOrdersByCustomerId(customerId);
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getOrdersByCustomerId(
+            @PathVariable UUID customerId,
+            @RequestParam(required = false) PaymentStatus paymentStatus) {
+        List<OrderResponse> response = orderService.getOrdersByCustomerId(customerId, paymentStatus);
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }
 

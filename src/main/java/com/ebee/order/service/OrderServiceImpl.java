@@ -260,6 +260,16 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional(readOnly = true)
     @Override
+    public List<OrderResponse> getOrdersByCustomerId(UUID customerId, PaymentStatus paymentStatus) {
+        List<OrderResponse> allOrders = getOrdersByCustomerId(customerId);
+        if (paymentStatus == null) return allOrders;
+        return allOrders.stream()
+                .filter(o -> o.getPaymentStatus() == paymentStatus)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<OrderResponse> getAllOrders() {
         List<Order> orders = orderRepository.findAllWithDetails();
         return orderMapper.toResponseList(orders);

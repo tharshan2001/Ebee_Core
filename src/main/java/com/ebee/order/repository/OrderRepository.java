@@ -1,6 +1,7 @@
 package com.ebee.order.repository;
 
 import com.ebee.order.entity.Order;
+import com.ebee.order.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -47,6 +48,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy WHERE o.customer.id = :customerId")
     Page<Order> findByCustomerIdWithDetails(@Param("customerId") UUID customerId, Pageable pageable);
+
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.createdBy JOIN FETCH o.items i JOIN FETCH i.product WHERE o.customer.id = :customerId AND o.paymentStatus IN :statuses ORDER BY o.createdAt ASC")
+    List<Order> findByCustomerIdAndPaymentStatusInWithDetails(@Param("customerId") UUID customerId, @Param("statuses") List<PaymentStatus> statuses);
 
     Optional<Order> findByOrderNumber(String orderNumber);
 

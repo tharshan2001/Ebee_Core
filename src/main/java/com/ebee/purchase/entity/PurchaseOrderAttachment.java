@@ -25,6 +25,9 @@ public class PurchaseOrderAttachment {
     @Column(name = "file_type")
     private String fileType;
 
+    @Column(name = "file_size")
+    private Long fileSize;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -43,5 +46,7 @@ public class PurchaseOrderAttachment {
     public void setFileName(String fileName) { this.fileName = fileName; }
     public String getFileType() { return fileType; }
     public void setFileType(String fileType) { this.fileType = fileType; }
+    public Long getFileSize() { return fileSize; }
+    public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

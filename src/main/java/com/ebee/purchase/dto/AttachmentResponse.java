@@ -8,5 +8,6 @@ public record AttachmentResponse(
         String fileUrl,
         String fileName,
         String fileType,
+        Long fileSize,
         LocalDateTime createdAt
 ) {}

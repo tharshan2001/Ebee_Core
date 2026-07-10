@@ -259,6 +259,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         attachment.setFileUrl(fileUrl);
         attachment.setFileName(file.getOriginalFilename());
         attachment.setFileType(file.getContentType());
+        attachment.setFileSize(file.getSize());
 
         order.getAttachments().add(attachment);
         PurchaseOrder saved = purchaseOrderRepository.save(order);

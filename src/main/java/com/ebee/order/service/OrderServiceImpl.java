@@ -260,11 +260,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<OrderResponse> getOrdersByCustomerId(UUID customerId, PaymentStatus paymentStatus) {
+    public List<OrderResponse> getOrdersByCustomerId(UUID customerId, List<PaymentStatus> paymentStatuses) {
         List<OrderResponse> allOrders = getOrdersByCustomerId(customerId);
-        if (paymentStatus == null) return allOrders;
+        if (paymentStatuses == null || paymentStatuses.isEmpty()) return allOrders;
+        Set<PaymentStatus> statuses = EnumSet.copyOf(paymentStatuses);
         return allOrders.stream()
-                .filter(o -> o.getPaymentStatus() == paymentStatus)
+                .filter(o -> statuses.contains(o.getPaymentStatus()))
                 .toList();
     }
 

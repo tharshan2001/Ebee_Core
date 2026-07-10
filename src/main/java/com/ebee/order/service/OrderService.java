@@ -25,7 +25,7 @@ public interface OrderService {
 
     List<OrderResponse> getOrdersByCustomerId(UUID customerId);
 
-    List<OrderResponse> getOrdersByCustomerId(UUID customerId, PaymentStatus paymentStatus);
+    List<OrderResponse> getOrdersByCustomerId(UUID customerId, List<PaymentStatus> paymentStatuses);
 
     List<OrderResponse> getAllOrders();
 

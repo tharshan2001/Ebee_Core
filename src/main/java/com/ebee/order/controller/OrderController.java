@@ -76,7 +76,7 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getOrdersByCustomerId(
             @PathVariable UUID customerId,
-            @RequestParam(required = false) PaymentStatus paymentStatus) {
+            @RequestParam(required = false) List<PaymentStatus> paymentStatus) {
         List<OrderResponse> response = orderService.getOrdersByCustomerId(customerId, paymentStatus);
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }

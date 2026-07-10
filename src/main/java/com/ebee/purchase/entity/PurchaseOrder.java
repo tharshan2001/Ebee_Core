@@ -55,6 +55,10 @@ public class PurchaseOrder {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -86,4 +90,6 @@ public class PurchaseOrder {
     public void setAttachments(List<PurchaseOrderAttachment> attachments) { this.attachments = attachments; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

@@ -129,6 +129,10 @@ public class FcmSender implements PushSender {
         ObjectNode inner = message.putObject("message");
         inner.put("token", request.token());
 
+        ObjectNode android = inner.putObject("android");
+        ObjectNode androidNotif = android.putObject("notification");
+        androidNotif.put("channel_id", "delivery-alerts");
+
         ObjectNode notification = inner.putObject("notification");
         notification.put("title", request.title());
         notification.put("body", request.body());

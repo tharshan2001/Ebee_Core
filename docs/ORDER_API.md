@@ -326,7 +326,7 @@ Retrieves all orders for a specific customer. Optionally filter by payment statu
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| paymentStatus | PaymentStatus | No | Filter by payment status: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `REFUNDED` |
+| paymentStatus | PaymentStatus | No | Filter by payment status(es). Single or comma-separated: `UNPAID`, `PARTIALLY_PAID`, `PAID`, `REFUNDED`. Example: `?paymentStatus=UNPAID,PARTIALLY_PAID` |
 
 **Success Response (200 OK):**
 ```json

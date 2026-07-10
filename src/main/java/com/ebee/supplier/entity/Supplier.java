@@ -1,6 +1,7 @@
 package com.ebee.supplier.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -28,6 +29,9 @@ public class Supplier {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    @Column(name = "outstanding_balance", nullable = false, precision = 12, scale = 2)
+    private BigDecimal outstandingBalance = BigDecimal.ZERO;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -60,6 +64,8 @@ public class Supplier {
     public void setAddress(String address) { this.address = address; }
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+    public BigDecimal getOutstandingBalance() { return outstandingBalance; }
+    public void setOutstandingBalance(BigDecimal outstandingBalance) { this.outstandingBalance = outstandingBalance; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

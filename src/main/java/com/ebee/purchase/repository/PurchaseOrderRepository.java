@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,4 +37,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
     long countByPoNumberStartingWith(String prefix);
 
     Optional<PurchaseOrder> findByPoNumber(String poNumber);
+
+    @Query("SELECT COALESCE(SUM(po.outstandingBalance), 0) FROM PurchaseOrder po WHERE po.supplier.id = :supplierId AND po.status = 'RECEIVED'")
+    BigDecimal sumOutstandingBySupplierId(@Param("supplierId") UUID supplierId);
 }

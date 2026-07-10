@@ -1,6 +1,8 @@
 package com.ebee.purchase.entity;
 
 import com.ebee.purchase.enums.PurchaseOrderStatus;
+import com.ebee.purchase.enums.PurchasePaymentMethod;
+import com.ebee.purchase.enums.PurchasePaymentStatus;
 import com.ebee.supplier.entity.Supplier;
 import com.ebee.user.entity.User;
 import jakarta.persistence.*;
@@ -55,6 +57,23 @@ public class PurchaseOrder {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PurchasePaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    private PurchasePaymentStatus paymentStatus = PurchasePaymentStatus.UNPAID;
+
+    @Column(name = "paid_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    @Column(name = "outstanding_balance", nullable = false, precision = 12, scale = 2)
+    private BigDecimal outstandingBalance = BigDecimal.ZERO;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -90,6 +109,16 @@ public class PurchaseOrder {
     public void setAttachments(List<PurchaseOrderAttachment> attachments) { this.attachments = attachments; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public PurchasePaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PurchasePaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+    public PurchasePaymentStatus getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(PurchasePaymentStatus paymentStatus) { this.paymentStatus = paymentStatus; }
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+    public BigDecimal getOutstandingBalance() { return outstandingBalance; }
+    public void setOutstandingBalance(BigDecimal outstandingBalance) { this.outstandingBalance = outstandingBalance; }
+    public LocalDateTime getPaidAt() { return paidAt; }
+    public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
 }

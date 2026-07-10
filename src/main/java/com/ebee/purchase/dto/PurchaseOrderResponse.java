@@ -1,6 +1,8 @@
 package com.ebee.purchase.dto;
 
 import com.ebee.purchase.enums.PurchaseOrderStatus;
+import com.ebee.purchase.enums.PurchasePaymentMethod;
+import com.ebee.purchase.enums.PurchasePaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +15,11 @@ public record PurchaseOrderResponse(
         String supplierName,
         PurchaseOrderStatus status,
         BigDecimal totalAmount,
+        PurchasePaymentMethod paymentMethod,
+        PurchasePaymentStatus paymentStatus,
+        BigDecimal paidAmount,
+        BigDecimal outstandingBalance,
+        LocalDateTime paidAt,
         String notes,
         UUID createdById,
         String createdByName,

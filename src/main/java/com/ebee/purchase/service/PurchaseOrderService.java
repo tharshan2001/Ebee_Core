@@ -4,6 +4,7 @@ import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.RecordPaymentRequest;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,4 +30,6 @@ public interface PurchaseOrderService {
     void deleteAttachment(UUID orderId, UUID attachmentId);
 
     List<PurchaseOrderResponse> findBySupplier(UUID supplierId);
+
+    PurchaseOrderResponse recordPayment(UUID id, RecordPaymentRequest request);
 }

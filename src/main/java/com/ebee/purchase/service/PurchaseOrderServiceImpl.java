@@ -15,10 +15,12 @@ import com.ebee.purchase.dto.PurchaseOrderItemResponse;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.RecordPaymentRequest;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.entity.PurchaseOrderAttachment;
 import com.ebee.purchase.entity.PurchaseOrderItem;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
+import com.ebee.purchase.enums.PurchasePaymentStatus;
 import com.ebee.purchase.mapper.PurchaseOrderMapper;
 import com.ebee.purchase.repository.PurchaseOrderAttachmentRepository;
 import com.ebee.purchase.repository.PurchaseOrderRepository;
@@ -68,6 +70,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final InventoryService inventoryService;
     private final InventoryRepository inventoryRepository;
     private final S3Service s3Service;
+    private final PurchaseOrderPaymentService purchaseOrderPaymentService;
 
     public PurchaseOrderServiceImpl(PurchaseOrderRepository purchaseOrderRepository,
                                     PurchaseOrderAttachmentRepository attachmentRepository,
@@ -77,7 +80,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                                     PurchaseOrderMapper purchaseOrderMapper,
                                     InventoryService inventoryService,
                                     InventoryRepository inventoryRepository,
-                                    S3Service s3Service) {
+                                    S3Service s3Service,
+                                    PurchaseOrderPaymentService purchaseOrderPaymentService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.attachmentRepository = attachmentRepository;
         this.supplierRepository = supplierRepository;
@@ -87,6 +91,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         this.inventoryService = inventoryService;
         this.inventoryRepository = inventoryRepository;
         this.s3Service = s3Service;
+        this.purchaseOrderPaymentService = purchaseOrderPaymentService;
     }
 
     @Retryable(retryFor = DuplicatePoNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
@@ -140,6 +145,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         order.setItems(items);
         order.setTotalAmount(totalAmount);
+
+        if (request.paymentMethod() != null) {
+            purchaseOrderPaymentService.initPayment(order, request.paymentMethod(), request.paidAmount());
+        }
 
         PurchaseOrder saved;
         try {
@@ -241,6 +250,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         if (target == PurchaseOrderStatus.RECEIVED) {
             recordStockReceipt(order);
+            purchaseOrderPaymentService.initPaymentOnReceipt(order);
+        }
+
+        if (target == PurchaseOrderStatus.CANCELLED && current == PurchaseOrderStatus.RECEIVED) {
+            purchaseOrderPaymentService.releaseSupplierOutstanding(order);
         }
 
         order.setStatus(target);
@@ -279,6 +293,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         s3Service.deleteFile(attachment.getFileUrl());
         order.getAttachments().remove(attachment);
         attachmentRepository.delete(attachment);
+    }
+
+    @Override
+    public PurchaseOrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+
+        purchaseOrderPaymentService.recordPayment(order.getId(), request);
+        return purchaseOrderMapper.toFullResponse(order);
     }
 
     @Override

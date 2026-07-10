@@ -7,6 +7,7 @@ import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.RecordPaymentRequest;
 import com.ebee.purchase.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -84,6 +85,14 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderStatusRequest request) {
         PurchaseOrderResponse response = purchaseOrderService.updateStatus(id, request);
         return ResponseEntity.ok(ApiResponse.success("Purchase order status updated successfully", response));
+    }
+
+    @PostMapping("/{id}/payments")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> recordPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecordPaymentRequest request) {
+        PurchaseOrderResponse response = purchaseOrderService.recordPayment(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
     }
 
     @PostMapping(value = "/{orderId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

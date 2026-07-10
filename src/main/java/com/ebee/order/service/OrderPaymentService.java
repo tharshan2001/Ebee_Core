@@ -115,7 +115,7 @@ public class OrderPaymentService {
         boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
 
         if (order.getPaymentMethod() == PaymentMethod.CREDIT || order.getPaymentMethod() == PaymentMethod.COD) {
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), false);
+            updateCustomerOutstandingBalance(order.getCustomer(), order.getTotalAmount(), false);
         }
 
         if (hasRefund) {

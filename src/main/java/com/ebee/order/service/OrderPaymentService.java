@@ -35,6 +35,7 @@ public class OrderPaymentService {
             order.setPaymentStatus(PaymentStatus.UNPAID);
             order.setPaidAmount(BigDecimal.ZERO);
             order.setOutstandingBalance(order.getTotalAmount());
+            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
         } else if (paymentMethod == PaymentMethod.CREDIT) {
             order.setPaymentMethod(PaymentMethod.CREDIT);
             BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;

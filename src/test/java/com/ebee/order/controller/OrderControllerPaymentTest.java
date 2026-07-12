@@ -140,13 +140,13 @@ class OrderControllerPaymentTest {
     }
 
     @Test
-    void recordPayment_withoutAuth_shouldReturnForbidden() throws Exception {
+    void recordPayment_withoutAuth_shouldReturnUnauthorized() throws Exception {
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
 
         mockMvc.perform(post("/api/orders/{id}/payment", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

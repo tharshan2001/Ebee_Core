@@ -77,7 +77,7 @@ public class AuthController {
             @RequestBody(required = false) Map<String, String> body) {
         String refreshToken = null;
 
-        if (body != null && body.containsKey("refreshToken")) {
+        if (body != null && body.containsKey("refreshToken") && body.get("refreshToken") != null && !body.get("refreshToken").isBlank()) {
             refreshToken = body.get("refreshToken");
         }
 

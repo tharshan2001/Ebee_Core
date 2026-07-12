@@ -87,6 +87,6 @@ class OrderControllerPrintTest {
     @Test
     void downloadInvoice_shouldRequireAuth() throws Exception {
         mockMvc.perform(get("/api/orders/{id}/invoice", UUID.randomUUID()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

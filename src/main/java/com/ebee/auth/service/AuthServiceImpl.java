@@ -265,6 +265,8 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        user.setRefreshTokenHash(null);
+        userRepository.save(user);
         sendLogoutAlert(user);
         auditLogService.record(AuditAction.LOGOUT, "User", user.getId(),
                 "User " + user.getEmail() + " logged out");
@@ -283,6 +285,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
         user.setPasswordChangedAt(java.time.LocalDateTime.now());
+        user.setRefreshTokenHash(null);
         userRepository.save(user);
 
         auditLogService.record(AuditAction.PASSWORD_CHANGE, "User", user.getId(),
@@ -322,6 +325,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
         user.setPasswordChangedAt(LocalDateTime.now());
+        user.setRefreshTokenHash(null);
         userRepository.save(user);
 
         auditLogService.record(AuditAction.PASSWORD_RESET, "User", user.getId(),

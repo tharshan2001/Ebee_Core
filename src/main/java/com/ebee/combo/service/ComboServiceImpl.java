@@ -210,8 +210,28 @@ public class ComboServiceImpl implements ComboService {
 
     @Transactional(readOnly = true)
     @Override
+    public Page<ComboResponse> listActiveCombos(String search, Pageable pageable) {
+        if (search == null || search.isBlank()) {
+            return comboRepository.findAllByIsActiveTrue(pageable).map(comboMapper::toResponse);
+        }
+        return comboRepository.findAllByIsActiveTrueAndNameContainingIgnoreCase(search.trim(), pageable)
+                .map(comboMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public Page<ComboResponse> listAllCombos(Pageable pageable) {
         return comboRepository.findAll(pageable).map(comboMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public Page<ComboResponse> listAllCombos(String search, Pageable pageable) {
+        if (search == null || search.isBlank()) {
+            return comboRepository.findAll(pageable).map(comboMapper::toResponse);
+        }
+        return comboRepository.findByNameContainingIgnoreCase(search.trim(), pageable)
+                .map(comboMapper::toResponse);
     }
 
     private ComboResponse cloneCombo(Combo existing, ComboRequest request) {

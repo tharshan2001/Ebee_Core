@@ -56,13 +56,14 @@ public class ComboController {
 
     @GetMapping("/combos")
     public ResponseEntity<ApiResponse<PageResponse<ComboResponse>>> listActiveCombos(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ComboResponse> combos = comboService.listActiveCombos(pageable);
+        Page<ComboResponse> combos = comboService.listActiveCombos(search, pageable);
         return ResponseEntity.ok(ApiResponse.success("Combos retrieved successfully",
                 PageResponse.from(combos)));
     }
@@ -70,13 +71,14 @@ public class ComboController {
     @GetMapping("/admin/combos")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<ComboResponse>>> listAllCombos(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ComboResponse> combos = comboService.listAllCombos(pageable);
+        Page<ComboResponse> combos = comboService.listAllCombos(search, pageable);
         return ResponseEntity.ok(ApiResponse.success("All combos retrieved successfully",
                 PageResponse.from(combos)));
     }

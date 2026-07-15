@@ -19,5 +19,9 @@ public interface ComboService {
 
     Page<ComboResponse> listActiveCombos(Pageable pageable);
 
+    Page<ComboResponse> listActiveCombos(String search, Pageable pageable);
+
     Page<ComboResponse> listAllCombos(Pageable pageable);
+
+    Page<ComboResponse> listAllCombos(String search, Pageable pageable);
 }

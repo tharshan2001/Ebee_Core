@@ -19,4 +19,8 @@ public interface ComboRepository extends JpaRepository<Combo, UUID> {
     Optional<Combo> findByIdWithDetails(@Param("id") UUID id);
 
     Page<Combo> findAllByIsActiveTrue(Pageable pageable);
+
+    Page<Combo> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    Page<Combo> findAllByIsActiveTrueAndNameContainingIgnoreCase(String name, Pageable pageable);
 }

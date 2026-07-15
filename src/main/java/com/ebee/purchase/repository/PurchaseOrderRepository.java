@@ -4,7 +4,9 @@ import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,7 +21,12 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
     @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.items i LEFT JOIN FETCH i.product WHERE po.id = :id")
     Optional<PurchaseOrder> findByIdWithItems(@Param("id") UUID id);
 
-    @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.attachments WHERE po.id = :id")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier WHERE po.id = :id")
+    Optional<PurchaseOrder> findByIdWithItemsLocked(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier WHERE po.id = :id")
     Optional<PurchaseOrder> findByIdWithAttachments(@Param("id") UUID id);
 
     @Query("SELECT DISTINCT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy WHERE po.supplier.id = :supplierId")

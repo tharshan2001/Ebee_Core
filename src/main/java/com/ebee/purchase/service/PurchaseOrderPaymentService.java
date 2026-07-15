@@ -69,7 +69,7 @@ public class PurchaseOrderPaymentService {
     }
 
     public PurchaseOrder recordPayment(UUID orderId, RecordPaymentRequest request) {
-        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(orderId)
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Purchase order not found: " + orderId));
 
         if (order.getPaymentStatus() == PurchasePaymentStatus.PAID) {

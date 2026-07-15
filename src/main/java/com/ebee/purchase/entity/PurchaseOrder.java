@@ -74,10 +74,6 @@ public class PurchaseOrder {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
-    @Version
-    @Column(nullable = false)
-    private Long version;
-
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -119,6 +115,4 @@ public class PurchaseOrder {
     public void setOutstandingBalance(BigDecimal outstandingBalance) { this.outstandingBalance = outstandingBalance; }
     public LocalDateTime getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
-    public Long getVersion() { return version; }
-    public void setVersion(Long version) { this.version = version; }
 }

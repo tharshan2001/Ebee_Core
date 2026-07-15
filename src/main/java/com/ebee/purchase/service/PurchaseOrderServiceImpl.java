@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
@@ -165,7 +164,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     public PurchaseOrderResponse updateOrder(UUID id, PurchaseOrderUpdateRequest request) {
-        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
 
         if (order.getStatus() != PurchaseOrderStatus.DRAFT && order.getStatus() != PurchaseOrderStatus.PENDING) {
@@ -237,10 +236,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return orders.map(purchaseOrderMapper::toFullResponse);
     }
 
-    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 100, multiplier = 2))
     @Override
     public PurchaseOrderResponse updateStatus(UUID id, PurchaseOrderStatusRequest request) {
-        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
 
         PurchaseOrderStatus current = order.getStatus();
@@ -297,7 +295,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     public PurchaseOrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
-        PurchaseOrder order = purchaseOrderRepository.findByIdWithItems(id)
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
 
         purchaseOrderPaymentService.recordPayment(order.getId(), request);

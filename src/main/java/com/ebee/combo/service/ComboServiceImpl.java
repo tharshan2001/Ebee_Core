@@ -43,6 +43,10 @@ public class ComboServiceImpl implements ComboService {
                 .map(ComboItemRequest::getProductId)
                 .collect(Collectors.toSet());
 
+        if (request.getRule() != null && request.getRule().getFreeProductId() != null) {
+            productIds.add(request.getRule().getFreeProductId());
+        }
+
         Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, p -> p));
 
@@ -112,6 +116,10 @@ public class ComboServiceImpl implements ComboService {
                 .map(ComboItemRequest::getProductId)
                 .collect(Collectors.toSet());
 
+        if (request.getRule() != null && request.getRule().getFreeProductId() != null) {
+            productIds.add(request.getRule().getFreeProductId());
+        }
+
         Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, p -> p));
 
@@ -129,6 +137,7 @@ public class ComboServiceImpl implements ComboService {
         existing.setName(request.getName());
         existing.setDescription(request.getDescription());
         existing.getItems().clear();
+        comboRepository.flush();
 
         for (ComboItemRequest itemReq : request.getItems()) {
             Product product = productMap.get(itemReq.getProductId());
@@ -209,6 +218,10 @@ public class ComboServiceImpl implements ComboService {
         Set<UUID> productIds = request.getItems().stream()
                 .map(ComboItemRequest::getProductId)
                 .collect(Collectors.toSet());
+
+        if (request.getRule() != null && request.getRule().getFreeProductId() != null) {
+            productIds.add(request.getRule().getFreeProductId());
+        }
 
         Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, p -> p));

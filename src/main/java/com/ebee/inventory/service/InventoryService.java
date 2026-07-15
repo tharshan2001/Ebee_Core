@@ -287,6 +287,27 @@ public class InventoryService {
     }
 
     @Transactional(readOnly = true)
+    public void checkStockAvailability(List<UUID> productIds, List<Integer> quantities) {
+        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+
+        for (int i = 0; i < productIds.size(); i++) {
+            Inventory inv = inventoryMap.get(productIds.get(i));
+            if (inv == null) {
+                throw new ResourceNotFoundException("Inventory", "productId", productIds.get(i));
+            }
+            if (inv.getQuantity() < quantities.get(i)) {
+                throw new IllegalArgumentException(
+                        (inv.getQuantity() == 0 ? "Out of stock: " : "Insufficient stock for ")
+                                + inv.getProduct().getName()
+                                + " (available: " + inv.getQuantity()
+                                + ", requested: " + quantities.get(i) + ")");
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
     public Map<UUID, BigDecimal> getAverageCosts(List<UUID> productIds) {
         return inventoryRepository.findByProductIdIn(productIds)
                 .stream()

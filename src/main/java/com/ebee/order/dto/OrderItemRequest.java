@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 public class OrderItemRequest {
@@ -26,4 +27,11 @@ public class OrderItemRequest {
     private DiscountType discountType;
 
     private BigDecimal discountValue;
+
+    /**
+     * Optional combo ID. When set, this order item represents a combo bundle.
+     * The productItemCode is ignored; the combo's products are expanded for
+     * stock movements and pricing is derived from the combo's rule.
+     */
+    private UUID comboId;
 }

@@ -41,7 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/auth/forgot-password")
                 || path.startsWith("/api/auth/verify-otp")
                 || path.startsWith("/api/auth/reset-password")
-                || ("GET".equals(request.getMethod()) && (path.startsWith("/api/products") || path.startsWith("/api/categories")))
+                || ("GET".equals(request.getMethod()) && (path.startsWith("/api/products") || path.startsWith("/api/categories") || path.startsWith("/api/combos")))
                 || path.startsWith("/api/agent-applications")
                 || path.startsWith("/api/whatsapp/webhook")
                 || path.startsWith("/ws")

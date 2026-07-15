@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/refresh",
                         "/api/auth/forgot-password", "/api/auth/verify-otp", "/api/auth/reset-password").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/combos/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/agent-applications").permitAll()
                 .requestMatchers("/api/whatsapp/webhook").permitAll()
                 .requestMatchers("/ws/**").permitAll()

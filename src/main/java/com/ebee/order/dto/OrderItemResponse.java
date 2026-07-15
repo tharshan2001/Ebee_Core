@@ -19,4 +19,7 @@ public class OrderItemResponse {
     private String discountType;
     private BigDecimal discountValue;
     private BigDecimal costPrice;
+    private UUID comboId;
+    private String comboName;
+    private Boolean isFreeProduct;
 }

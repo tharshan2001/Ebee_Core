@@ -1,5 +1,6 @@
 package com.ebee.order.entity;
 
+import com.ebee.combo.entity.Combo;
 import com.ebee.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -59,6 +60,14 @@ public class OrderItem {
 
     @Column(name = "cost_price", precision = 12, scale = 2)
     private BigDecimal costPrice;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "combo_id")
+    private Combo combo;
+
+    @Column(name = "is_free_product", nullable = false)
+    @Builder.Default
+    private Boolean isFreeProduct = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

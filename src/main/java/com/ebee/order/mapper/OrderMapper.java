@@ -41,6 +41,9 @@ public interface OrderMapper {
     @Mapping(target = "productName", source = "product.name")
     @Mapping(target = "productItemCode", source = "product.itemCode")
     @Mapping(target = "costPrice", source = "costPrice")
+    @Mapping(target = "comboId", source = "combo.id")
+    @Mapping(target = "comboName", source = "combo.name")
+    @Mapping(target = "isFreeProduct", source = "isFreeProduct")
     OrderItemResponse toItemResponse(OrderItem item);
 
     List<OrderItemResponse> toItemResponseList(List<OrderItem> items);

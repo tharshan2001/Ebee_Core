@@ -19,6 +19,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     List<OrderItem> findByProductId(UUID productId);
 
+    boolean existsByComboId(UUID comboId);
+
     @Query("SELECT i.product.id AS productId, i.product.name AS productName, i.product.itemCode AS itemCode, i.product.category AS category, SUM(i.quantity) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.id, i.product.name, i.product.itemCode, i.product.category ORDER BY COALESCE(SUM(i.subtotal), 0) DESC")
     List<ProductSalesProjection> findSalesByProduct(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 

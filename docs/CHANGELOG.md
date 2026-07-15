@@ -2,6 +2,22 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
+## [Unreleased] — 2026-07-15
+
+### Combo (Product Bundle) Feature
+
+- **Combo domain** — New `combo/` package: `Combo`, `ComboItem`, `ComboRule` entities with Flyway V89 (`combos`, `combo_items`, `combo_rules`) and V90 (`combo_id` FK + indexes on `order_items`).
+- **Rule types** — Three modes: null (plain bundle), `FREE_PRODUCT` (admin picks exact free product), `DISCOUNT` (`FIXED` or `PERCENTAGE` off combo price).
+- **Auto-calculated combo price** — `sum(product.price * quantity)` across all combo items. No manual pricing.
+- **Admin CRUD** — `POST /api/admin/combos`, `PUT /api/admin/combos/{id}`, `DELETE /api/admin/combos/{id}`, `GET /api/admin/combos`. Public `GET /api/combos` for browsing.
+- **Combo immutability** — Once a combo is used in an order, edits clone a new combo (new UUID) and deactivate the old one. Delete throws `ComboImmutabilityException` (400).
+- **Order integration** — New `comboId` field on `OrderItemRequest`. Combos appear as a single order line; free products added as separate lines at price 0. `originalUnitPrice` stored for before/after discount display.
+- **Stock flow** — `InventoryService.checkStockAvailability()` (read-only) validates stock before building order items. Single `recordOrderStocks()` call deducts all products (combo items + free product) in one pass with FIFO layer consumption.
+- **Cost price on combo items** — Combo order items store `costPrice = sum(avgCost * quantity)` across combo products for COGS tracking.
+- **Security** — `/api/combos/**` added to public GET endpoints alongside products and categories.
+- **GlobalExceptionHandler** — `ComboImmutabilityException` mapped to 400 Bad Request.
+- **38 new tests** — `ComboServiceTest` (19), `ComboControllerTest` (11), `OrderServiceComboTest` (8). 351 total tests pass.
+
 ## [Unreleased] — 2026-06-25
 
 ### Customer Payment System

@@ -107,6 +107,18 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - Further sale of 6 exhausts layer 1 (5→0) and consumes 1 from layer 2 (10→9), WAC = 200
 - 308 tests pass
 
+### Combo (Product Bundle) Feature
+- New `combo/` domain package (entity, dto, enums, exception, mapper, repository, service, controller)
+- Three rule types: null (plain bundle), `FREE_PRODUCT` (admin picks exact free product), `DISCOUNT` (FIXED/PERCENTAGE)
+- Combo price auto-calculated as `sum(product.price * quantity)` — no manual pricing
+- Combos immutable after first order: edits clone new combo (new UUID) and deactivate old; delete blocked with `ComboImmutabilityException`
+- `InventoryService.checkStockAvailability()` — read-only batch stock validation before order creation
+- `recordOrderStocks()` called exactly ONCE per order (validates + deducts + FIFO)
+- `order_items.combo_id` FK + `combo_items` / `combo_rules` tables (V89/V90)
+- `ComboImmutabilityException` mapped to 400 in `GlobalExceptionHandler`
+- `/api/combos/**` public for GET (like products/categories) in SecurityConfig + JwtAuthenticationFilter
+- 351 tests pass (2 pre-existing CommissionLockTest errors need running DB)
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

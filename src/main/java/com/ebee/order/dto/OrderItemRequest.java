@@ -34,4 +34,11 @@ public class OrderItemRequest {
      * stock movements and pricing is derived from the combo's rule.
      */
     private UUID comboId;
+
+    /**
+     * When true and the combo has a FREE_PRODUCT rule, instead of adding the
+     * free product as a separate order item, deduct its price from the combo
+     * total. The free product is not stocked (no inventory deduction).
+     */
+    private Boolean applyFreeProductAsDiscount;
 }

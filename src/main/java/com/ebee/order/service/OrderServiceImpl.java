@@ -229,7 +229,8 @@ public class OrderServiceImpl implements OrderService {
                         + " - " + ci.getProduct().getName());
             }
 
-            if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
+            if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT
+                    && !Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
                 comboStockProductIds.add(rule.getFreeProduct().getId());
                 comboStockQuantities.add(1);
                 comboStockNotes.add("Order " + orderNumber + " - Combo " + combo.getName()
@@ -251,23 +252,28 @@ public class OrderServiceImpl implements OrderService {
             if (rule == null) {
                 unitPrice = comboPrice;
             } else if (rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
-                unitPrice = comboPrice;
+                if (Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
+                    // Deduct free product price from combo total instead of adding free item
+                    unitPrice = comboPrice.subtract(rule.getFreeProduct().getPrice()).max(BigDecimal.ZERO);
+                } else {
+                    unitPrice = comboPrice;
 
-                BigDecimal freeProductAvgCost = avgCosts.getOrDefault(
-                        rule.getFreeProduct().getId(), BigDecimal.ZERO);
+                    BigDecimal freeProductAvgCost = avgCosts.getOrDefault(
+                            rule.getFreeProduct().getId(), BigDecimal.ZERO);
 
-                OrderItem freeItem = OrderItem.builder()
-                        .order(order)
-                        .product(rule.getFreeProduct())
-                        .quantity(1)
-                        .unitPrice(BigDecimal.ZERO)
-                        .originalUnitPrice(rule.getFreeProduct().getPrice())
-                        .subtotal(BigDecimal.ZERO)
-                        .costPrice(freeProductAvgCost.setScale(2, RoundingMode.HALF_UP))
-                        .isFreeProduct(true)
-                        .build();
+                    OrderItem freeItem = OrderItem.builder()
+                            .order(order)
+                            .product(rule.getFreeProduct())
+                            .quantity(1)
+                            .unitPrice(BigDecimal.ZERO)
+                            .originalUnitPrice(rule.getFreeProduct().getPrice())
+                            .subtotal(BigDecimal.ZERO)
+                            .costPrice(freeProductAvgCost.setScale(2, RoundingMode.HALF_UP))
+                            .isFreeProduct(true)
+                            .build();
 
-                order.getItems().add(freeItem);
+                    order.getItems().add(freeItem);
+                }
             } else if (rule.getRuleType() == ComboRuleType.DISCOUNT) {
                 unitPrice = switch (rule.getDiscountType()) {
                     case "FIXED" -> comboPrice.subtract(rule.getDiscountValue()).max(BigDecimal.ZERO);

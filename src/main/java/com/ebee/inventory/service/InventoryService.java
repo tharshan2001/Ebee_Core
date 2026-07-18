@@ -17,6 +17,8 @@ import com.ebee.stock.entity.Stock;
 import com.ebee.stock.mapper.StockMapper;
 import com.ebee.stock.repository.StockRepository;
 import com.ebee.stock.service.StockMovementRecorder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.retry.annotation.Backoff;
@@ -397,30 +399,28 @@ public class InventoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<StockResponse> getStockHistoryByProductId(UUID productId) {
+    public Page<StockResponse> getStockHistoryByProductId(UUID productId, Pageable pageable) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
-        
-        List<Stock> stocks = stockRepository.findByInventoryIdOrderByCreatedAtDesc(inventory.getId());
-        return stockMapper.toResponseList(stocks);
+
+        return stockRepository.findByInventoryIdOrderByCreatedAtDesc(inventory.getId(), pageable)
+                .map(stockMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<InventoryLayerResponse> getLayersByProductId(UUID productId) {
+    public Page<InventoryLayerResponse> getLayersByProductId(UUID productId, Pageable pageable) {
         Inventory inventory = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
 
         return inventoryLayerRepository
-                .findByInventoryIdOrderByReceivedAtAsc(inventory.getId())
-                .stream()
+                .findByInventoryIdOrderByReceivedAtAsc(inventory.getId(), pageable)
                 .map(layer -> new InventoryLayerResponse(
                         layer.getId(),
-                        layer.getInventory().getId(),
+                        inventory.getId(),
                         layer.getQuantity(),
                         layer.getRemainingQuantity(),
                         layer.getUnitCost(),
-                        layer.getReceivedAt()))
-                .toList();
+                        layer.getReceivedAt()));
     }
 
     private void consumeFifoLayers(Inventory inventory, int quantity) {

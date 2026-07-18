@@ -1,6 +1,8 @@
 package com.ebee.inventory.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.inventory.dto.InventoryLayerResponse;
 import com.ebee.inventory.dto.InventoryResponse;
 import com.ebee.inventory.service.InventoryService;
@@ -9,6 +11,10 @@ import com.ebee.stock.dto.StockResponse;
 import com.ebee.stock.enums.StockMovementType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -81,16 +87,26 @@ public class InventoryController {
 
     @GetMapping("/product/{productId}/history")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
-    public ResponseEntity<ApiResponse<List<StockResponse>>> getStockHistoryByProductId(@PathVariable UUID productId) {
-        List<StockResponse> response = inventoryService.getStockHistoryByProductId(productId);
-        return ResponseEntity.ok(ApiResponse.success("Stock history retrieved successfully", response));
+    public ResponseEntity<ApiResponse<PageResponse<StockResponse>>> getStockHistoryByProductId(
+            @PathVariable UUID productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<StockResponse> response = inventoryService.getStockHistoryByProductId(productId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Stock history retrieved successfully", PageResponse.from(response)));
     }
 
     @GetMapping("/product/{productId}/layers")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
-    public ResponseEntity<ApiResponse<List<InventoryLayerResponse>>> getLayersByProductId(@PathVariable UUID productId) {
-        List<InventoryLayerResponse> response = inventoryService.getLayersByProductId(productId);
-        return ResponseEntity.ok(ApiResponse.success("Inventory layers retrieved successfully", response));
+    public ResponseEntity<ApiResponse<PageResponse<InventoryLayerResponse>>> getLayersByProductId(
+            @PathVariable UUID productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size),
+                Sort.by(Sort.Direction.ASC, "receivedAt"));
+        Page<InventoryLayerResponse> response = inventoryService.getLayersByProductId(productId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Inventory layers retrieved successfully", PageResponse.from(response)));
     }
 
     @PostMapping("/order-stock")

@@ -3,7 +3,9 @@ package com.ebee.inventory.service;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.inventory.dto.InventoryResponse;
 import com.ebee.inventory.entity.Inventory;
+import com.ebee.inventory.entity.InventoryLayer;
 import com.ebee.inventory.mapper.InventoryMapper;
+import com.ebee.inventory.repository.InventoryLayerRepository;
 import com.ebee.inventory.repository.InventoryRepository;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
@@ -22,6 +24,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +47,7 @@ class InventoryServiceTest {
     }
 
     @Mock private InventoryRepository inventoryRepository;
+    @Mock private InventoryLayerRepository inventoryLayerRepository;
     @Mock private ProductRepository productRepository;
     @Mock private InventoryMapper inventoryMapper;
     @Mock private StockMapper stockMapper;
@@ -98,7 +104,14 @@ class InventoryServiceTest {
         request.setQuantityChange(-10);
         request.setMovementType(StockMovementType.OUT);
 
+        InventoryLayer layer = new InventoryLayer(inventory, 100, 100, BigDecimal.TEN, java.time.LocalDateTime.now());
+
         when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryLayerRepository.findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(
+                any(), eq(0))).thenReturn(List.of(layer));
+        when(inventoryLayerRepository.saveAll(anyList())).thenReturn(List.of(layer));
+        when(inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(any()))
+                .thenReturn(Optional.empty());
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 

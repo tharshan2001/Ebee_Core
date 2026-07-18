@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -115,6 +114,19 @@ public class InventoryService {
                             + inventory.getReservedQuantity() + ", would leave: " + quantityAfter);
         }
 
+        int change = request.getQuantityChange();
+        if (change < 0) {
+            consumeFifoLayers(inventory, -change);
+            updateCurrentCost(inventory);
+        } else if (change > 0) {
+            BigDecimal layerCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
+                    .map(InventoryLayer::getUnitCost)
+                    .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
+                    .orElse(BigDecimal.ZERO);
+            inventoryLayerRepository.save(new InventoryLayer(inventory, change, change, layerCost, LocalDateTime.now()));
+            updateCurrentCost(inventory);
+        }
+
         inventory.setQuantity(quantityAfter);
         inventoryRepository.save(inventory);
 
@@ -150,14 +162,15 @@ public class InventoryService {
 
         if (movementType == StockMovementType.OUT) {
             consumeFifoLayers(inventory, quantity);
-            recalculateWac(inventory);
+            updateCurrentCost(inventory);
         } else if (movementType == StockMovementType.RETURN) {
-            BigDecimal currentWac = inventory.getAverageCost();
-            InventoryLayer returnLayer = new InventoryLayer(inventory, quantity, quantity,
-                    currentWac.compareTo(BigDecimal.ZERO) > 0 ? currentWac : BigDecimal.ZERO,
-                    LocalDateTime.now());
+            BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
+                    .map(InventoryLayer::getUnitCost)
+                    .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
+                    .orElse(BigDecimal.ZERO);
+            InventoryLayer returnLayer = new InventoryLayer(inventory, quantity, quantity, returnCost, LocalDateTime.now());
             inventoryLayerRepository.save(returnLayer);
-            recalculateWac(inventory);
+            updateCurrentCost(inventory);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -205,14 +218,15 @@ public class InventoryService {
 
             if (movementType == StockMovementType.OUT) {
                 consumeFifoLayers(inv, qty);
-                recalculateWac(inv);
+                updateCurrentCost(inv);
             } else if (movementType == StockMovementType.RETURN) {
-                BigDecimal currentWac = inv.getAverageCost();
-                InventoryLayer returnLayer = new InventoryLayer(inv, qty, qty,
-                        currentWac.compareTo(BigDecimal.ZERO) > 0 ? currentWac : BigDecimal.ZERO,
-                        LocalDateTime.now());
+                BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inv.getId())
+                        .map(InventoryLayer::getUnitCost)
+                        .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
+                        .orElse(BigDecimal.ZERO);
+                InventoryLayer returnLayer = new InventoryLayer(inv, qty, qty, returnCost, LocalDateTime.now());
                 inventoryLayerRepository.save(returnLayer);
-                recalculateWac(inv);
+                updateCurrentCost(inv);
             }
 
             inv.setQuantity(after);
@@ -240,6 +254,10 @@ public class InventoryService {
 
         inventory.setReservedQuantity(inventory.getReservedQuantity() + quantity);
         Inventory saved = inventoryRepository.save(inventory);
+
+        stockMovementRecorder.record(inventory, 0, inventory.getQuantity(), inventory.getQuantity(),
+                StockMovementType.RESERVE, "Reserved " + quantity + " units");
+
         return inventoryMapper.toResponse(saved);
     }
 
@@ -255,6 +273,10 @@ public class InventoryService {
 
         inventory.setReservedQuantity(inventory.getReservedQuantity() - quantity);
         Inventory saved = inventoryRepository.save(inventory);
+
+        stockMovementRecorder.record(inventory, 0, inventory.getQuantity(), inventory.getQuantity(),
+                StockMovementType.RELEASE, "Released " + quantity + " units");
+
         return inventoryMapper.toResponse(saved);
     }
 
@@ -269,7 +291,7 @@ public class InventoryService {
         }
 
         consumeFifoLayers(inventory, quantity);
-        recalculateWac(inventory);
+        updateCurrentCost(inventory);
 
         inventory.setReservedQuantity(inventory.getReservedQuantity() - quantity);
         inventory.setQuantity(inventory.getQuantity() - quantity);
@@ -355,7 +377,7 @@ public class InventoryService {
             InventoryLayer layer = new InventoryLayer(inv, qty, qty, unitCost, LocalDateTime.now());
             inventoryLayerRepository.save(layer);
 
-            recalculateWac(inv);
+            updateCurrentCost(inv);
 
             inv.setQuantity(after);
 
@@ -420,23 +442,12 @@ public class InventoryService {
         }
     }
 
-    private void recalculateWac(Inventory inventory) {
-        List<InventoryLayer> layers = inventoryLayerRepository
-                .findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(inventory.getId(), 0);
-
-        if (layers.isEmpty()) {
-            inventory.setAverageCost(BigDecimal.ZERO);
-            return;
-        }
-
-        BigDecimal totalCost = BigDecimal.ZERO;
-        int totalQty = 0;
-        for (InventoryLayer layer : layers) {
-            totalCost = totalCost.add(layer.getUnitCost().multiply(BigDecimal.valueOf(layer.getRemainingQuantity())));
-            totalQty += layer.getRemainingQuantity();
-        }
-
-        inventory.setAverageCost(totalCost.divide(BigDecimal.valueOf(totalQty), 2, RoundingMode.HALF_UP));
+    private void updateCurrentCost(Inventory inventory) {
+        inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
+                .ifPresentOrElse(
+                        layer -> inventory.setAverageCost(layer.getUnitCost()),
+                        () -> inventory.setAverageCost(BigDecimal.ZERO)
+                );
     }
 
 }

@@ -7,7 +7,9 @@ import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.ReceiveOrderRequest;
 import com.ebee.purchase.dto.RecordPaymentRequest;
+import com.ebee.purchase.dto.ReturnItemsRequest;
 import com.ebee.purchase.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -85,6 +87,22 @@ public class PurchaseOrderController {
             @Valid @RequestBody PurchaseOrderStatusRequest request) {
         PurchaseOrderResponse response = purchaseOrderService.updateStatus(id, request);
         return ResponseEntity.ok(ApiResponse.success("Purchase order status updated successfully", response));
+    }
+
+    @PostMapping("/{id}/receive")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> receiveOrder(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReceiveOrderRequest request) {
+        PurchaseOrderResponse response = purchaseOrderService.receiveOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Purchase order received successfully", response));
+    }
+
+    @PostMapping("/{id}/return-items")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> returnItems(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReturnItemsRequest request) {
+        PurchaseOrderResponse response = purchaseOrderService.returnItems(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Items returned successfully", response));
     }
 
     @PostMapping("/{id}/payments")

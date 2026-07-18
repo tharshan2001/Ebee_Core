@@ -35,6 +35,8 @@ public interface PurchaseOrderMapper {
     @Mapping(target = "productId", source = "item.product.id")
     @Mapping(target = "productName", source = "item.product.name")
     @Mapping(target = "productItemCode", source = "item.product.itemCode")
+    @Mapping(target = "receivedQuantity", source = "item.receivedQuantity")
+    @Mapping(target = "returnedQuantity", source = "item.returnedQuantity")
     PurchaseOrderItemResponse toItemResponse(PurchaseOrderItem item);
 
     AttachmentResponse toAttachmentResponse(PurchaseOrderAttachment attachment);

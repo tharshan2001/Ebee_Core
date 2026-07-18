@@ -4,7 +4,9 @@ import com.ebee.purchase.dto.PurchaseOrderRequest;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.ReceiveOrderRequest;
 import com.ebee.purchase.dto.RecordPaymentRequest;
+import com.ebee.purchase.dto.ReturnItemsRequest;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,10 @@ public interface PurchaseOrderService {
     Page<PurchaseOrderResponse> listOrders(String search, Pageable pageable);
 
     PurchaseOrderResponse updateStatus(UUID id, PurchaseOrderStatusRequest request);
+
+    PurchaseOrderResponse receiveOrder(UUID id, ReceiveOrderRequest request);
+
+    PurchaseOrderResponse returnItems(UUID id, ReturnItemsRequest request);
 
     PurchaseOrderResponse addAttachment(UUID orderId, MultipartFile file);
 

@@ -9,6 +9,8 @@ public record PurchaseOrderItemResponse(
         String productName,
         String productItemCode,
         Integer quantity,
+        Integer receivedQuantity,
+        Integer returnedQuantity,
         BigDecimal unitPrice,
         BigDecimal sellingPrice,
         BigDecimal subtotal

@@ -56,6 +56,7 @@ spring:
     locations: classpath:db/migration
     # baseline-on-migrate: true  # Should be removed in production; only needed for initial Flyway setup
     validate-on-migrate: true
+    out-of-order: true
 
 
   data:

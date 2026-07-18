@@ -7,6 +7,7 @@ import com.ebee.inventory.repository.InventoryRepository;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
+import com.ebee.stock.enums.StockMovementType;
 import com.ebee.purchase.dto.AttachmentResponse;
 import com.ebee.purchase.dto.PurchaseOrderItemRequest;
 import com.ebee.purchase.dto.PurchaseOrderItemResponse;
@@ -15,7 +16,9 @@ import com.ebee.purchase.dto.PurchaseOrderItemResponse;
 import com.ebee.purchase.dto.PurchaseOrderResponse;
 import com.ebee.purchase.dto.PurchaseOrderStatusRequest;
 import com.ebee.purchase.dto.PurchaseOrderUpdateRequest;
+import com.ebee.purchase.dto.ReceiveOrderRequest;
 import com.ebee.purchase.dto.RecordPaymentRequest;
+import com.ebee.purchase.dto.ReturnItemsRequest;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.entity.PurchaseOrderAttachment;
 import com.ebee.purchase.entity.PurchaseOrderItem;
@@ -246,16 +249,158 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         validateTransition(current, target);
 
-        if (target == PurchaseOrderStatus.RECEIVED) {
-            recordStockReceipt(order);
-            purchaseOrderPaymentService.initPaymentOnReceipt(order);
-        }
-
         if (target == PurchaseOrderStatus.CANCELLED && current == PurchaseOrderStatus.RECEIVED) {
             purchaseOrderPaymentService.releaseSupplierOutstanding(order);
         }
 
         order.setStatus(target);
+        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        return purchaseOrderMapper.toFullResponse(saved);
+    }
+
+    @Override
+    public PurchaseOrderResponse receiveOrder(UUID id, ReceiveOrderRequest request) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+
+        PurchaseOrderStatus status = order.getStatus();
+        if (status != PurchaseOrderStatus.APPROVED && status != PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+            throw new IllegalArgumentException("Cannot receive order in status: " + status);
+        }
+
+        Map<UUID, PurchaseOrderItem> itemMap = order.getItems().stream()
+                .collect(Collectors.toMap(PurchaseOrderItem::getId, Function.identity()));
+
+        List<UUID> productIds = new ArrayList<>();
+        List<Integer> quantities = new ArrayList<>();
+        List<BigDecimal> unitCosts = new ArrayList<>();
+        List<String> notes = new ArrayList<>();
+        BigDecimal receivedTotal = BigDecimal.ZERO;
+        boolean allFullyReceived = true;
+
+        for (ReceiveOrderRequest.ItemReceipt receipt : request.items()) {
+            PurchaseOrderItem item = itemMap.get(receipt.itemId());
+            if (item == null) {
+                throw new ResourceNotFoundException("PurchaseOrderItem", "id", receipt.itemId());
+            }
+
+            int alreadyReceived = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+            int alreadyReturned = item.getReturnedQuantity() != null ? item.getReturnedQuantity() : 0;
+            int availableToReceive = item.getQuantity() - alreadyReceived - alreadyReturned;
+
+            if (receipt.receivedQuantity() > availableToReceive) {
+                throw new IllegalArgumentException(
+                        "Cannot receive " + receipt.receivedQuantity() + " of item " + item.getProduct().getName()
+                                + " — only " + availableToReceive + " remaining to receive");
+            }
+
+            int newReceived = alreadyReceived + receipt.receivedQuantity();
+            item.setReceivedQuantity(newReceived);
+
+            productIds.add(item.getProduct().getId());
+            quantities.add(receipt.receivedQuantity());
+            BigDecimal uc = item.getUnitPrice() != null ? item.getUnitPrice() : ZERO;
+            unitCosts.add(uc);
+            notes.add("PO " + order.getPoNumber() + " - " + item.getProduct().getName());
+
+            receivedTotal = receivedTotal.add(uc.multiply(BigDecimal.valueOf(receipt.receivedQuantity())));
+
+            if (newReceived < item.getQuantity()) {
+                allFullyReceived = false;
+            }
+        }
+
+        recordStockReceipt(productIds, quantities, unitCosts, notes, order.getPoNumber());
+
+        if (order.getReceivedAt() == null) {
+            order.setReceivedAt(LocalDateTime.now());
+        }
+
+        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) == 0) {
+            order.setOutstandingBalance(receivedTotal);
+            purchaseOrderPaymentService.addSupplierOutstanding(order.getSupplier(), receivedTotal);
+        } else {
+            order.setOutstandingBalance(order.getOutstandingBalance().add(receivedTotal));
+            purchaseOrderPaymentService.addSupplierOutstanding(order.getSupplier(), receivedTotal);
+        }
+
+        order.setStatus(allFullyReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED);
+
+        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        return purchaseOrderMapper.toFullResponse(saved);
+    }
+
+    @Override
+    public PurchaseOrderResponse returnItems(UUID id, ReturnItemsRequest request) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+
+        PurchaseOrderStatus status = order.getStatus();
+        if (status != PurchaseOrderStatus.RECEIVED && status != PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+            throw new IllegalArgumentException("Cannot return items from order in status: " + status);
+        }
+
+        Map<UUID, PurchaseOrderItem> itemMap = order.getItems().stream()
+                .collect(Collectors.toMap(PurchaseOrderItem::getId, Function.identity()));
+
+        List<UUID> productIds = new ArrayList<>();
+        List<Integer> quantities = new ArrayList<>();
+        List<String> notes = new ArrayList<>();
+        BigDecimal returnTotal = BigDecimal.ZERO;
+        boolean allFullyReturned = true;
+
+        for (ReturnItemsRequest.ItemReturn ret : request.items()) {
+            PurchaseOrderItem item = itemMap.get(ret.itemId());
+            if (item == null) {
+                throw new ResourceNotFoundException("PurchaseOrderItem", "id", ret.itemId());
+            }
+
+            int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+            int alreadyReturned = item.getReturnedQuantity() != null ? item.getReturnedQuantity() : 0;
+            int availableToReturn = received - alreadyReturned;
+
+            if (ret.returnQuantity() > availableToReturn) {
+                throw new IllegalArgumentException(
+                        "Cannot return " + ret.returnQuantity() + " of item " + item.getProduct().getName()
+                                + " — only " + availableToReturn + " available to return");
+            }
+
+            item.setReturnedQuantity(alreadyReturned + ret.returnQuantity());
+
+            productIds.add(item.getProduct().getId());
+            quantities.add(ret.returnQuantity());
+            String reason = request.reason() != null ? request.reason() : "Return to supplier";
+            notes.add("PO " + order.getPoNumber() + " return - " + item.getProduct().getName() + " - " + reason);
+
+            BigDecimal uc = item.getUnitPrice() != null ? item.getUnitPrice() : ZERO;
+            returnTotal = returnTotal.add(uc.multiply(BigDecimal.valueOf(ret.returnQuantity())));
+
+            int newReturned = item.getReturnedQuantity();
+            if (newReturned < received) {
+                allFullyReturned = false;
+            }
+        }
+
+        inventoryService.recordOrderStocks(productIds, quantities, StockMovementType.OUT, notes);
+
+        order.setOutstandingBalance(order.getOutstandingBalance().subtract(returnTotal));
+        purchaseOrderPaymentService.subtractSupplierOutstanding(order.getSupplier(), returnTotal);
+
+        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) <= 0) {
+            order.setOutstandingBalance(BigDecimal.ZERO);
+            if (order.getPaymentStatus() == PurchasePaymentStatus.PAID) {
+                order.setPaidAmount(order.getPaidAmount().subtract(returnTotal));
+                if (order.getPaidAmount().compareTo(BigDecimal.ZERO) < 0) {
+                    order.setPaidAmount(BigDecimal.ZERO);
+                }
+            }
+        }
+
+        if (allFullyReturned) {
+            order.setStatus(PurchaseOrderStatus.RETURNED);
+            order.setReturnedAt(LocalDateTime.now());
+        }
+
         PurchaseOrder saved = purchaseOrderRepository.save(order);
         return purchaseOrderMapper.toFullResponse(saved);
     }
@@ -318,20 +463,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return String.format("%s%03d", prefix, count + 1);
     }
 
-    private void recordStockReceipt(PurchaseOrder order) {
-        List<UUID> productIds = new ArrayList<>();
-        List<Integer> quantities = new ArrayList<>();
-        List<BigDecimal> unitCosts = new ArrayList<>();
-        List<String> notes = new ArrayList<>();
-
-        for (int i = 0; i < order.getItems().size(); i++) {
-            PurchaseOrderItem item = order.getItems().get(i);
-            productIds.add(item.getProduct().getId());
-            quantities.add(item.getQuantity());
-            unitCosts.add(item.getUnitPrice() != null ? item.getUnitPrice() : ZERO);
-            notes.add("PO " + order.getPoNumber() + " - Item " + (i + 1));
-        }
-
+    private void recordStockReceipt(List<UUID> productIds, List<Integer> quantities,
+                                     List<BigDecimal> unitCosts, List<String> notes, String poNumber) {
         inventoryService.recordPurchaseStocks(productIds, quantities, unitCosts, notes);
 
         List<Inventory> inventories = inventoryRepository.findByProductIdIn(productIds);
@@ -356,8 +489,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         boolean valid = switch (current) {
             case DRAFT -> target == PurchaseOrderStatus.PENDING;
             case PENDING -> target == PurchaseOrderStatus.APPROVED;
-            case APPROVED -> target == PurchaseOrderStatus.RECEIVED;
-            case RECEIVED, CANCELLED -> false;
+            case APPROVED -> false;
+            case PARTIALLY_RECEIVED -> false;
+            case RECEIVED -> target == PurchaseOrderStatus.RETURNED;
+            case RETURNED, CANCELLED -> false;
         };
 
         if (!valid) {

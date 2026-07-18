@@ -74,6 +74,12 @@ public class PurchaseOrder {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    @Column(name = "received_at")
+    private LocalDateTime receivedAt;
+
+    @Column(name = "returned_at")
+    private LocalDateTime returnedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -115,4 +121,8 @@ public class PurchaseOrder {
     public void setOutstandingBalance(BigDecimal outstandingBalance) { this.outstandingBalance = outstandingBalance; }
     public LocalDateTime getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
+    public LocalDateTime getReceivedAt() { return receivedAt; }
+    public void setReceivedAt(LocalDateTime receivedAt) { this.receivedAt = receivedAt; }
+    public LocalDateTime getReturnedAt() { return returnedAt; }
+    public void setReturnedAt(LocalDateTime returnedAt) { this.returnedAt = returnedAt; }
 }

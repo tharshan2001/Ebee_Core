@@ -20,6 +20,8 @@ public record PurchaseOrderResponse(
         BigDecimal paidAmount,
         BigDecimal outstandingBalance,
         LocalDateTime paidAt,
+        LocalDateTime receivedAt,
+        LocalDateTime returnedAt,
         String notes,
         UUID createdById,
         String createdByName,

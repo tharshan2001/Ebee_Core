@@ -109,12 +109,12 @@ public class PurchaseOrderPaymentService {
         }
     }
 
-    private Supplier addSupplierOutstanding(Supplier supplier, BigDecimal amount) {
+    public Supplier addSupplierOutstanding(Supplier supplier, BigDecimal amount) {
         supplier.setOutstandingBalance(supplier.getOutstandingBalance().add(amount));
         return supplierRepository.save(supplier);
     }
 
-    private Supplier subtractSupplierOutstanding(Supplier supplier, BigDecimal amount) {
+    public Supplier subtractSupplierOutstanding(Supplier supplier, BigDecimal amount) {
         BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
         supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
         return supplierRepository.save(supplier);

@@ -31,6 +31,12 @@ public class PurchaseOrderItem {
     @Column(name = "selling_price", precision = 10, scale = 2)
     private BigDecimal sellingPrice;
 
+    @Column(name = "received_quantity")
+    private Integer receivedQuantity;
+
+    @Column(name = "returned_quantity", nullable = false)
+    private Integer returnedQuantity = 0;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
@@ -56,5 +62,9 @@ public class PurchaseOrderItem {
     public void setSellingPrice(BigDecimal sellingPrice) { this.sellingPrice = sellingPrice; }
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
+    public Integer getReceivedQuantity() { return receivedQuantity; }
+    public void setReceivedQuantity(Integer receivedQuantity) { this.receivedQuantity = receivedQuantity; }
+    public Integer getReturnedQuantity() { return returnedQuantity; }
+    public void setReturnedQuantity(Integer returnedQuantity) { this.returnedQuantity = returnedQuantity; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

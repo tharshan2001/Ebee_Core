@@ -25,7 +25,7 @@ spring:
       host: localhost
       port: 16379
 
-aws:
+minio:
   endpoint:
   access-key: test
   secret-key: test

@@ -6,7 +6,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.common.util.DateUtils;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.delivery.enums.DeliveryStatus;
@@ -65,7 +65,7 @@ public class DriverAppService {
     private final AlertService alertService;
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
     private final NotificationPort notificationPort;
 
     public Driver getCurrentDriver() {
@@ -215,12 +215,12 @@ public class DriverAppService {
         }
 
         if (photo != null && !photo.isEmpty()) {
-            String photoUrl = s3Service.uploadFile(photo, "deliveries");
+            String photoUrl = storagePort.uploadFile(photo, "deliveries");
             order.setDeliveryPhotoUrl(photoUrl);
         }
 
         if (signature != null && !signature.isEmpty()) {
-            String sigUrl = s3Service.uploadFile(signature, "deliveries");
+            String sigUrl = storagePort.uploadFile(signature, "deliveries");
             order.setDeliverySignatureUrl(sigUrl);
         }
 
@@ -380,7 +380,7 @@ public class DriverAppService {
                 .build();
 
         if (receipt != null && !receipt.isEmpty()) {
-            expense.setReceiptUrl(s3Service.uploadFile(receipt, "expenses"));
+            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses"));
         }
 
         expense = expenseRepository.save(expense);
@@ -409,7 +409,7 @@ public class DriverAppService {
     public DriverProfileResponse uploadProfilePhoto(MultipartFile photo) {
         User user = getCurrentUser();
         if (photo != null && !photo.isEmpty()) {
-            String photoUrl = s3Service.uploadFile(photo, "profiles");
+            String photoUrl = storagePort.uploadFile(photo, "profiles");
             user.setProfilePictureUrl(photoUrl);
             user.setProfilePictureName(photo.getOriginalFilename());
             userRepository.save(user);

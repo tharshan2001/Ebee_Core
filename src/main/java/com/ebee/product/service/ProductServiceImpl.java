@@ -4,7 +4,7 @@ import com.ebee.category.service.CategoryService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.PrintTemplateService;
 import com.ebee.product.dto.LabelData;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.inventory.mapper.InventoryMapper;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.product.dto.ProductImageResponse;
@@ -42,7 +42,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final ProductImageRepository productImageRepository;
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
     private final JdbcTemplate jdbcTemplate;
     private final InventoryService inventoryService;
     private final InventoryMapper inventoryMapper;
@@ -83,7 +83,7 @@ public class ProductServiceImpl implements ProductService {
 
             int sortOrder = 0;
             for (MultipartFile image : imageList) {
-                String imageUrl = s3Service.uploadFile(image, "products/" + productId);
+                String imageUrl = storagePort.uploadFile(image, "products/" + productId);
                 if (imageUrl != null) {
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -293,7 +293,7 @@ public class ProductServiceImpl implements ProductService {
         if (request.getRemoveImageUrls() != null && !request.getRemoveImageUrls().isEmpty()) {
             for (String imageUrl : request.getRemoveImageUrls()) {
                 productImageRepository.deleteByProductIdAndImageUrl(id, imageUrl);
-                s3Service.deleteFile(imageUrl);
+                storagePort.deleteFile(imageUrl);
             }
             product.getImages().removeIf(img -> request.getRemoveImageUrls().contains(img.getImageUrl()));
             jdbcTemplate.update("UPDATE product_images SET sort_order = s.new_order FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY sort_order) - 1 AS new_order FROM product_images WHERE product_id = ?) s WHERE product_images.id = s.id", id);
@@ -310,7 +310,7 @@ public class ProductServiceImpl implements ProductService {
 
             int sortOrder = baseSortOrder;
             for (MultipartFile image : imageList) {
-                String imageUrl = s3Service.uploadFile(image, "products/" + id);
+                String imageUrl = storagePort.uploadFile(image, "products/" + id);
                 if (imageUrl != null) {
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -350,7 +350,7 @@ public class ProductServiceImpl implements ProductService {
 
         int currentSortOrder = sortOrder;
         for (MultipartFile image : imageList) {
-            String imageUrl = s3Service.uploadFile(image, "products/" + id);
+            String imageUrl = storagePort.uploadFile(image, "products/" + id);
             if (imageUrl != null) {
                 jdbcTemplate.update(
                         "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -398,7 +398,7 @@ public class ProductServiceImpl implements ProductService {
         int deletedSortOrder = productImage.getSortOrder();
         productImageRepository.delete(productImage);
         productImageRepository.decrementSortOrderAfter(productId, deletedSortOrder);
-        s3Service.deleteFile(imageUrl);
+        storagePort.deleteFile(imageUrl);
     }
 
     private ProductResponse toResponseWithRelations(Product product) {

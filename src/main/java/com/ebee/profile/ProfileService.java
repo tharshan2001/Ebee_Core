@@ -1,7 +1,7 @@
 package com.ebee.profile;
 
 import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.profile.dto.ProfilePhotoResponse;
 import com.ebee.profile.dto.ProfileUpdateRequest;
 import com.ebee.profile.dto.SettingsUpdateRequest;
@@ -22,7 +22,7 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
 
     public UserProfileResponse getProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -50,10 +50,10 @@ public class ProfileService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
         if (user.getProfilePictureUrl() != null) {
-            s3Service.deleteFile(user.getProfilePictureUrl());
+            storagePort.deleteFile(user.getProfilePictureUrl());
         }
 
-        String url = s3Service.uploadFile(file, "profiles");
+        String url = storagePort.uploadFile(file, "profiles");
         user.setProfilePictureUrl(url);
         user.setProfilePictureName(file.getOriginalFilename());
         user.setProfilePictureType(file.getContentType());
@@ -69,7 +69,7 @@ public class ProfileService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
         if (user.getProfilePictureUrl() != null) {
-            s3Service.deleteFile(user.getProfilePictureUrl());
+            storagePort.deleteFile(user.getProfilePictureUrl());
         }
 
         user.setProfilePictureUrl(null);

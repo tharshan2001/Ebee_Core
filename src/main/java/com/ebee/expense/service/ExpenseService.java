@@ -4,7 +4,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseRequest;
@@ -39,7 +39,7 @@ public class ExpenseService {
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request, MultipartFile receipt) {
@@ -68,7 +68,7 @@ public class ExpenseService {
         Expense expense = builder.build();
 
         if (receipt != null && !receipt.isEmpty()) {
-            expense.setReceiptUrl(s3Service.uploadFile(receipt, "expenses"));
+            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses"));
         }
 
         expense = expenseRepository.save(expense);

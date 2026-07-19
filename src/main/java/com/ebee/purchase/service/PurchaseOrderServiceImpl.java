@@ -1,7 +1,7 @@
 package com.ebee.purchase.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.inventory.entity.Inventory;
 import com.ebee.inventory.repository.InventoryRepository;
 import com.ebee.inventory.service.InventoryService;
@@ -71,7 +71,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final InventoryService inventoryService;
     private final InventoryRepository inventoryRepository;
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
 
     public PurchaseOrderServiceImpl(PurchaseOrderRepository purchaseOrderRepository,
@@ -82,7 +82,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                                     PurchaseOrderMapper purchaseOrderMapper,
                                     InventoryService inventoryService,
                                     InventoryRepository inventoryRepository,
-                                    S3Service s3Service,
+                                    StoragePort storagePort,
                                     PurchaseOrderPaymentService purchaseOrderPaymentService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.attachmentRepository = attachmentRepository;
@@ -92,7 +92,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         this.purchaseOrderMapper = purchaseOrderMapper;
         this.inventoryService = inventoryService;
         this.inventoryRepository = inventoryRepository;
-        this.s3Service = s3Service;
+        this.storagePort = storagePort;
         this.purchaseOrderPaymentService = purchaseOrderPaymentService;
     }
 
@@ -411,7 +411,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", orderId));
 
         String folder = "purchases/" + orderId;
-        String fileUrl = s3Service.uploadFile(file, folder);
+        String fileUrl = storagePort.uploadFile(file, folder);
 
         PurchaseOrderAttachment attachment = new PurchaseOrderAttachment();
         attachment.setPurchaseOrder(order);
@@ -433,7 +433,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         PurchaseOrderAttachment attachment = attachmentRepository.findByIdAndPurchaseOrderId(attachmentId, orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
 
-        s3Service.deleteFile(attachment.getFileUrl());
+        storagePort.deleteFile(attachment.getFileUrl());
         order.getAttachments().remove(attachment);
         attachmentRepository.delete(attachment);
     }

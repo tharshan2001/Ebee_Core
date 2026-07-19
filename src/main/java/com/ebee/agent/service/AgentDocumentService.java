@@ -1,7 +1,7 @@
 package com.ebee.agent.service;
 
 import com.ebee.agent.entity.Agent;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,17 +10,17 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class AgentDocumentService {
 
-    private final S3Service s3Service;
+    private final StoragePort storagePort;
 
     public void uploadNewDocuments(Agent agent, MultipartFile nicDocument, MultipartFile bankPassbookDocument) {
         if (nicDocument != null && !nicDocument.isEmpty()) {
-            agent.setNicDocumentUrl(s3Service.uploadFile(nicDocument, "agents/nic"));
+            agent.setNicDocumentUrl(storagePort.uploadFile(nicDocument, "agents/nic"));
             agent.setNicDocumentName(nicDocument.getOriginalFilename());
             agent.setNicDocumentType(nicDocument.getContentType());
         }
 
         if (bankPassbookDocument != null && !bankPassbookDocument.isEmpty()) {
-            agent.setBankPassbookDocumentUrl(s3Service.uploadFile(bankPassbookDocument, "agents/passbook"));
+            agent.setBankPassbookDocumentUrl(storagePort.uploadFile(bankPassbookDocument, "agents/passbook"));
             agent.setBankPassbookDocumentName(bankPassbookDocument.getOriginalFilename());
             agent.setBankPassbookDocumentType(bankPassbookDocument.getContentType());
         }
@@ -32,18 +32,18 @@ public class AgentDocumentService {
 
         if (hasNicDoc) {
             if (agent.getNicDocumentUrl() != null) {
-                s3Service.deleteFile(agent.getNicDocumentUrl());
+                storagePort.deleteFile(agent.getNicDocumentUrl());
             }
-            agent.setNicDocumentUrl(s3Service.uploadFile(nicDocument, "agents/nic"));
+            agent.setNicDocumentUrl(storagePort.uploadFile(nicDocument, "agents/nic"));
             agent.setNicDocumentName(nicDocument.getOriginalFilename());
             agent.setNicDocumentType(nicDocument.getContentType());
         }
 
         if (hasPassbookDoc) {
             if (agent.getBankPassbookDocumentUrl() != null) {
-                s3Service.deleteFile(agent.getBankPassbookDocumentUrl());
+                storagePort.deleteFile(agent.getBankPassbookDocumentUrl());
             }
-            agent.setBankPassbookDocumentUrl(s3Service.uploadFile(bankPassbookDocument, "agents/passbook"));
+            agent.setBankPassbookDocumentUrl(storagePort.uploadFile(bankPassbookDocument, "agents/passbook"));
             agent.setBankPassbookDocumentName(bankPassbookDocument.getOriginalFilename());
             agent.setBankPassbookDocumentType(bankPassbookDocument.getContentType());
         }

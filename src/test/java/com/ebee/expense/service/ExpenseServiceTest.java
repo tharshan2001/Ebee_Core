@@ -4,7 +4,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
-import com.ebee.common.service.S3Service;
+import com.ebee.common.port.StoragePort;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseRequest;
@@ -46,7 +46,7 @@ class ExpenseServiceTest {
     @Mock private DriverRepository driverRepository;
     @Mock private SecurityService securityService;
     @Mock private AuditLogService auditLogService;
-    @Mock private S3Service s3Service;
+    @Mock private StoragePort storagePort;
 
     @InjectMocks private ExpenseService expenseService;
 
@@ -133,7 +133,7 @@ class ExpenseServiceTest {
 
         when(securityService.getCurrentUserId()).thenReturn(currentUserId);
         when(userRepository.findById(currentUserId)).thenReturn(Optional.of(admin));
-        when(s3Service.uploadFile(receipt, "expenses")).thenReturn("https://s3.url/receipt.pdf");
+        when(storagePort.uploadFile(receipt, "expenses")).thenReturn("https://s3.url/receipt.pdf");
 
         Expense expense = Expense.builder().id(UUID.randomUUID()).build();
         when(expenseRepository.save(any())).thenReturn(expense);

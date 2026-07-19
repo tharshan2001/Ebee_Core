@@ -3,8 +3,8 @@ package com.ebee.common.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
-@ConfigurationProperties(prefix = "aws")
-public class AwsProperties {
+@ConfigurationProperties(prefix = "minio")
+public class MinioProperties {
 
     private final String accessKey;
     private final String secretKey;
@@ -14,7 +14,7 @@ public class AwsProperties {
     private final String publicUrl;
 
     @ConstructorBinding
-    public AwsProperties(String accessKey, String secretKey, String region, String bucketName, String endpoint, String publicUrl) {
+    public MinioProperties(String accessKey, String secretKey, String region, String bucketName, String endpoint, String publicUrl) {
         this.accessKey = accessKey;
         this.secretKey = secretKey;
         this.region = region;

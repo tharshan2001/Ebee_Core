@@ -1,6 +1,7 @@
 package com.ebee.common.service;
 
-import com.ebee.common.config.AwsProperties;
+import com.ebee.common.config.MinioProperties;
+import com.ebee.common.port.StoragePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -13,10 +14,10 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class S3Service {
+public class MinioService implements StoragePort {
 
     private final S3Client s3Client;
-    private final AwsProperties awsProperties;
+    private final MinioProperties minioProperties;
 
     private static final java.util.Set<String> ALLOWED_CONTENT_TYPES = java.util.Set.of(
             "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -41,7 +42,7 @@ public class S3Service {
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(awsProperties.getBucketName())
+                    .bucket(minioProperties.getBucketName())
                     .key(fileName)
                     .contentType(file.getContentType())
                     .build();
@@ -52,11 +53,11 @@ public class S3Service {
             return buildFileUrl(fileName);
 
         } catch (S3Exception e) {
-            log.error("Failed to upload file to S3: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to upload file to S3", e);
+            log.error("Failed to upload file to MinIO: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file to MinIO", e);
         } catch (Exception e) {
-            log.error("Failed to upload file to S3: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to upload file to S3", e);
+            log.error("Failed to upload file to MinIO: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file to MinIO", e);
         }
     }
 
@@ -70,23 +71,23 @@ public class S3Service {
             String key = extractKeyFromUrl(fileUrl);
 
             s3Client.deleteObject(b -> b
-                    .bucket(awsProperties.getBucketName())
+                    .bucket(minioProperties.getBucketName())
                     .key(key)
             );
 
         } catch (S3Exception e) {
-            log.error("Failed to delete file from S3: {}", e.getMessage(), e);
+            log.error("Failed to delete file from MinIO: {}", e.getMessage(), e);
         }
     }
 
     private String buildFileUrl(String fileName) {
-        if (awsProperties.getPublicUrl() != null && !awsProperties.getPublicUrl().isBlank()) {
-            return awsProperties.getPublicUrl() + "/" + awsProperties.getBucketName() + "/" + fileName;
+        if (minioProperties.getPublicUrl() != null && !minioProperties.getPublicUrl().isBlank()) {
+            return minioProperties.getPublicUrl() + "/" + minioProperties.getBucketName() + "/" + fileName;
         }
-        if (awsProperties.getEndpoint() != null && !awsProperties.getEndpoint().isBlank()) {
-            return awsProperties.getEndpoint() + "/" + awsProperties.getBucketName() + "/" + fileName;
+        if (minioProperties.getEndpoint() != null && !minioProperties.getEndpoint().isBlank()) {
+            return minioProperties.getEndpoint() + "/" + minioProperties.getBucketName() + "/" + fileName;
         }
-        return "https://s3." + awsProperties.getRegion() + ".amazonaws.com/" + awsProperties.getBucketName() + "/" + fileName;
+        return "https://s3." + minioProperties.getRegion() + ".amazonaws.com/" + minioProperties.getBucketName() + "/" + fileName;
     }
 
     private String extractKeyFromUrl(String fileUrl) {

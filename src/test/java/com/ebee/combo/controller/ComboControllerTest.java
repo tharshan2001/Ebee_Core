@@ -169,7 +169,7 @@ class ComboControllerTest {
 
     @Test
     void listActiveCombos_returns200() throws Exception {
-        when(comboService.listActiveCombos(any())).thenReturn(
+        when(comboService.listActiveCombos(any(), any())).thenReturn(
                 new org.springframework.data.domain.PageImpl<>(List.of(comboResponse)));
 
         mockMvc.perform(get("/api/combos")
@@ -182,7 +182,7 @@ class ComboControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void listAllCombos_admin_returns200() throws Exception {
-        when(comboService.listAllCombos(any())).thenReturn(
+        when(comboService.listAllCombos(any(), any())).thenReturn(
                 new org.springframework.data.domain.PageImpl<>(List.of(comboResponse)));
 
         mockMvc.perform(get("/api/admin/combos")

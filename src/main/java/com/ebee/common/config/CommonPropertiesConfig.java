@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties({AppProperties.class, AwsProperties.class, PrintProperties.class})
+@EnableConfigurationProperties({AppProperties.class, MinioProperties.class, PrintProperties.class})
 public class CommonPropertiesConfig {
 }

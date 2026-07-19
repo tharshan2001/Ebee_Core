@@ -76,7 +76,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `JWT_SECRET` (>= 256 bits)
 - `JWT_RESET_SECRET` (different from JWT_SECRET)
 - `SUPER_ADMIN_PASSWORD`
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET_NAME`
+- `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET_NAME`
 - `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD`
 - `REDIS_HOST`, `REDIS_PORT`
 

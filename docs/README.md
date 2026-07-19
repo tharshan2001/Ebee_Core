@@ -224,10 +224,10 @@ All secrets are loaded from environment variables (see `.env` in the project roo
 | `MAIL_PORT` | SMTP port | `587` |
 | `GMAIL_USERNAME` | Gmail SMTP username | _(empty)_ |
 | `GMAIL_APP_PASSWORD` | Gmail app password | _(empty)_ |
-| `AWS_ACCESS_KEY_ID` | AWS access key | _(empty)_ |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | _(empty)_ |
-| `AWS_REGION` | AWS region | `eu-north-1` |
-| `AWS_BUCKET_NAME` | AWS S3 bucket | _(empty)_ |
+| `MINIO_ACCESS_KEY` | MinIO access key | _(empty)_ |
+| `MINIO_SECRET_KEY` | MinIO secret key | _(empty)_ |
+| `MINIO_REGION` | MinIO region | `eu-north-1` |
+| `MINIO_BUCKET_NAME` | MinIO bucket | _(empty)_ |
 | `JWT_SECRET` | JWT signing secret (256-bit) | _(empty)_ |
 | `JWT_RESET_SECRET` | JWT reset-token signing secret | _(empty, falls back to JWT_SECRET)_ |
 | `JWT_EXPIRATION` | Access token TTL (ms) | `86400000` (24h) |

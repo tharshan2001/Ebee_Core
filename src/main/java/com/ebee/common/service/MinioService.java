@@ -26,7 +26,7 @@ public class MinioService implements StoragePort {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 
-    public String uploadFile(MultipartFile file, String folder) {
+    public String uploadFile(MultipartFile file, String folder, String objectName) {
         if (file == null || file.isEmpty()) {
             return null;
         }
@@ -37,8 +37,12 @@ public class MinioService implements StoragePort {
         }
 
         String originalName = file.getOriginalFilename();
-        String safeName = originalName != null ? originalName.replaceAll("[^a-zA-Z0-9._-]", "_") : "file";
-        String fileName = folder + "/" + java.util.UUID.randomUUID() + "-" + safeName;
+        String ext = "";
+        if (originalName != null && originalName.contains(".")) {
+            ext = originalName.substring(originalName.lastIndexOf("."));
+        }
+        String safeObjectName = objectName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String fileName = folder + "/" + safeObjectName + "_" + java.util.UUID.randomUUID() + ext;
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()

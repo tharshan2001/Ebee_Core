@@ -20,9 +20,11 @@ public class DriverDeliveryResponse {
     private String customerName;
     private String customerPhone;
     private String customerStreet;
+    private String customerAddressLine2;
     private String customerCity;
-    private String customerDistrict;
     private String customerPostalCode;
+    private String customerDistrict;
+    private String customerCountry;
     private String district;
     private DeliveryStatus deliveryStatus;
     private OrderStatus orderStatus;
@@ -50,7 +52,7 @@ public class DriverDeliveryResponse {
 
     @JsonProperty("customer")
     public CustomerInfo getCustomer() {
-        return new CustomerInfo(customerName, customerPhone, buildAddress(), customerDistrict);
+        return new CustomerInfo(customerName, customerPhone, buildAddress(), customerDistrict, customerCountry);
     }
 
     @JsonProperty("orderInfo")
@@ -72,6 +74,10 @@ public class DriverDeliveryResponse {
     private String buildAddress() {
         StringBuilder sb = new StringBuilder();
         if (customerStreet != null) sb.append(customerStreet);
+        if (customerAddressLine2 != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(customerAddressLine2);
+        }
         if (customerCity != null) {
             if (!sb.isEmpty()) sb.append(", ");
             sb.append(customerCity);
@@ -79,6 +85,14 @@ public class DriverDeliveryResponse {
         if (customerPostalCode != null) {
             if (!sb.isEmpty()) sb.append(", ");
             sb.append(customerPostalCode);
+        }
+        if (customerDistrict != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(customerDistrict);
+        }
+        if (customerCountry != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(customerCountry);
         }
         return sb.toString();
     }
@@ -105,6 +119,7 @@ public class DriverDeliveryResponse {
         private final String phone;
         private final String address;
         private final String district;
+        private final String country;
     }
 
     @Data

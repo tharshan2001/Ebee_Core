@@ -133,7 +133,7 @@ class ExpenseServiceTest {
 
         when(securityService.getCurrentUserId()).thenReturn(currentUserId);
         when(userRepository.findById(currentUserId)).thenReturn(Optional.of(admin));
-        when(storagePort.uploadFile(receipt, "expenses")).thenReturn("https://s3.url/receipt.pdf");
+        when(storagePort.uploadFile(receipt, "expenses", "admin@ebee.com_Expense")).thenReturn("https://s3.url/receipt.pdf");
 
         Expense expense = Expense.builder().id(UUID.randomUUID()).build();
         when(expenseRepository.save(any())).thenReturn(expense);

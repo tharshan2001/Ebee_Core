@@ -38,8 +38,12 @@ public class AgentController {
             @RequestParam("email") String email,
             @RequestParam("firstName") String firstName,
             @RequestParam("lastName") String lastName,
-            @RequestParam("address") String address,
+            @RequestParam("addressLine1") String addressLine1,
+            @RequestParam(value = "addressLine2", required = false) String addressLine2,
+            @RequestParam("city") String city,
+            @RequestParam(value = "postalCode", required = false) String postalCode,
             @RequestParam("district") String district,
+            @RequestParam(value = "country", required = false) String country,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
             @RequestParam(value = "nicNumber", required = false) String nicNumber,
             @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
@@ -52,8 +56,12 @@ public class AgentController {
         request.setEmail(email);
         request.setFirstName(firstName);
         request.setLastName(lastName);
-        request.setAddress(address);
+        request.setAddressLine1(addressLine1);
+        request.setAddressLine2(addressLine2);
+        request.setCity(city);
+        request.setPostalCode(postalCode);
         request.setDistrict(district);
+        request.setCountry(country);
         request.setPhoneNumber(phoneNumber);
         request.setNicNumber(nicNumber);
         request.setNicDocument(nicDocument);
@@ -152,8 +160,12 @@ public class AgentController {
             @RequestParam("agentCode") String agentCode,
             @RequestParam(value = "commissionRate", required = false) Double commissionRate,
             @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType,
-            @RequestParam("address") String address,
+            @RequestParam("addressLine1") String addressLine1,
+            @RequestParam(value = "addressLine2", required = false) String addressLine2,
+            @RequestParam("city") String city,
+            @RequestParam(value = "postalCode", required = false) String postalCode,
             @RequestParam("district") String district,
+            @RequestParam(value = "country", required = false) String country,
             @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
             @RequestParam(value = "nicNumber", required = false) String nicNumber,
             @RequestParam(value = "nicDocument", required = false) MultipartFile nicDocument,
@@ -166,8 +178,12 @@ public class AgentController {
         request.setAgentCode(agentCode);
         request.setCommissionRate(commissionRate);
         request.setCommissionType(commissionType);
-        request.setAddress(address);
+        request.setAddressLine1(addressLine1);
+        request.setAddressLine2(addressLine2);
+        request.setCity(city);
+        request.setPostalCode(postalCode);
         request.setDistrict(district);
+        request.setCountry(country);
         request.setPhoneNumber(phoneNumber);
         request.setNicNumber(nicNumber);
         request.setNicDocument(nicDocument);

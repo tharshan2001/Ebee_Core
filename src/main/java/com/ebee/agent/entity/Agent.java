@@ -62,11 +62,23 @@ public class Agent {
     @Builder.Default
     private AgentCommissionType commissionType = AgentCommissionType.DEFAULT;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String address;
+    @Column(name = "address_line_1", nullable = false, length = 255)
+    private String addressLine1;
+
+    @Column(name = "address_line_2", length = 255)
+    private String addressLine2;
+
+    @Column(nullable = false, length = 100)
+    private String city;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
 
     @Column(nullable = false, length = 50)
     private District district;
+
+    @Column(length = 100)
+    private String country;
 
     @Column(name = "nic_number")
     private String nicNumber;

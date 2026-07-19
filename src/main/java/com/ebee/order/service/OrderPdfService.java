@@ -31,7 +31,8 @@ public class OrderPdfService {
         String address = null;
         if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
             var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+            address = formatAddress(a.getStreet(), a.getAddressLine2(), a.getCity(),
+                    a.getPostalCode(), a.getDistrict(), a.getCountry());
         }
 
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -82,7 +83,8 @@ public class OrderPdfService {
         String address = null;
         if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
             var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+            address = formatAddress(a.getStreet(), a.getAddressLine2(), a.getCity(),
+                    a.getPostalCode(), a.getDistrict(), a.getCountry());
         }
 
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -137,7 +139,8 @@ public class OrderPdfService {
         String address = null;
         if (order.getCustomer() != null && order.getCustomer().getAddress() != null) {
             var a = order.getCustomer().getAddress();
-            address = a.getStreet() + ", " + a.getCity() + ", " + a.getDistrict().getDisplayName() + " - " + a.getPostalCode();
+            address = formatAddress(a.getStreet(), a.getAddressLine2(), a.getCity(),
+                    a.getPostalCode(), a.getDistrict(), a.getCountry());
         }
 
         var data = new ShippingLabelData(
@@ -150,6 +153,17 @@ public class OrderPdfService {
         );
 
         return printTemplateService.renderToPdf("shipping-label", toMap(data));
+    }
+
+    private String formatAddress(String line1, String line2, String city, String postalCode,
+                                  com.ebee.common.enums.District district, String country) {
+        StringBuilder sb = new StringBuilder(line1);
+        if (line2 != null) sb.append(", ").append(line2);
+        sb.append(", ").append(city);
+        if (postalCode != null) sb.append(" ").append(postalCode);
+        sb.append(", ").append(district.getDisplayName());
+        if (country != null) sb.append(", ").append(country);
+        return sb.toString();
     }
 
     private Map<String, Object> toMap(Object record) {

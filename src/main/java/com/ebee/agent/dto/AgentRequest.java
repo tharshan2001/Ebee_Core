@@ -3,6 +3,7 @@ package com.ebee.agent.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,11 +20,21 @@ public class AgentRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    @NotBlank(message = "Address is required")
-    private String address;
+    @NotBlank(message = "Address line 1 is required")
+    private String addressLine1;
+
+    private String addressLine2;
+
+    @NotBlank(message = "City is required")
+    private String city;
+
+    @Size(max = 20, message = "Postal code must not exceed 20 characters")
+    private String postalCode;
 
     @NotBlank(message = "District is required")
     private String district;
+
+    private String country;
 
     @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
     private String phoneNumber;

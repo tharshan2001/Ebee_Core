@@ -83,7 +83,7 @@ public class ProductServiceImpl implements ProductService {
 
             int sortOrder = 0;
             for (MultipartFile image : imageList) {
-                String imageUrl = storagePort.uploadFile(image, "products/" + productId);
+                String imageUrl = storagePort.uploadFile(image, "products/" + productId, "Image_" + sortOrder);
                 if (imageUrl != null) {
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -310,7 +310,7 @@ public class ProductServiceImpl implements ProductService {
 
             int sortOrder = baseSortOrder;
             for (MultipartFile image : imageList) {
-                String imageUrl = storagePort.uploadFile(image, "products/" + id);
+                String imageUrl = storagePort.uploadFile(image, "products/" + id, "Image_" + sortOrder);
                 if (imageUrl != null) {
                     jdbcTemplate.update(
                             "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -350,7 +350,7 @@ public class ProductServiceImpl implements ProductService {
 
         int currentSortOrder = sortOrder;
         for (MultipartFile image : imageList) {
-            String imageUrl = storagePort.uploadFile(image, "products/" + id);
+            String imageUrl = storagePort.uploadFile(image, "products/" + id, "Image_" + currentSortOrder);
             if (imageUrl != null) {
                 jdbcTemplate.update(
                         "INSERT INTO product_images (id, product_id, image_url, image_name, image_type, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",

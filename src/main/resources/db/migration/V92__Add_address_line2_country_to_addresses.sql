@@ -1,0 +1,3 @@
+ALTER TABLE addresses ADD COLUMN address_line_2 VARCHAR(255);
+ALTER TABLE addresses ADD COLUMN country VARCHAR(100) NOT NULL DEFAULT 'Sri Lanka';
+ALTER TABLE addresses ALTER COLUMN postal_code DROP NOT NULL;

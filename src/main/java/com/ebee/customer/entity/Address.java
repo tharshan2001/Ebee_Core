@@ -36,14 +36,20 @@ public class Address {
     @Column(nullable = false, length = 255)
     private String street;
 
+    @Column(name = "address_line_2", length = 255)
+    private String addressLine2;
+
     @Column(nullable = false, length = 100)
     private String city;
 
     @Column(nullable = false, length = 100)
     private District district;
 
-    @Column(name = "postal_code", nullable = false, length = 20)
+    @Column(name = "postal_code", length = 20)
     private String postalCode;
+
+    @Column(length = 100)
+    private String country;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

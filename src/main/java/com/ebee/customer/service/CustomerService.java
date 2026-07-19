@@ -231,8 +231,10 @@ public class CustomerService {
         Address.AddressBuilder builder = Address.builder()
                 .customer(customer)
                 .street(request.getStreet())
+                .addressLine2(request.getAddressLine2())
                 .city(request.getCity())
-                .postalCode(request.getPostalCode());
+                .postalCode(request.getPostalCode())
+                .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka");
 
         if (request.getDistrict() != null) {
             builder.district(District.fromDisplayName(request.getDistrict()));
@@ -243,28 +245,41 @@ public class CustomerService {
 
     private void updateAddress(Address address, AddressRequest request) {
         address.setStreet(request.getStreet());
+        address.setAddressLine2(request.getAddressLine2());
         address.setCity(request.getCity());
         if (request.getDistrict() != null) {
             address.setDistrict(District.fromDisplayName(request.getDistrict()));
         }
         address.setPostalCode(request.getPostalCode());
+        address.setCountry(request.getCountry() != null ? request.getCountry() : "Sri Lanka");
     }
 
     private void sendWelcomeNotification(Customer customer) {
         try {
             String subject = "Welcome to Ebee — Customer Registration Successful";
             String addr = customer.getAddress() != null
-                    ? customer.getAddress().getStreet() + ", " + customer.getAddress().getCity()
+                    ? formatAddressBlock(customer.getAddress())
                     : "";
             Map<String, String> p = new HashMap<>();
             p.put("firstName", customer.getFirstName());
             p.put("lastName", customer.getLastName());
-            p.put("addressBlock", addr.isEmpty() ? "" : "<p>Address: " + addr + "</p>");
-            p.put("addressBlockTxt", addr.isEmpty() ? "" : "Address: " + addr);
+            p.put("addressBlock", addr.isEmpty() ? "" : "<p>Address:<br>" + addr.replace("\n", "<br>") + "</p>");
+            p.put("addressBlockTxt", addr.isEmpty() ? "" : "Address: " + addr.replace("\n", ", "));
             notificationPort.notifyCustomer(customer, subject, "customer-welcome", p, Set.of("addressBlock"));
         } catch (Exception e) {
             log.warn("Failed to send welcome notification to customer {}: {}", customer.getPhoneNumber(), e.getMessage());
         }
+    }
+
+    private String formatAddressBlock(Address a) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(a.getStreet());
+        if (a.getAddressLine2() != null) sb.append("\n").append(a.getAddressLine2());
+        sb.append("\n").append(a.getCity());
+        if (a.getPostalCode() != null) sb.append(" ").append(a.getPostalCode());
+        sb.append("\n").append(a.getDistrict().getDisplayName());
+        if (a.getCountry() != null) sb.append("\n").append(a.getCountry());
+        return sb.toString();
     }
 
     private CustomerResponse toResponse(Customer customer) {
@@ -281,11 +296,13 @@ public class CustomerService {
             AddressResponse addrResponse = new AddressResponse();
             addrResponse.setId(customer.getAddress().getId());
             addrResponse.setStreet(customer.getAddress().getStreet());
+            addrResponse.setAddressLine2(customer.getAddress().getAddressLine2());
             addrResponse.setCity(customer.getAddress().getCity());
             addrResponse.setDistrict(customer.getAddress().getDistrict() != null
                     ? customer.getAddress().getDistrict().getDisplayName()
                     : null);
             addrResponse.setPostalCode(customer.getAddress().getPostalCode());
+            addrResponse.setCountry(customer.getAddress().getCountry());
             response.setAddress(addrResponse);
         }
         response.setCreatedAt(customer.getCreatedAt());

@@ -18,8 +18,12 @@ public class AgentWithCredentialsResponse {
     private String firstName;
     private String lastName;
     private String agentCode;
-    private String address;
+    private String addressLine1;
+    private String addressLine2;
+    private String city;
+    private String postalCode;
     private String district;
+    private String country;
     private String phoneNumber;
     private Double commissionRate;
     private Double effectiveCommissionRate;

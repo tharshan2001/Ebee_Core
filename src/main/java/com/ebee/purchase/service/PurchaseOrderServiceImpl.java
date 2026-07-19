@@ -411,7 +411,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", orderId));
 
         String folder = "purchases/" + orderId;
-        String fileUrl = storagePort.uploadFile(file, folder);
+        String fileUrl = storagePort.uploadFile(file, folder, "Attachment");
 
         PurchaseOrderAttachment attachment = new PurchaseOrderAttachment();
         attachment.setPurchaseOrder(order);

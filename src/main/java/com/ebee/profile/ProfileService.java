@@ -53,7 +53,7 @@ public class ProfileService {
             storagePort.deleteFile(user.getProfilePictureUrl());
         }
 
-        String url = storagePort.uploadFile(file, "profiles");
+        String url = storagePort.uploadFile(file, "profiles", user.getEmail() + "_Profile");
         user.setProfilePictureUrl(url);
         user.setProfilePictureName(file.getOriginalFilename());
         user.setProfilePictureType(file.getContentType());

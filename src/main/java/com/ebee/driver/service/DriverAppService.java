@@ -215,12 +215,12 @@ public class DriverAppService {
         }
 
         if (photo != null && !photo.isEmpty()) {
-            String photoUrl = storagePort.uploadFile(photo, "deliveries");
+            String photoUrl = storagePort.uploadFile(photo, "deliveries", order.getOrderNumber() + "_Photo");
             order.setDeliveryPhotoUrl(photoUrl);
         }
 
         if (signature != null && !signature.isEmpty()) {
-            String sigUrl = storagePort.uploadFile(signature, "deliveries");
+            String sigUrl = storagePort.uploadFile(signature, "deliveries", order.getOrderNumber() + "_Signature");
             order.setDeliverySignatureUrl(sigUrl);
         }
 
@@ -380,7 +380,7 @@ public class DriverAppService {
                 .build();
 
         if (receipt != null && !receipt.isEmpty()) {
-            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses"));
+            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses", currentUser.getEmail() + "_Expense"));
         }
 
         expense = expenseRepository.save(expense);
@@ -409,7 +409,7 @@ public class DriverAppService {
     public DriverProfileResponse uploadProfilePhoto(MultipartFile photo) {
         User user = getCurrentUser();
         if (photo != null && !photo.isEmpty()) {
-            String photoUrl = storagePort.uploadFile(photo, "profiles");
+            String photoUrl = storagePort.uploadFile(photo, "profiles", user.getEmail() + "_Profile");
             user.setProfilePictureUrl(photoUrl);
             user.setProfilePictureName(photo.getOriginalFilename());
             userRepository.save(user);
@@ -478,11 +478,14 @@ public class DriverAppService {
                     + " " + order.getCustomer().getLastName());
             response.setCustomerPhone(order.getCustomer().getPhoneNumber());
             if (order.getCustomer().getAddress() != null) {
-                response.setCustomerStreet(order.getCustomer().getAddress().getStreet());
-                response.setCustomerCity(order.getCustomer().getAddress().getCity());
-                response.setCustomerDistrict(order.getCustomer().getAddress().getDistrict() != null
-                        ? order.getCustomer().getAddress().getDistrict().getDisplayName() : null);
-                response.setCustomerPostalCode(order.getCustomer().getAddress().getPostalCode());
+                var a = order.getCustomer().getAddress();
+                response.setCustomerStreet(a.getStreet());
+                response.setCustomerAddressLine2(a.getAddressLine2());
+                response.setCustomerCity(a.getCity());
+                response.setCustomerPostalCode(a.getPostalCode());
+                response.setCustomerDistrict(a.getDistrict() != null
+                        ? a.getDistrict().getDisplayName() : null);
+                response.setCustomerCountry(a.getCountry());
             }
         }
 

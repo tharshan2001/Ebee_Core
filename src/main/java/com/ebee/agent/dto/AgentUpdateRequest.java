@@ -3,6 +3,7 @@ package com.ebee.agent.dto;
 import com.ebee.agent.enums.AgentCommissionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,11 +20,21 @@ public class AgentUpdateRequest {
 
     private AgentCommissionType commissionType;
 
-    @NotBlank(message = "Address is required")
-    private String address;
+    @NotBlank(message = "Address line 1 is required")
+    private String addressLine1;
+
+    private String addressLine2;
+
+    @NotBlank(message = "City is required")
+    private String city;
+
+    @Size(max = 20, message = "Postal code must not exceed 20 characters")
+    private String postalCode;
 
     @NotBlank(message = "District is required")
     private String district;
+
+    private String country;
 
     private String nicNumber;
 

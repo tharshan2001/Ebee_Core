@@ -68,7 +68,7 @@ public class ExpenseService {
         Expense expense = builder.build();
 
         if (receipt != null && !receipt.isEmpty()) {
-            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses"));
+            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses", currentUser.getEmail() + "_Expense"));
         }
 
         expense = expenseRepository.save(expense);

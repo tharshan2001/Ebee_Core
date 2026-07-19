@@ -98,8 +98,12 @@ public class AgentServiceImpl implements AgentService {
         Agent agent = Agent.builder()
                 .user(savedUser)
                 .agentCode(agentCode)
-                .address(request.getAddress())
+                .addressLine1(request.getAddressLine1())
+                .addressLine2(request.getAddressLine2())
+                .city(request.getCity())
+                .postalCode(request.getPostalCode())
                 .district(district)
+                .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka")
                 .phoneNumber(request.getPhoneNumber())
                 .commissionRate(defaultConfig.getCommissionRate())
                 .commissionType(AgentCommissionType.DEFAULT)
@@ -127,8 +131,12 @@ public class AgentServiceImpl implements AgentService {
                 .firstName(savedUser.getFirstName())
                 .lastName(savedUser.getLastName())
                 .agentCode(savedAgent.getAgentCode())
-                .address(savedAgent.getAddress())
+                .addressLine1(savedAgent.getAddressLine1())
+                .addressLine2(savedAgent.getAddressLine2())
+                .city(savedAgent.getCity())
+                .postalCode(savedAgent.getPostalCode())
                 .district(savedAgent.getDistrict() != null ? savedAgent.getDistrict().getDisplayName() : null)
+                .country(savedAgent.getCountry())
                 .phoneNumber(savedAgent.getPhoneNumber())
                 .commissionRate(savedAgent.getCommissionRate().doubleValue())
                 .effectiveCommissionRate(savedAgent.getCommissionRate().doubleValue())
@@ -353,7 +361,11 @@ public class AgentServiceImpl implements AgentService {
             agent.setCommissionRate(defaultConfig.getCommissionRate());
         }
 
-        agent.setAddress(request.getAddress());
+        agent.setAddressLine1(request.getAddressLine1());
+        agent.setAddressLine2(request.getAddressLine2());
+        agent.setCity(request.getCity());
+        agent.setPostalCode(request.getPostalCode());
+        agent.setCountry(request.getCountry() != null ? request.getCountry() : "Sri Lanka");
         agent.setPhoneNumber(request.getPhoneNumber());
         agent.setNicNumber(request.getNicNumber());
         agent.setBankAccountNumber(request.getBankAccountNumber());

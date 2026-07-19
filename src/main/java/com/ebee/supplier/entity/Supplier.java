@@ -1,5 +1,6 @@
 package com.ebee.supplier.entity;
 
+import com.ebee.common.enums.District;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,8 +25,23 @@ public class Supplier {
     @Column(length = 20)
     private String phone;
 
-    @Column(columnDefinition = "TEXT")
-    private String address;
+    @Column(name = "address_line_1", nullable = false, length = 255)
+    private String addressLine1;
+
+    @Column(name = "address_line_2", length = 255)
+    private String addressLine2;
+
+    @Column(nullable = false, length = 100)
+    private String city;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+
+    @Column(length = 50)
+    private District district;
+
+    @Column(length = 100)
+    private String country;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
@@ -60,8 +76,18 @@ public class Supplier {
     public void setEmail(String email) { this.email = email; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
-    public String getAddress() { return address; }
-    public void setAddress(String address) { this.address = address; }
+    public String getAddressLine1() { return addressLine1; }
+    public void setAddressLine1(String addressLine1) { this.addressLine1 = addressLine1; }
+    public String getAddressLine2() { return addressLine2; }
+    public void setAddressLine2(String addressLine2) { this.addressLine2 = addressLine2; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+    public District getDistrict() { return district; }
+    public void setDistrict(District district) { this.district = district; }
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
     public BigDecimal getOutstandingBalance() { return outstandingBalance; }

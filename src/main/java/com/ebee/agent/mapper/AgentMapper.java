@@ -17,6 +17,11 @@ public interface AgentMapper {
     @Mapping(target = "fullName", expression = "java(agent.getUser().getFirstName() + \" \" + agent.getUser().getLastName())")
     @Mapping(target = "district", expression = "java(agent.getDistrict() != null ? agent.getDistrict().getDisplayName() : null)")
     @Mapping(target = "userStatus", source = "user.status")
+    @Mapping(target = "addressLine1", source = "addressLine1")
+    @Mapping(target = "addressLine2", source = "addressLine2")
+    @Mapping(target = "city", source = "city")
+    @Mapping(target = "postalCode", source = "postalCode")
+    @Mapping(target = "country", source = "country")
     AgentResponse toResponse(Agent agent);
 
     List<AgentResponse> toResponseList(List<Agent> agents);

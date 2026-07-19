@@ -11,7 +11,9 @@ public class AddressResponse {
     @JsonIgnore
     private UUID id;
     private String street;
+    private String addressLine2;
     private String city;
     private String district;
     private String postalCode;
+    private String country;
 }

@@ -82,6 +82,7 @@ public class OrderPaymentService {
         }
 
         boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;
+        boolean isCodOrder = order.getPaymentMethod() == PaymentMethod.COD;
 
         BigDecimal newPaidAmount = order.getPaidAmount().add(request.amount());
 
@@ -99,7 +100,7 @@ public class OrderPaymentService {
 
         order = orderRepository.save(order);
 
-        if (isCreditOrder || order.getPaymentMethod() == PaymentMethod.COD) {
+        if (isCreditOrder || isCodOrder) {
             updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
         }
 
@@ -112,10 +113,11 @@ public class OrderPaymentService {
 
     public void handlePaymentRefund(Order order) {
         BigDecimal refundAmount = order.getPaidAmount();
+        BigDecimal remainingOutstanding = order.getOutstandingBalance();
         boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
 
-        if (order.getPaymentMethod() == PaymentMethod.CREDIT || order.getPaymentMethod() == PaymentMethod.COD) {
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getTotalAmount(), false);
+        if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
+            updateCustomerOutstandingBalance(order.getCustomer(), remainingOutstanding, false);
         }
 
         if (hasRefund) {

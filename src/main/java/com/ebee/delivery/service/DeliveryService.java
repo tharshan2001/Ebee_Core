@@ -53,6 +53,7 @@ public class DeliveryService {
     public void initializeDelivery(Order order) {
         if (order.getDeliveryStatus() == null) {
             order.setDeliveryStatus(DeliveryStatus.PENDING);
+            order.setDeliveryScheduledDate(LocalDate.now());
         }
     }
 

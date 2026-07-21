@@ -1,3 +1,2 @@
-Dear {{agentName}},
-
+Hi {{agentName}}!
 {{statusMessage}}

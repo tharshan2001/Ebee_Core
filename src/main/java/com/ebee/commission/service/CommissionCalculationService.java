@@ -59,10 +59,10 @@ public class CommissionCalculationService {
         placeholders.put("savingsContext", "");
         placeholders.put("savingsContextTxt", "");
         Set<String> unescaped = Set.of("savingsContext");
-        notificationPort.notifyAgent(agent, "Commission Calculated – Order " + order.getOrderNumber(),
+        notificationPort.notifyAgent(agent, "Commission: " + order.getOrderNumber(),
                 "order-commission-calculated", placeholders, unescaped);
         notificationPort.createInternalAlert(agent.getUser(),
-                "Commission Calculated – Order " + order.getOrderNumber(),
+                "Commission: " + order.getOrderNumber(),
                 """
                         A commission of LKR %s has been calculated for order %s.
                         

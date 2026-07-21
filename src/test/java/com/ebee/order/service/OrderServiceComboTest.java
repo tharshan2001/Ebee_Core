@@ -115,6 +115,7 @@ class OrderServiceComboTest {
                 .address(address)
                 .outstandingBalance(BigDecimal.ZERO)
                 .creditLimit(BigDecimal.ZERO)
+                .customerCode("CU-123456")
                 .build();
 
         product1 = Product.builder()

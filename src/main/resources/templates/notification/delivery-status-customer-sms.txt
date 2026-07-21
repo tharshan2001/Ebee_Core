@@ -1,7 +1,6 @@
-Dear {{firstName}},
+Hi {{firstName}}!
+Delivery update for {{orderNumber}}:
 
-Delivery update for order {{orderNumber}}:
-
-Status: {{statusLabel}}
+{{statusLabel}}
 
 {{messageBlockTxt}}

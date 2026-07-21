@@ -1,3 +1,2 @@
-Dear {{agentName}},
-
-Order {{orderNumber}} for {{customerName}} has been cancelled.
+Hi {{agentName}}!
+Order {{orderNumber}} for {{customerName}} is cancelled.

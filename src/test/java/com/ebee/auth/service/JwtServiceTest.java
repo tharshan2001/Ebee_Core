@@ -142,6 +142,6 @@ class JwtServiceTest {
     void extractEmailFromResetToken_withInvalidToken_throws() {
         assertThatThrownBy(() -> jwtService.extractEmailFromResetToken("invalid.token.here"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid or expired reset token");
+                .hasMessageContaining("Invalid or expired reset link");
     }
 }

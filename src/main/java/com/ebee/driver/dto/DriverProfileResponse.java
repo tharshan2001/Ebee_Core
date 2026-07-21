@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 @Data
@@ -35,6 +36,6 @@ public class DriverProfileResponse {
 
     @JsonProperty("memberSince")
     public String getMemberSince() {
-        return createdAt != null ? createdAt.toString() : null;
+        return createdAt != null ? createdAt.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) : null;
     }
 }

@@ -104,20 +104,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException ex) {
         log.warn("Missing request parameter: {}", ex.getParameterName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Required parameter '" + ex.getParameterName() + "' is missing"));
+                .body(ApiResponse.error("Parameter '" + ex.getParameterName() + "' is required"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException ex) {
         log.warn("Malformed request body: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Malformed request body"));
+                .body(ApiResponse.error("Invalid request body"));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(ApiResponse.error("Method not supported: " + ex.getMethod()));
+                .body(ApiResponse.error("Method not allowed"));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -151,7 +151,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNoHandlerFound(NoHandlerFoundException ex) {
         log.warn("No handler found: {} {}", ex.getHttpMethod(), ex.getRequestURL());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Resource not found"));
+                .body(ApiResponse.error("Not found"));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -160,10 +160,10 @@ public class GlobalExceptionHandler {
         String message = ex.getMostSpecificCause().getMessage();
         if (message != null && message.toLowerCase().contains("unique")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error("A record with the same value already exists"));
+                    .body(ApiResponse.error("This value is already taken"));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Data integrity violation"));
+                .body(ApiResponse.error("Couldn't save"));
     }
 
     @ExceptionHandler(Exception.class)
@@ -190,6 +190,6 @@ public class GlobalExceptionHandler {
             cause = cause.getCause();
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("An unexpected error occurred"));
+                .body(ApiResponse.error("Something went wrong"));
     }
 }

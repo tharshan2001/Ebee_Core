@@ -89,7 +89,7 @@ public class DeliveryService {
         driverP.put("driverName", driver.getFirstName());
         driverP.put("orderNumber", savedOrder.getOrderNumber());
         driverP.put("district", savedOrder.getDistrict() != null ? savedOrder.getDistrict() : "");
-        String subject = "Delivery Assigned – " + savedOrder.getOrderNumber();
+        String subject = "Delivery assigned: " + savedOrder.getOrderNumber();
         notificationPort.notifyUser(driver, subject, "delivery-assigned-driver", driverP, Set.of());
 
         if (driverProfile.getFcmToken() != null) {

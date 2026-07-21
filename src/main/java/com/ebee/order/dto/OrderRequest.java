@@ -17,7 +17,7 @@ public class OrderRequest {
     private String agentCode;
 
     @NotBlank(message = "Customer phone number is required")
-    @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
+    @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String customerPhoneNumber;
 
     @NotNull(message = "Payment method is required")

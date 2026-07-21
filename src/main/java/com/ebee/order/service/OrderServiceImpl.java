@@ -108,8 +108,7 @@ public class OrderServiceImpl implements OrderService {
         District district = (customer.getAddress() != null) ? customer.getAddress().getDistrict() : null;
         if (district == null) {
             throw new IllegalArgumentException(
-                    "Customer '" + customer.getPhoneNumber() + "' has no district on file; "
-                            + "update the customer profile before placing an order");
+                    "Customer has no district. Update their address first.");
         }
         String orderNumber = orderNumberService.generateOrderNumber(district, orderSource);
 
@@ -437,7 +436,7 @@ public class OrderServiceImpl implements OrderService {
         if (status == OrderStatus.DELIVERED
                 || status == OrderStatus.RETURNED
                 || status == OrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("Order status can only be updated up to SHIPPED. Use delivery or cancel endpoints for further changes.");
+            throw new IllegalArgumentException("Use delivery or cancel endpoints after shipping");
         }
 
         OrderStatus oldStatus = order.getStatus();
@@ -573,7 +572,7 @@ public class OrderServiceImpl implements OrderService {
     @Recover
     public OrderResponse recoverDuplicateOrderNumber(DuplicateOrderNumberException ex, OrderRequest request) {
         log.error("Failed to create order after retries: {}", ex.getMessage());
-        throw new IllegalStateException("Unable to generate unique order number. Please try again.", ex);
+        throw new IllegalStateException("Couldn't generate order number. Try again.", ex);
     }
 
     private static boolean isDuplicateOrderNumber(DataIntegrityViolationException ex) {

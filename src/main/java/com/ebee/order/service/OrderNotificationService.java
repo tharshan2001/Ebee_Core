@@ -54,7 +54,7 @@ public class OrderNotificationService {
             p.put("savingsBlock", savingsBlockHtml);
             p.put("savingsBlockTxt", savingsBlockTxt);
             notificationPort.notifyCustomer(order.getCustomer(),
-                    "Order Placed – " + order.getOrderNumber(),
+                    "Order placed: " + order.getOrderNumber(),
                     "order-created-customer", p, HTML_KEYS);
         }
 
@@ -88,13 +88,13 @@ public class OrderNotificationService {
             p.put("commissionBlock", commissionBlockHtml);
             p.put("commissionBlockTxt", commissionBlockTxt);
             notificationPort.notifyAgent(order.getAgent(),
-                    "New Order Assigned – " + order.getOrderNumber(),
+                    "New order: " + order.getOrderNumber(),
                     "order-created-agent", p, HTML_KEYS);
 
             String alertMsg = "Order " + order.getOrderNumber() + " assigned for " + customerName
                     + ". Total: LKR " + NumberUtils.formatAmount(totalAmount);
             notificationPort.createInternalAlert(order.getAgent().getUser(),
-                    "New Order Assigned – " + order.getOrderNumber(), alertMsg,
+                    "New order: " + order.getOrderNumber(), alertMsg,
                     AlertType.ORDER_CREATED, order.getId(), "order");
 
             if (commission != null) {
@@ -120,14 +120,14 @@ public class OrderNotificationService {
                 cp.put("originalAmount", NumberUtils.formatAmount(originalAmount));
                 cp.put("totalSavings", NumberUtils.formatAmount(totalSavings));
                 notificationPort.notifyAgent(order.getAgent(),
-                        "Commission Calculated – Order " + order.getOrderNumber(),
+                        "Commission: " + order.getOrderNumber(),
                         "order-commission-calculated", cp, HTML_KEYS);
 
                 String commissionAlert = "Commission LKR " + NumberUtils.formatAmount(commission.getCommissionAmount())
                         + " at " + commission.getCommissionRate().toPlainString()
                         + "% for order " + order.getOrderNumber() + ".";
                 notificationPort.createInternalAlert(order.getAgent().getUser(),
-                        "Commission Calculated – Order " + order.getOrderNumber(), commissionAlert,
+                        "Commission: " + order.getOrderNumber(), commissionAlert,
                         AlertType.COMMISSION_CALCULATED, commission.getId(), "commission");
             }
         }
@@ -189,7 +189,7 @@ public class OrderNotificationService {
             p.put("firstName", OrderItemSummaryBuilder.customerDisplayName(order.getCustomer()));
             p.put("orderNumber", order.getOrderNumber());
             notificationPort.notifyCustomer(order.getCustomer(),
-                    "Order Cancelled – " + order.getOrderNumber(),
+                    "Order cancelled: " + order.getOrderNumber(),
                     "order-cancelled-customer", p, Set.of());
         }
 
@@ -202,12 +202,12 @@ public class OrderNotificationService {
             p.put("customerName", customerName);
             p.put("orderNumber", order.getOrderNumber());
             notificationPort.notifyAgent(order.getAgent(),
-                    "Order Cancelled – " + order.getOrderNumber(),
+                    "Order cancelled: " + order.getOrderNumber(),
                     "order-cancelled-agent", p, Set.of());
 
             String alertMsg = "Order " + order.getOrderNumber() + " for " + customerName + " has been cancelled.";
             notificationPort.createInternalAlert(order.getAgent().getUser(),
-                    "Order Cancelled – " + order.getOrderNumber(), alertMsg,
+                    "Order cancelled: " + order.getOrderNumber(), alertMsg,
                     AlertType.ORDER_CANCELLED, order.getId(), "order");
         }
     }

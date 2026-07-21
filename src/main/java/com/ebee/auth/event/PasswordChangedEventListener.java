@@ -11,6 +11,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -25,13 +26,13 @@ public class PasswordChangedEventListener {
     public void onPasswordChanged(PasswordChangedEvent event) {
         User user = event.getUser();
         try {
-            String time = LocalDateTime.now().toString();
-            String subject = "Ebee - Password Changed";
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy\nHH:mm"));
+            String subject = "Password changed";
 
             notificationPort.sendEmail(EmailRequest.builder()
                     .to(user.getEmail())
                     .subject(subject)
-                    .body("Your Ebee account password was changed.\n\nTime: " + time
+                    .body("Your Ebee account password was changed.\n\n" + time
                             + "\n\nIf you did not make this change, please contact support immediately.")
                     .html(false)
                     .build());
@@ -39,8 +40,8 @@ public class PasswordChangedEventListener {
             if (user.getPhoneNumber() != null) {
                 notificationPort.sendSms(SmsRequest.builder()
                         .phoneNumbers(List.of(user.getPhoneNumber()))
-                        .message("Ebee: Your account password was changed at " + time
-                                + ". If this was not you, contact support.")
+                        .message("Ebee: Your account password was changed.\n" + time
+                                + "\nIf this was not you, contact support.")
                         .build());
             }
         } catch (Exception e) {

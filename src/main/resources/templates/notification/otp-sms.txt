@@ -1,6 +1,6 @@
-Ebee: One-Time Password
+Ebee code for {{purpose}}
 
-Your OTP for {{purpose}} is:
+Your code:
 
 {{otp}}
 

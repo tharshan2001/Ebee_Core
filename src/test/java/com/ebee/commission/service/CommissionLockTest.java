@@ -95,12 +95,14 @@ class CommissionLockTest {
                 .isActive(true)
                 .district(District.MN)
                 .commissionType(AgentCommissionType.DEFAULT)
+                .country("Sri Lanka")
                 .build());
 
         Customer customer = customerRepository.save(Customer.builder()
                 .firstName("Test")
                 .lastName("Customer")
                 .phoneNumber("077" + uniqueSuffix)
+                .customerCode("CU-" + uniqueSuffix)
                 .build());
 
         Address address = Address.builder()
@@ -108,6 +110,7 @@ class CommissionLockTest {
                 .district(District.MN)
                 .city("Mannar")
                 .street("Main Street")
+                .country("Sri Lanka")
                 .build();
         customer.setAddress(address);
         customerRepository.save(customer);

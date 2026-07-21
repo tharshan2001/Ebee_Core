@@ -1,8 +1,4 @@
 Low Stock Alert
+{{productName}} is below reorder level.
 
-{{productName}} is below the reorder level.
-
-Current Stock: {{currentQty}}
-Reorder Level: {{reorderLevel}}
-
-Please arrange to restock this item.
+Stock: {{currentQty}} | Reorder at: {{reorderLevel}}

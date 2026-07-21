@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +73,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (!rateLimitingService.isLoginAllowed(loginKey)) {
             log.warn("Login rate limit exceeded for: {}", email);
-            throw new IllegalStateException("Too many login attempts. Please try again later.");
+            throw new IllegalStateException("Too many attempts. Try again later.");
         }
 
         Authentication authentication = authenticationManager.authenticate(
@@ -92,7 +93,7 @@ public class AuthServiceImpl implements AuthService {
         if (user.getRole() == RoleType.DRIVER) {
             driverOpt = driverRepository.findByUserId(user.getId());
             driverOpt.filter(d -> d.getAvailability() == DriverAvailability.SUSPENDED)
-                    .ifPresent(d -> { throw new IllegalStateException("Your account has been suspended"); });
+                    .ifPresent(d -> { throw new IllegalStateException("Your account is suspended"); });
         }
 
         if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.SUPER_ADMIN) {
@@ -137,8 +138,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         try {
-            String time = LocalDateTime.now().toString();
-            String subject = "Ebee - New Login Detected";
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy\nHH:mm"));
+            String subject = "New login to Ebee";
             notificationPort.notifyUser(user, subject, "login-alert",
                     Map.of("firstName", user.getFirstName(), "loginTime", time, "email", user.getEmail()),
                     Set.of());
@@ -153,8 +154,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         try {
-            String time = LocalDateTime.now().toString();
-            String subject = "Ebee - Logout Detected";
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy\nHH:mm"));
+            String subject = "Logged out of Ebee";
             notificationPort.notifyUser(user, subject, "logout-alert",
                     Map.of("firstName", user.getFirstName(), "logoutTime", time, "email", user.getEmail()),
                     Set.of());
@@ -165,8 +166,8 @@ public class AuthServiceImpl implements AuthService {
 
     private void sendPasswordChangedAlert(User user) {
         try {
-            String time = LocalDateTime.now().toString();
-            String subject = "Ebee - Password Changed";
+            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy\nHH:mm"));
+            String subject = "Password changed";
             notificationPort.notifyUser(user, subject, "password-changed",
                     Map.of("firstName", user.getFirstName(), "changeTime", time, "email", user.getEmail()),
                     Set.of());
@@ -195,9 +196,9 @@ public class AuthServiceImpl implements AuthService {
         try {
             email = jwtService.extractEmailFromToken(refreshToken);
         } catch (ExpiredJwtException e) {
-            throw new AccessDeniedException("Refresh token has expired");
+            throw new AccessDeniedException("Session expired. Log in again.");
         } catch (JwtException e) {
-            throw new AccessDeniedException("Invalid refresh token");
+            throw new AccessDeniedException("Session expired. Log in again.");
         }
 
         User user = userRepository.findByEmail(email)
@@ -209,7 +210,7 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshTokenHash = sha256Hex(refreshToken);
         if (!refreshTokenHash.equals(user.getRefreshTokenHash())) {
-            throw new AccessDeniedException("Invalid refresh token");
+            throw new AccessDeniedException("Session expired. Log in again.");
         }
 
         Collection<? extends GrantedAuthority> authorities =
@@ -279,7 +280,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Current password is incorrect");
+            throw new IllegalArgumentException("Current password is wrong");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -308,7 +309,7 @@ public class AuthServiceImpl implements AuthService {
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty() || !otpService.verifyOtp(email, otp)) {
-            throw new IllegalArgumentException("Invalid or expired OTP");
+            throw new IllegalArgumentException("Invalid or expired code");
         }
 
         return generateResetToken(userOpt.get());

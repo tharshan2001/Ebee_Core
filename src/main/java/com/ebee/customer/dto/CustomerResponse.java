@@ -10,6 +10,7 @@ import java.util.UUID;
 public class CustomerResponse {
 
     private UUID id;
+    private String customerCode;
     private String firstName;
     private String lastName;
     private String phoneNumber;

@@ -140,7 +140,7 @@ public class JwtService {
         try {
             return extractClaim(token, getResetSigningKey(), Claims::getSubject);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid or expired reset token");
+            throw new IllegalArgumentException("Invalid or expired reset link");
         }
     }
 

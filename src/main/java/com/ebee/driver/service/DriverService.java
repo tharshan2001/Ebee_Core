@@ -79,7 +79,7 @@ public class DriverService {
         Driver savedDriver = driverRepository.save(driver);
 
         log.info("Driver created: {}", savedUser.getEmail());
-        String subject = "Welcome to Ebee – Driver Account Created";
+        String subject = "Welcome to Ebee!";
         Map<String, String> p = new HashMap<>();
         p.put("firstName", savedUser.getFirstName());
         p.put("email", savedUser.getEmail());

@@ -60,7 +60,8 @@
     </td>
     <td>
       <div class="label">Date</div>
-      <div class="value" th:text="${#temporals.format(createdAt, 'dd MMM yyyy HH:mm')}">Date</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'MMM dd, yyyy')}">Jul 19, 2026</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'HH:mm')}">14:30</div>
     </td>
   </tr>
   <tr>

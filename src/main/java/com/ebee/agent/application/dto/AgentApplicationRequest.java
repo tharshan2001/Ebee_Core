@@ -24,7 +24,7 @@ public class AgentApplicationRequest {
     @Email(message = "Email must be valid")
     private String email;
 
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
+    @NotBlank(message = "Phone is required")
+    @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String phoneNumber;
 }

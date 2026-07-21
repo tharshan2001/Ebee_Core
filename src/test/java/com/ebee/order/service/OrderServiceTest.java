@@ -132,6 +132,7 @@ class OrderServiceTest {
                 .address(address)
                 .outstandingBalance(BigDecimal.ZERO)
                 .creditLimit(BigDecimal.ZERO)
+                .customerCode("CU-123456")
                 .build();
 
         product1 = Product.builder()
@@ -377,6 +378,7 @@ class OrderServiceTest {
                 .lastName(customer.getLastName())
                 .phoneNumber(customer.getPhoneNumber())
                 .address(null)
+                .customerCode("CU-789012")
                 .build();
 
         when(securityService.isAdmin()).thenReturn(true);
@@ -387,7 +389,7 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.createOrder(orderRequest))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("no district on file");
+                .hasMessageContaining("Customer has no district");
     }
 
     // --- Payment-method-specific createOrder tests ---
@@ -645,7 +647,7 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Order status can only be updated up to SHIPPED");
+                .hasMessageContaining("Use delivery or cancel endpoints after shipping");
     }
 
     @Test

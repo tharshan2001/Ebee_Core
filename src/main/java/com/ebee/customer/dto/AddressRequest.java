@@ -11,7 +11,7 @@ public class AddressRequest {
     @Size(max = 255, message = "Street must not exceed 255 characters")
     private String street;
 
-    @Size(max = 255, message = "Address line 2 must not exceed 255 characters")
+    @Size(max = 255, message = "Address line 2 too long")
     private String addressLine2;
 
     @NotBlank(message = "City is required")

@@ -1,6 +1,5 @@
-Dear {{firstName}},
-
-Welcome to Ebee! Your account has been created.
+Hi {{firstName}}!
+Welcome! Your account is ready.
 
 Email: {{email}}
 Password: {{password}}

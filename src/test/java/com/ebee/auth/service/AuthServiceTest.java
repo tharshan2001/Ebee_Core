@@ -147,7 +147,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Too many login attempts");
+                .hasMessageContaining("Too many attempts");
     }
 
     @Test
@@ -160,7 +160,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(request, "127.0.0.1"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Too many login attempts");
+                .hasMessageContaining("Too many attempts");
 
         verify(authenticationManager, never()).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verify(rateLimitingService, never()).resetLoginAttempts(anyString());
@@ -278,7 +278,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.changePassword(email, "wrong", "new"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Current password is incorrect");
+                .hasMessageContaining("Current password is wrong");
     }
 
     @Test

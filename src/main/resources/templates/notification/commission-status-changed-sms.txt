@@ -1,5 +1,4 @@
-Dear {{agentName}},
-
-Commission for order {{orderNumber}} has been {{statusLabel}}.
+Hi {{agentName}}!
+Commission for {{orderNumber}}: {{statusLabel}}.
 
 {{statusMessage}}

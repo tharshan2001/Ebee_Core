@@ -38,6 +38,9 @@ public class Customer {
     @Column(name = "phone_number", nullable = false, unique = true, length = 20)
     private String phoneNumber;
 
+    @Column(name = "customer_code", nullable = false, unique = true, length = 20)
+    private String customerCode;
+
     @Column(length = 255)
     private String email;
 

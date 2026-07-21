@@ -2,6 +2,7 @@ package com.ebee.customer.service;
 
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.service.CodeGenerationService;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
@@ -42,12 +43,13 @@ public class CustomerService {
     private final NotificationPort notificationPort;
     private final OrderPaymentService orderPaymentService;
     private final OrderRepository orderRepository;
+    private final CodeGenerationService codeGenerationService;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
         request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (customerRepository.existsByPhoneNumber(request.getPhoneNumber())) {
-            throw new IllegalArgumentException("Customer already exists with phone: " + request.getPhoneNumber());
+            throw new IllegalArgumentException("A customer with this phone already exists");
         }
 
         Customer customer = Customer.builder()
@@ -55,6 +57,7 @@ public class CustomerService {
                 .lastName(request.getLastName())
                 .phoneNumber(request.getPhoneNumber())
                 .email(request.getEmail())
+                .customerCode(generateCustomerCode(request))
                 .build();
 
         if (request.getAddress() != null) {
@@ -83,7 +86,7 @@ public class CustomerService {
         if (request.getPhoneNumber() != null &&
             !customer.getPhoneNumber().equals(request.getPhoneNumber()) &&
             customerRepository.existsByPhoneNumber(request.getPhoneNumber())) {
-            throw new IllegalArgumentException("Customer already exists with phone: " + request.getPhoneNumber());
+            throw new IllegalArgumentException("A customer with this phone already exists");
         }
         if (request.getPhoneNumber() != null) {
             customer.setPhoneNumber(request.getPhoneNumber());
@@ -113,6 +116,7 @@ public class CustomerService {
                             .firstName(firstName)
                             .lastName(lastName)
                             .phoneNumber(normalized)
+                            .customerCode(codeGenerationService.generateCode(null))
                             .build();
                     customer = customerRepository.save(customer);
                     sendWelcomeNotification(customer);
@@ -131,6 +135,13 @@ public class CustomerService {
     public CustomerResponse getCustomerById(UUID id) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+        return toResponse(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerResponse getCustomerByCode(String customerCode) {
+        Customer customer = customerRepository.findByCustomerCode(customerCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "customerCode", customerCode));
         return toResponse(customer);
     }
 
@@ -200,7 +211,7 @@ public class CustomerService {
                 customerId, List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID));
 
         if (unpaidOrders.isEmpty()) {
-            throw new IllegalArgumentException("Customer has no outstanding orders");
+            throw new IllegalArgumentException("Customer has no unpaid orders");
         }
 
         BigDecimal remaining = request.amount();
@@ -256,7 +267,7 @@ public class CustomerService {
 
     private void sendWelcomeNotification(Customer customer) {
         try {
-            String subject = "Welcome to Ebee — Customer Registration Successful";
+            String subject = "Welcome to Ebee!";
             String addr = customer.getAddress() != null
                     ? formatAddressBlock(customer.getAddress())
                     : "";
@@ -282,9 +293,22 @@ public class CustomerService {
         return sb.toString();
     }
 
+    private String generateCustomerCode(CustomerRequest request) {
+        District district = null;
+        if (request.getAddress() != null && request.getAddress().getDistrict() != null) {
+            try {
+                district = District.fromDisplayName(request.getAddress().getDistrict());
+            } catch (IllegalArgumentException e) {
+                // ignore, use null -> XX prefix
+            }
+        }
+        return codeGenerationService.generateCode(district);
+    }
+
     private CustomerResponse toResponse(Customer customer) {
         CustomerResponse response = new CustomerResponse();
         response.setId(customer.getId());
+        response.setCustomerCode(customer.getCustomerCode());
         response.setFirstName(customer.getFirstName());
         response.setLastName(customer.getLastName());
         response.setPhoneNumber(customer.getPhoneNumber());

@@ -15,8 +15,8 @@ public class CustomerRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
+    @NotBlank(message = "Phone is required")
+    @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String phoneNumber;
 
     @NotBlank(message = "Email is required")

@@ -46,6 +46,7 @@ class OrderPaymentServiceTest {
                 .id(UUID.randomUUID())
                 .outstandingBalance(BigDecimal.ZERO)
                 .creditLimit(BigDecimal.ZERO)
+                .customerCode("CU-123456")
                 .build();
 
         return Order.builder()
@@ -121,6 +122,7 @@ class OrderPaymentServiceTest {
                 .id(UUID.randomUUID())
                 .outstandingBalance(new BigDecimal("1200.00"))
                 .creditLimit(new BigDecimal("5000.00"))
+                .customerCode("CU-654321")
                 .build();
 
         Order order = Order.builder()

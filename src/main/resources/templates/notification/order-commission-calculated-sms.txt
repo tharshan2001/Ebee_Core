@@ -1,9 +1,8 @@
-Dear {{agentName}},
-
-A commission has been calculated for order {{orderNumber}}.
+Hi {{agentName}}!
+Commission calculated for {{orderNumber}}.
 
 Commission: LKR {{commissionAmount}}
 Rate: {{commissionRate}}%
 Order Total: LKR {{totalAmount}}
 {{savingsContextTxt}}
-The commission will be processed once the order is completed and approved.
+Commission will be processed once the order is completed and approved.

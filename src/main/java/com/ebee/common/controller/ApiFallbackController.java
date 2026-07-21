@@ -15,7 +15,7 @@ public class ApiFallbackController implements ErrorController {
     @RequestMapping("/api/**")
     public ResponseEntity<ApiResponse<Void>> handleUnmatched() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Resource not found"));
+                .body(ApiResponse.error("Not found"));
     }
 
     @RequestMapping("/error")
@@ -25,6 +25,6 @@ public class ApiFallbackController implements ErrorController {
             statusCode = 404;
         }
         return ResponseEntity.status(statusCode)
-                .body(ApiResponse.error("Resource not found"));
+                .body(ApiResponse.error("Not found"));
     }
 }

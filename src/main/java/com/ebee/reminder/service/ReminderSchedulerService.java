@@ -76,8 +76,8 @@ public class ReminderSchedulerService {
 
         for (Reminder reminder : reminders) {
             try {
-                String subject = "Upcoming Reminder: " + reminder.getTitle() + " in 5 minutes";
-                String timeStr = reminder.getReminderTime() != null ? reminder.getReminderTime().toString() : "";
+                String subject = "Reminder: " + reminder.getTitle();
+                String timeStr = reminder.getReminderTime() != null ? reminder.getReminderTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) : "";
                 Map<String, String> p = new HashMap<>();
                 p.put("title", reminder.getTitle());
                 p.put("description", reminder.getDescription() != null ? reminder.getDescription() : "");

@@ -1,7 +1,6 @@
-Dear {{firstName}} {{lastName}},
-
+Hi {{firstName}}!
 Your agent application has been received.
 
-We will review it and get back to you at {{email}}.
+We'll review it and get back to you at {{email}}.
 
-Thank you for your interest in Ebee!
+Thanks for your interest!

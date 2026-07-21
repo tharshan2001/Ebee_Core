@@ -66,13 +66,15 @@
     </td>
     <td>
       <div class="label">Date</div>
-      <div class="value" th:text="${#temporals.format(createdAt, 'dd MMM yyyy HH:mm')}">Date</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'MMM dd, yyyy')}">Jul 19, 2026</div>
+      <div class="value" th:text="${#temporals.format(createdAt, 'HH:mm')}">14:30</div>
     </td>
   </tr>
   <tr>
     <td>
       <div class="label">Paid At</div>
-      <div class="value" th:text="${#temporals.format(paidAt, 'dd MMM yyyy HH:mm')}">Paid Date</div>
+      <div class="value" th:text="${#temporals.format(paidAt, 'MMM dd, yyyy')}">Jul 19, 2026</div>
+      <div class="value" th:text="${#temporals.format(paidAt, 'HH:mm')}">14:30</div>
     </td>
     <td>
       <div class="label">Payment Method</div>

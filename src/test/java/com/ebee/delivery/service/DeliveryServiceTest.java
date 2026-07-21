@@ -84,6 +84,7 @@ class DeliveryServiceTest {
                 .lastName("Doe")
                 .phoneNumber("0771234567")
                 .address(address)
+                .customerCode("CU-123456")
                 .build();
 
         driverUser = User.builder()

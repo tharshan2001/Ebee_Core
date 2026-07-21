@@ -1,7 +1,5 @@
-Ebee: Logout Detected
-
-You have been logged out of your account.
+Logged out of Ebee
 
 Time: {{logoutTime}}
 
-If this was not you, please change your password immediately.
+If this wasn't you, change your password now.

@@ -36,7 +36,7 @@ public class AgentRequest {
 
     private String country;
 
-    @Pattern(regexp = "^0\\d{9}$", message = "Phone number must be 10 digits starting with 0")
+    @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String phoneNumber;
 
     private String nicNumber;

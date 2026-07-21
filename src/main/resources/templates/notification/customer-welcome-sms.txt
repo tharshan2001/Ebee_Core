@@ -1,5 +1,4 @@
-Dear {{firstName}} {{lastName}},
-
-Welcome to Ebee! Your customer account has been registered.
+Hi {{firstName}}!
+Welcome to Ebee!
 
 {{addressBlockTxt}}

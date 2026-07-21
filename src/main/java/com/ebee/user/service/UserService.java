@@ -74,7 +74,7 @@ public class UserService {
 
     private void sendWelcomeNotification(User user, String rawPassword) {
         try {
-            String subject = "Welcome to Ebee — Account Created";
+            String subject = "Welcome to Ebee!";
             Map<String, String> p = new HashMap<>();
             p.put("firstName", user.getFirstName());
             p.put("email", user.getEmail());

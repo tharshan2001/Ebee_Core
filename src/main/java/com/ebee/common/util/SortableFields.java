@@ -30,7 +30,7 @@ public final class SortableFields {
 
     public static final Set<String> CUSTOMER = Set.of(
             "createdAt", "updatedAt", "firstName", "lastName",
-            "phoneNumber", "totalOrders"
+            "phoneNumber", "customerCode", "totalOrders"
     );
 
     public static final Set<String> AGENT = Set.of(

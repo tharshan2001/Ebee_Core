@@ -12,10 +12,9 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.common.service.CodeGenerationService;
 import com.ebee.common.util.PasswordGenerator;
 import com.ebee.common.util.PhoneUtils;
-import com.ebee.agent.entity.AgentCodeSequence;
-import com.ebee.agent.repository.AgentCodeSequenceRepository;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.CommissionConfig;
 import com.ebee.commission.enums.CommissionType;
@@ -58,7 +57,7 @@ public class AgentServiceImpl implements AgentService {
     private final CommissionConfigRepository commissionConfigRepository;
     private final CommissionRepository commissionRepository;
     private final AuditLogService auditLogService;
-    private final AgentCodeSequenceRepository agentCodeSequenceRepository;
+    private final CodeGenerationService codeGenerationService;
     private final SecurityService securityService;
 
 
@@ -441,7 +440,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private void sendAgentStatusNotification(Agent agent, String statusLabel, String message, boolean includeSms) {
-        String subject = "Agent Account " + statusLabel + " – Ebee";
+        String subject = "Account " + statusLabel;
         try {
             Map<String, String> p = new HashMap<>();
             p.put("agentName", agent.getUser().getFirstName());
@@ -468,7 +467,7 @@ public class AgentServiceImpl implements AgentService {
     private void sendWelcomeNotification(String firstName, String lastName, String agentCode,
                                           Agent agent, String rawPassword) {
         try {
-            String subject = "Welcome to Ebee — Agent Registration Successful";
+            String subject = "Welcome to Ebee!";
             Map<String, String> p = new HashMap<>();
             p.put("firstName", firstName);
             p.put("lastName", lastName);
@@ -486,7 +485,7 @@ public class AgentServiceImpl implements AgentService {
 
     private void sendPasswordResetNotification(Agent agent) {
         try {
-            String subject = "Password Reset – Ebee";
+            String subject = "Password reset";
             Map<String, String> p = new HashMap<>();
             p.put("firstName", agent.getUser().getFirstName());
             p.put("lastName", agent.getUser().getLastName());
@@ -561,15 +560,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private String generateAgentCode(District district) {
-        String districtName = district.name();
-        AgentCodeSequence seq = agentCodeSequenceRepository.findByDistrictWithLock(districtName)
-                .orElseGet(() -> agentCodeSequenceRepository.save(
-                        AgentCodeSequence.builder().district(districtName).nextValue(1).build()
-                ));
-        int code = seq.getNextValue();
-        seq.setNextValue(code + 1);
-        agentCodeSequenceRepository.save(seq);
-        return String.format("%s-%03d", districtName, code);
+        return codeGenerationService.generateCode(district);
     }
 
 }

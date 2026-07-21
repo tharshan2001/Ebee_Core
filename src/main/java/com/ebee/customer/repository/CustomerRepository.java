@@ -20,6 +20,8 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     Optional<Customer> findByPhoneNumber(String phoneNumber);
 
+    Optional<Customer> findByCustomerCode(String customerCode);
+
     boolean existsByPhoneNumber(String phoneNumber);
 
     @Modifying
@@ -40,10 +42,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
            countQuery = "SELECT COUNT(c) FROM Customer c")
     Page<Customer> findAll(Pageable pageable);
 
-    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search%")
+    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search%")
     Page<Customer> findBySearchTerm(@Param("search") String search, Pageable pageable);
 
-    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search%")
+    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search%")
     List<Customer> findBySearchTerm(@Param("search") String search);
 
     List<Customer> findByOutstandingBalanceGreaterThan(BigDecimal balance, Sort sort);

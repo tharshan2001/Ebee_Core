@@ -1,6 +1,5 @@
-Dear {{firstName}},
-
-Your driver account has been created.
+Hi {{firstName}}!
+Your driver account is ready.
 
 Email: {{email}}
 Password: {{password}}

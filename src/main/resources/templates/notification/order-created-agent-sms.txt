@@ -1,6 +1,5 @@
-Dear {{agentName}},
-
-New order {{orderNumber}} assigned.
+Hi {{agentName}}!
+New order {{orderNumber}}
 
 Customer: {{customerName}}
 
@@ -10,4 +9,3 @@ Items:
 Total: LKR {{totalAmount}}
 {{savingsBlockTxt}}
 {{commissionBlockTxt}}
-Please process this order at your earliest convenience.

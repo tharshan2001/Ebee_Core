@@ -40,7 +40,7 @@ public class OtpService {
         redisTemplate.opsForValue().set(OTP_KEY_PREFIX + email, sha256Hex(otp), OTP_TTL_SECONDS, TimeUnit.SECONDS);
 
         User user = userRepository.findByEmail(email).orElse(null);
-        String subject = "Ebee - OTP for " + purpose;
+        String subject = "Ebee code for " + purpose;
         var p = Map.of("otp", otp, "purpose", purpose);
         if (user != null) {
             notificationPort.notifyUser(user, subject, "otp", p, Set.of());

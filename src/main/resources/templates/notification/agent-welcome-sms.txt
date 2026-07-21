@@ -1,6 +1,5 @@
-Dear {{firstName}} {{lastName}},
-
-Welcome to Ebee! Your agent account has been created.
+Hi {{firstName}}!
+Welcome! Your Ebee agent account is ready.
 
 Agent Code: {{agentCode}}
 Email: {{email}}

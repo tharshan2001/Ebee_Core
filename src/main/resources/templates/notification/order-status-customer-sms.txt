@@ -1,5 +1,2 @@
-Dear {{firstName}},
-
-Your order {{orderNumber}} is now {{statusLabel}}.
-
-Thank you for choosing Ebee!
+Hi {{firstName}}!
+Order {{orderNumber}}: {{statusLabel}}.

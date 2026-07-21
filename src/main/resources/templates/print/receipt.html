@@ -10,24 +10,24 @@
   .header .company-info { color: #666; font-size: 8pt; margin-top: 3px; }
   .header .title { float: right; font-size: 16pt; font-weight: bold; color: #d4a017; }
   .clearfix::after { content: ""; display: table; clear: both; }
-  .paid-stamp { border: 2px solid #2e7d32; color: #2e7d32; padding: 5px 15px; font-size: 14pt; font-weight: bold; text-align: center; display: inline-block; margin-bottom: 10px; }
+  .paid-stamp { border: 2px solid #2e7d32; color: #2e7d32; padding: 6px 18px; font-size: 14pt; font-weight: bold; text-align: center; display: inline-block; margin-bottom: 12px; }
   .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-  .info-table td { vertical-align: top; padding: 3px 5px; }
+  .info-table td { vertical-align: top; padding: 5px 8px; }
   .info-table td:first-child { width: 50%; }
-  .info-table .label { color: #888; font-size: 8pt; text-transform: uppercase; }
-  .info-table .value { font-size: 9pt; }
-  table.items { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-  table.items th { background: #1a1a1a; color: #fff; padding: 6px 8px; text-align: left; font-size: 8pt; text-transform: uppercase; }
-  table.items td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 9pt; }
+  .info-table .label { color: #888; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; }
+  .info-table .value { font-size: 9pt; line-height: 1.4; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+  table.items th { background: #1a1a1a; color: #fff; padding: 8px 10px; text-align: left; font-size: 8pt; text-transform: uppercase; }
+  table.items td { padding: 8px 10px; border-bottom: 1px solid #ddd; font-size: 9pt; }
   table.items td.right { text-align: right; }
   table.items tr:last-child td { border-bottom: 2px solid #1a1a1a; }
-  .totals { width: 300px; margin-left: auto; }
+  .totals { width: 300px; margin-left: auto; margin-top: 10px; }
   .totals table { width: 100%; }
-  .totals td { padding: 3px 8px; font-size: 9pt; }
+  .totals td { padding: 5px 8px; font-size: 9pt; }
   .totals td.right { text-align: right; }
-  .totals .grand-total td { font-size: 12pt; font-weight: bold; border-top: 2px solid #1a1a1a; padding-top: 5px; }
-  .footer { border-top: 1px solid #ddd; margin-top: 30px; padding-top: 10px; font-size: 7pt; color: #999; text-align: center; }
-  .notes { border: 1px solid #ddd; padding: 8px; margin-top: 15px; font-size: 8pt; color: #666; }
+  .totals .grand-total td { font-size: 12pt; font-weight: bold; border-top: 2px solid #1a1a1a; padding-top: 8px; }
+  .footer { border-top: 1px solid #ddd; margin-top: 40px; padding-top: 12px; font-size: 7pt; color: #999; text-align: center; }
+  .notes { border: 1px solid #ddd; padding: 10px; margin-top: 20px; font-size: 8pt; color: #666; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -48,6 +48,7 @@
       </td>
       <td style="width: 140px; text-align: right; vertical-align: middle;">
         <div class="title" style="float: none;" th:text="${title}">RECEIPT</div>
+        <div style="font-size: 9pt; color: #777777; margin-top: 4px;" th:text="${#temporals.format(createdAt, 'MMM dd, yyyy')}">Jul 19, 2026</div>
       </td>
     </tr>
   </table>
@@ -63,11 +64,6 @@
     <td>
       <div class="label">Order Number</div>
       <div class="value" th:text="${orderNumber}">ORD-001</div>
-    </td>
-    <td>
-      <div class="label">Date</div>
-      <div class="value" th:text="${#temporals.format(createdAt, 'MMM dd, yyyy')}">Jul 19, 2026</div>
-      <div class="value" th:text="${#temporals.format(createdAt, 'HH:mm')}">14:30</div>
     </td>
   </tr>
   <tr>
@@ -87,11 +83,6 @@
       <div class="value" th:text="${customerName}">Customer Name</div>
       <div class="value" th:if="${customerPhone}" th:text="${customerPhone}">Phone</div>
       <div class="value" th:if="${customerAddress}" th:text="${customerAddress}">Address</div>
-    </td>
-    <td>
-      <div class="label" th:if="${agentName}">Agent</div>
-      <div class="value" th:if="${agentName}" th:text="${agentName}">Agent</div>
-      <div class="value" th:if="${agentCode}" th:text="'Code: ' + ${agentCode}">Code</div>
     </td>
   </tr>
 </table>
@@ -130,7 +121,7 @@
       <td class="right" th:text="'-' + ${#numbers.formatDecimal(discountTotal, 1, 2)}">0.00</td>
     </tr>
     <tr class="grand-total">
-      <td>Total Paid</td>
+      <td>Total</td>
       <td class="right" th:text="${#numbers.formatDecimal(totalAmount, 1, 2)}">0.00</td>
     </tr>
   </table>

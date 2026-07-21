@@ -5,4 +5,5 @@
  | |___| (_) | |_) |  __/ | |  __/
  |______\___/|_.__/ \___|_|  \___|
 
- :: Ebee Core :: POS & Commission Management
+ :: Kismet Plus Pvt Ltd
+ :: CRM & ERP Solutions

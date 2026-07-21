@@ -257,8 +257,11 @@ public class DeliveryService {
         }
         response.setScheduledDate(order.getDeliveryScheduledDate());
         response.setNotes(order.getDeliveryNotes());
+        response.setDriverNotes(order.getDriverNotes());
         response.setDeliveredAt(order.getDeliveredAt());
         response.setDeliveryFailureReason(order.getDeliveryFailureReason());
+        response.setDeliveryPhotoUrl(order.getDeliveryPhotoUrl());
+        response.setDeliverySignatureUrl(order.getDeliverySignatureUrl());
         return response;
     }
 
@@ -308,6 +311,7 @@ public class DeliveryService {
     private void sendDeliveryNotifications(Order order, DeliveryStatus newStatus) {
         if (order.getCustomer() != null) {
             String statusLabel = switch (newStatus) {
+                case DELIVERED -> "Delivered";
                 case FAILED -> "Failed";
                 case FAILED_PERMANENT -> "Failed Permanently";
                 default -> null;
@@ -316,6 +320,9 @@ public class DeliveryService {
             if (statusLabel != null) {
                 String reason = order.getDeliveryFailureReason();
                 String messageHtml = switch (newStatus) {
+                    case DELIVERED -> "<p>Your order <strong>"
+                            + order.getOrderNumber() + "</strong> has been delivered successfully.</p>"
+                            + "<p>Thank you for your purchase!</p>";
                     case FAILED -> "<p>Unfortunately, delivery of your order <strong>"
                             + order.getOrderNumber() + "</strong> has failed."
                             + (reason != null ? "</p><p>Reason: " + reason : "") + "</p>";
@@ -325,6 +332,8 @@ public class DeliveryService {
                     default -> "";
                 };
                 String messageTxt = switch (newStatus) {
+                    case DELIVERED -> "Your order " + order.getOrderNumber()
+                            + " has been delivered successfully. Thank you for your purchase!";
                     case FAILED -> "Unfortunately, delivery of your order " + order.getOrderNumber()
                             + " has failed." + (reason != null ? " Reason: " + reason : "");
                     case FAILED_PERMANENT -> "Delivery of your order " + order.getOrderNumber()

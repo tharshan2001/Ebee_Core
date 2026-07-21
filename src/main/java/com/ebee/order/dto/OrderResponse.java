@@ -45,5 +45,9 @@ public class OrderResponse {
     private LocalDate deliveryScheduledDate;
     private String deliveryNotes;
     private String deliveryFailureReason;
+    private String deliveryPhotoUrl;
+    private String deliverySignatureUrl;
+    private String driverNotes;
+    private LocalDateTime deliveredAt;
     private OrderSource orderSource;
 }

@@ -33,6 +33,7 @@ public class DriverDeliveryResponse {
     private LocalDate scheduledDate;
     private String notes;
     private String deliveryNotes;
+    private String driverNotes;
     private String deliveryFailureReason;
     private String deliveryPhotoUrl;
     private String deliverySignatureUrl;

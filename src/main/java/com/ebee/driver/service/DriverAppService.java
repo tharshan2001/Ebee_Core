@@ -5,6 +5,7 @@ import com.ebee.alert.service.AlertService;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.security.SecurityService;
 import com.ebee.common.port.StoragePort;
 import com.ebee.common.util.DateUtils;
@@ -62,6 +63,7 @@ public class DriverAppService {
     private final ExpenseMapper expenseMapper;
     private final DeliveryService deliveryService;
     private final DeliveryStateTransition deliveryStateTransition;
+    private final CommissionLifecycleService commissionLifecycleService;
     private final AlertService alertService;
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
@@ -170,7 +172,7 @@ public class DriverAppService {
         assertDriverCanTransition(order.getDeliveryStatus(), request.getStatus());
 
         if (request.getDriverNotes() != null) {
-            order.setDeliveryNotes(request.getDriverNotes());
+            order.setDriverNotes(request.getDriverNotes());
         }
 
         DeliveryStatus previousStatus = order.getDeliveryStatus();
@@ -185,6 +187,7 @@ public class DriverAppService {
         Order savedOrder = orderRepository.save(order);
 
         if (result.wasDelivered()) {
+            commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
             driverRepository.findByUserId(securityService.getCurrentUserId()).ifPresent(d -> {
                 d.setAvailability(DriverAvailability.AVAILABLE);
                 driverRepository.save(d);
@@ -225,7 +228,7 @@ public class DriverAppService {
         }
 
         if (driverNotes != null) {
-            order.setDeliveryNotes(driverNotes);
+            order.setDriverNotes(driverNotes);
         }
 
         DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
@@ -237,6 +240,8 @@ public class DriverAppService {
             d.setAvailability(DriverAvailability.AVAILABLE);
             driverRepository.save(d);
         });
+
+        commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
 
         auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
                 "Driver completed delivery for order " + savedOrder.getOrderNumber());
@@ -456,6 +461,7 @@ public class DriverAppService {
         response.setDistrict(order.getDistrict());
         response.setNotes(order.getNotes());
         response.setDeliveryNotes(order.getDeliveryNotes());
+        response.setDriverNotes(order.getDriverNotes());
         response.setDeliveryFailureReason(order.getDeliveryFailureReason());
         response.setDeliveryPhotoUrl(order.getDeliveryPhotoUrl());
         response.setDeliverySignatureUrl(order.getDeliverySignatureUrl());

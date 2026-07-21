@@ -2,6 +2,7 @@ package com.ebee.auth.controller;
 
 import com.ebee.auth.dto.IpWhitelistRequest;
 import com.ebee.auth.dto.IpWhitelistResponse;
+import com.ebee.auth.dto.WhitelistStatusResponse;
 import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.security.SecurityService;
@@ -33,6 +34,13 @@ public class IpWhitelistController {
         return ResponseEntity.ok(ApiResponse.success("IP whitelist entries retrieved", ipWhitelistService.getEntriesForUser(currentUserId)));
     }
 
+    @GetMapping("/status")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<WhitelistStatusResponse>> getStatus() {
+        return ResponseEntity.ok(ApiResponse.success("Whitelist status retrieved",
+                new WhitelistStatusResponse(ipWhitelistService.isGloballyEnabled())));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<IpWhitelistResponse>> addEntry(@Valid @RequestBody IpWhitelistRequest request) {
@@ -46,5 +54,19 @@ public class IpWhitelistController {
     public ResponseEntity<ApiResponse<Void>> removeEntry(@PathVariable UUID id) {
         ipWhitelistService.removeEntry(id);
         return ResponseEntity.ok(ApiResponse.success("IP whitelist entry removed"));
+    }
+
+    @PutMapping("/enable")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<WhitelistStatusResponse>> enable() {
+        return ResponseEntity.ok(ApiResponse.success("IP whitelist enabled",
+                ipWhitelistService.setWhitelistEnabled(true)));
+    }
+
+    @PutMapping("/disable")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<WhitelistStatusResponse>> disable() {
+        return ResponseEntity.ok(ApiResponse.success("IP whitelist disabled",
+                ipWhitelistService.setWhitelistEnabled(false)));
     }
 }

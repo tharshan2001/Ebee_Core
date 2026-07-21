@@ -19,6 +19,9 @@ public class DeliveryResponse {
     private String driverName;
     private LocalDate scheduledDate;
     private String notes;
+    private String driverNotes;
     private LocalDateTime deliveredAt;
     private String deliveryFailureReason;
+    private String deliveryPhotoUrl;
+    private String deliverySignatureUrl;
 }

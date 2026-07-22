@@ -2,16 +2,41 @@ package com.ebee.delivery.service;
 
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.entity.Order;
-import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderStatus;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Set;
 
 @Component
-@RequiredArgsConstructor
 class DeliveryStateMachine implements DeliveryStateTransition {
+
+    /**
+     * Strict delivery state machine.
+     * <p>
+     * Happy path:  PENDING → ASSIGNED → PICKED_UP → IN_TRANSIT → DELIVERED
+     * Off-ramps:   ASSIGNED, PICKED_UP, IN_TRANSIT → FAILED
+     * Retry:       FAILED → PENDING
+     * Terminal:    FAILED → FAILED_PERMANENT (admin only)
+     * <p>
+     * Notes:
+     * <ul>
+     *   <li>PENDING can only be left via {@code assignDelivery()} — it is not a valid
+     *       target of {@code updateDeliveryStatus()}.</li>
+     *   <li>DELIVERED and FAILED_PERMANENT are terminal — no outgoing transitions.</li>
+     *   <li>FAILED_PERMANENT requires admin role.</li>
+     *   <li>Same-status transitions are a no-op (idempotent).</li>
+     * </ul>
+     */
+    private static final Map<DeliveryStatus, Set<DeliveryStatus>> VALID_TRANSITIONS = Map.of(
+            DeliveryStatus.ASSIGNED, Set.of(DeliveryStatus.PICKED_UP, DeliveryStatus.FAILED),
+            DeliveryStatus.PICKED_UP, Set.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED),
+            DeliveryStatus.IN_TRANSIT, Set.of(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED),
+            DeliveryStatus.FAILED, Set.of(DeliveryStatus.PENDING, DeliveryStatus.FAILED_PERMANENT),
+            DeliveryStatus.DELIVERED, Set.of(),
+            DeliveryStatus.FAILED_PERMANENT, Set.of()
+    );
 
     @Override
     public TransitionResult transition(Order order, DeliveryStatus newStatus, String reason, boolean isAdmin) {
@@ -21,15 +46,24 @@ class DeliveryStateMachine implements DeliveryStateTransition {
             throw new IllegalArgumentException("Delivery has not been initialized for this order");
         }
 
-        if (currentStatus == DeliveryStatus.DELIVERED || currentStatus == DeliveryStatus.FAILED_PERMANENT) {
-            throw new IllegalArgumentException("Cannot update status of a " +
-                    (currentStatus == DeliveryStatus.DELIVERED ? "delivered" : "permanently failed") + " delivery");
+        if (currentStatus == DeliveryStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Cannot transition from PENDING via updateDeliveryStatus. Use assignDelivery() instead.");
         }
 
-        if (currentStatus == DeliveryStatus.FAILED
-                && newStatus != DeliveryStatus.PENDING
-                && newStatus != DeliveryStatus.FAILED_PERMANENT) {
-            throw new IllegalArgumentException("Failed delivery can only be retried (PENDING) or marked permanent (FAILED_PERMANENT)");
+        if (currentStatus == newStatus) {
+            return new TransitionResult(false, false, currentStatus);
+        }
+
+        Set<DeliveryStatus> allowed = VALID_TRANSITIONS.getOrDefault(currentStatus, Set.of());
+        if (!allowed.contains(newStatus)) {
+            throw new IllegalArgumentException(
+                    "Invalid delivery status transition: " + currentStatus + " → " + newStatus
+                            + ". Allowed transitions from " + currentStatus + ": " + allowed);
+        }
+
+        if (newStatus == DeliveryStatus.FAILED_PERMANENT && !isAdmin) {
+            throw new SecurityException("Only admins can mark a delivery as permanently failed");
         }
 
         if (newStatus == DeliveryStatus.FAILED) {
@@ -39,10 +73,6 @@ class DeliveryStateMachine implements DeliveryStateTransition {
         if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.PENDING) {
             order.setDeliveryFailureReason(null);
             order.setDeliveryAssignedTo(null);
-        }
-
-        if (newStatus == DeliveryStatus.FAILED_PERMANENT && !isAdmin) {
-            throw new SecurityException("Only admins can mark a delivery as permanently failed");
         }
 
         if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.FAILED_PERMANENT) {

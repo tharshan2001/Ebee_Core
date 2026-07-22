@@ -57,9 +57,13 @@ class DeliveryStateMachine implements DeliveryStateTransition {
 
         Set<DeliveryStatus> allowed = VALID_TRANSITIONS.getOrDefault(currentStatus, Set.of());
         if (!allowed.contains(newStatus)) {
+            String allowedList = allowed.isEmpty()
+                    ? "none (terminal state)"
+                    : String.join(", ",
+                            allowed.stream().map(Enum::name).sorted().toList());
             throw new IllegalArgumentException(
                     "Invalid delivery status transition: " + currentStatus + " → " + newStatus
-                            + ". Allowed transitions from " + currentStatus + ": " + allowed);
+                            + ". Allowed: " + allowedList);
         }
 
         if (newStatus == DeliveryStatus.FAILED_PERMANENT && !isAdmin) {

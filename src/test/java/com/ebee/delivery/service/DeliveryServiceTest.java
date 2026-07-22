@@ -32,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -57,6 +58,7 @@ class DeliveryServiceTest {
     @Mock private CommissionLifecycleService commissionLifecycleService;
     @Mock private AuditLogService auditLogService;
     @Mock private DeliveryStateTransition deliveryStateTransition;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private DeliveryService deliveryService;
 

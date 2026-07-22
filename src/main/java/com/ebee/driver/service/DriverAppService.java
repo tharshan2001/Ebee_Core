@@ -11,6 +11,7 @@ import com.ebee.common.port.StoragePort;
 import com.ebee.common.util.DateUtils;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.delivery.event.DeliveryStatusChangedEvent;
 import com.ebee.delivery.repository.DeliveryRepository;
 import com.ebee.delivery.service.DeliveryService;
 import com.ebee.delivery.service.DeliveryStateTransition;
@@ -37,6 +38,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +70,7 @@ public class DriverAppService {
     private final AuditLogService auditLogService;
     private final StoragePort storagePort;
     private final NotificationPort notificationPort;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Driver getCurrentDriver() {
         UUID userId = securityService.getCurrentUserId();
@@ -191,6 +194,9 @@ public class DriverAppService {
 
         deliveryService.sendDeliveryStatusNotification(savedOrder, request.getStatus());
 
+        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                this, savedOrder, previousStatus, request.getReason(), LocalDateTime.now()));
+
         return toDriverDeliveryResponse(savedOrder);
     }
 
@@ -235,6 +241,9 @@ public class DriverAppService {
                 "Driver completed delivery for order " + savedOrder.getOrderNumber());
 
         deliveryService.sendDeliveryStatusNotification(savedOrder, DeliveryStatus.DELIVERED);
+
+        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                this, savedOrder, DeliveryStatus.IN_TRANSIT, null, LocalDateTime.now()));
 
         return toDriverDeliveryResponse(savedOrder);
     }

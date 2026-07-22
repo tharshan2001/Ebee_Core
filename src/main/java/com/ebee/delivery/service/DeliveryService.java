@@ -9,6 +9,7 @@ import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.service.CommissionLifecycleService;
 import org.springframework.security.access.AccessDeniedException;
 import com.ebee.delivery.dto.DeliveryResponse;
+import com.ebee.delivery.event.DeliveryStatusChangedEvent;
 import com.ebee.notification.NotificationPort;
 import com.ebee.notification.model.PushRequest;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
@@ -25,10 +26,12 @@ import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ public class DeliveryService {
     private final CommissionLifecycleService commissionLifecycleService;
     private final AuditLogService auditLogService;
     private final DeliveryStateTransition deliveryStateTransition;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public DeliveryResponse assignDelivery(UUID orderId, UUID driverId) {
@@ -114,6 +118,9 @@ public class DeliveryService {
         auditLogService.record(AuditAction.DELIVERY_ASSIGN, "Order", savedOrder.getId(),
                 "Driver " + driver.getFirstName() + " assigned to deliver order "
                 + savedOrder.getOrderNumber());
+
+        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                this, savedOrder, DeliveryStatus.PENDING, null, LocalDateTime.now()));
 
         return toDeliveryResponse(savedOrder);
     }
@@ -182,6 +189,9 @@ public class DeliveryService {
         if (securityService.isAdmin() && previousDriver != null) {
             sendDriverStatusPush(previousDriver.getId(), savedOrder, previousStatus, newStatus);
         }
+
+        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                this, savedOrder, previousStatus, request.getReason(), LocalDateTime.now()));
 
         return toDeliveryResponse(savedOrder);
     }

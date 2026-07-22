@@ -94,6 +94,10 @@ public class ArchitectureTest {
         .ignoreDependency(com.ebee.seed.SuperAdminSeeder.class, com.ebee.user.repository.UserRepository.class)
         .ignoreDependency(com.ebee.audit.aspect.RepositoryAuditAspect.class, com.ebee.audit.service.AuditLogService.class)
         .ignoreDependency(
+            com.ebee.driver.config.WebSocketAuthInterceptor.class,
+            com.ebee.auth.service.JwtService.class
+        )
+        .ignoreDependency(
             resideInAPackage("..report.."),
             resideInAPackage("..report.service..")
         );

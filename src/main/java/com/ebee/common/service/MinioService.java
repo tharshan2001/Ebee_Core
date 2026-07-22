@@ -18,6 +18,7 @@ public class MinioService implements StoragePort {
 
     private final S3Client s3Client;
     private final MinioProperties minioProperties;
+    private final ImageConversionService imageConversionService;
 
     private static final java.util.Set<String> ALLOWED_CONTENT_TYPES = java.util.Set.of(
             "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -36,23 +37,36 @@ public class MinioService implements StoragePort {
             throw new IllegalArgumentException("File type '" + contentType + "' is not allowed");
         }
 
-        String originalName = file.getOriginalFilename();
-        String ext = "";
-        if (originalName != null && originalName.contains(".")) {
-            ext = originalName.substring(originalName.lastIndexOf("."));
-        }
         String safeObjectName = objectName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String ext = ".webp";
+        String uploadContentType = "image/webp";
+        byte[] fileBytes;
+
+        try {
+            if (imageConversionService.isImage(contentType)) {
+                fileBytes = imageConversionService.convertToWebP(file);
+                log.debug("Converted {} to WebP: {} bytes", file.getOriginalFilename(), fileBytes.length);
+            } else {
+                ext = getOriginalExtension(file.getOriginalFilename());
+                uploadContentType = contentType;
+                fileBytes = file.getBytes();
+            }
+        } catch (Exception e) {
+            log.error("Failed to process file {}: {}", file.getOriginalFilename(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process file", e);
+        }
+
         String fileName = folder + "/" + safeObjectName + "_" + java.util.UUID.randomUUID() + ext;
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(minioProperties.getBucketName())
                     .key(fileName)
-                    .contentType(file.getContentType())
+                    .contentType(uploadContentType)
                     .build();
 
             s3Client.putObject(putObjectRequest,
-                    software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.getBytes()));
+                    software.amazon.awssdk.core.sync.RequestBody.fromBytes(fileBytes));
 
             return buildFileUrl(fileName);
 
@@ -63,6 +77,13 @@ public class MinioService implements StoragePort {
             log.error("Failed to upload file to MinIO: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to upload file to MinIO", e);
         }
+    }
+
+    private String getOriginalExtension(String originalFilename) {
+        if (originalFilename != null && originalFilename.contains(".")) {
+            return originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        return "";
     }
 
     @Async

@@ -27,7 +27,6 @@ import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
-import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
@@ -179,19 +178,11 @@ public class DriverAppService {
         DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
                 order, request.getStatus(), request.getReason(), false);
 
-        if (result.wasDelivered()) {
-            order.setDeliveredAt(LocalDateTime.now());
-            order.setStatus(OrderStatus.DELIVERED);
-        }
-
         Order savedOrder = orderRepository.save(order);
 
         if (result.wasDelivered()) {
             commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
-            driverRepository.findByUserId(securityService.getCurrentUserId()).ifPresent(d -> {
-                d.setAvailability(DriverAvailability.AVAILABLE);
-                driverRepository.save(d);
-            });
+            recalculateDriverAvailability(securityService.getCurrentUserId());
         }
 
         auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
@@ -211,10 +202,10 @@ public class DriverAppService {
 
         assertDriverAssigned(order);
 
-        if (order.getDeliveryStatus() != DeliveryStatus.ASSIGNED
-                && order.getDeliveryStatus() != DeliveryStatus.PICKED_UP
-                && order.getDeliveryStatus() != DeliveryStatus.IN_TRANSIT) {
-            throw new IllegalArgumentException("Delivery cannot be completed from status: " + order.getDeliveryStatus());
+        if (order.getDeliveryStatus() != DeliveryStatus.IN_TRANSIT) {
+            throw new IllegalArgumentException(
+                    "Delivery can only be completed from IN_TRANSIT. Current status: " + order.getDeliveryStatus()
+                            + ". Update status to IN_TRANSIT first via updateDeliveryStatus.");
         }
 
         if (photo != null && !photo.isEmpty()) {
@@ -236,10 +227,7 @@ public class DriverAppService {
 
         Order savedOrder = orderRepository.save(order);
 
-        driverRepository.findByUserId(securityService.getCurrentUserId()).ifPresent(d -> {
-            d.setAvailability(DriverAvailability.AVAILABLE);
-            driverRepository.save(d);
-        });
+        recalculateDriverAvailability(securityService.getCurrentUserId());
 
         commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
 
@@ -436,6 +424,19 @@ public class DriverAppService {
                 || !order.getDeliveryAssignedTo().getId().equals(userId)) {
             throw new AccessDeniedException("This delivery is not assigned to you");
         }
+    }
+
+    private void recalculateDriverAvailability(UUID userId) {
+        List<DeliveryStatus> activeStatuses = List.of(
+                DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+        long activeCount = deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(userId, activeStatuses);
+        DriverAvailability newAvailability = activeCount > 0 ? DriverAvailability.ON_TRIP : DriverAvailability.AVAILABLE;
+        driverRepository.findByUserId(userId).ifPresent(d -> {
+            if (d.getAvailability() != newAvailability) {
+                d.setAvailability(newAvailability);
+                driverRepository.save(d);
+            }
+        });
     }
 
     private void assertDriverCanTransition(DeliveryStatus current, DeliveryStatus target) {

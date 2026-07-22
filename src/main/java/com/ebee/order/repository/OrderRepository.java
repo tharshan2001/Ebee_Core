@@ -2,7 +2,9 @@ package com.ebee.order.repository;
 
 import com.ebee.order.entity.Order;
 import com.ebee.order.enums.PaymentStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -24,6 +26,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.createdBy WHERE o.id = :id")
+    Optional<Order> findByIdForUpdateWithDetails(@Param("id") UUID id);
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.orderNumber = :orderNumber")
     Optional<Order> findByOrderNumberWithDetails(@Param("orderNumber") String orderNumber);

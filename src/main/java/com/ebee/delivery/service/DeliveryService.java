@@ -2,6 +2,7 @@ package com.ebee.delivery.service;
 
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
+import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
@@ -50,16 +51,8 @@ public class DeliveryService {
     private final DeliveryStateTransition deliveryStateTransition;
 
     @Transactional
-    public void initializeDelivery(Order order) {
-        if (order.getDeliveryStatus() == null) {
-            order.setDeliveryStatus(DeliveryStatus.PENDING);
-            order.setDeliveryScheduledDate(LocalDate.now());
-        }
-    }
-
-    @Transactional
     public DeliveryResponse assignDelivery(UUID orderId, UUID driverId) {
-        Order order = orderRepository.findByIdWithDetails(orderId)
+        Order order = orderRepository.findByIdForUpdateWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (order.getDeliveryStatus() != DeliveryStatus.PENDING) {
@@ -138,6 +131,16 @@ public class DeliveryService {
             }
         }
 
+        if (order.getDeliveryAssignedTo() != null) {
+            driverRepository.findByUserId(order.getDeliveryAssignedTo().getId())
+                    .ifPresent(assignedDriver -> {
+                        if (Boolean.FALSE.equals(assignedDriver.getIsActive())
+                                || assignedDriver.getAvailability() == DriverAvailability.SUSPENDED) {
+                            throw new IllegalStateException("Cannot update delivery — assigned driver is not active");
+                        }
+                    });
+        }
+
         DeliveryStatus previousStatus = order.getDeliveryStatus();
         DeliveryStatus newStatus = request.getStatus();
 
@@ -185,18 +188,19 @@ public class DeliveryService {
 
     @Transactional(readOnly = true)
     public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district) {
+        District districtEnum = (district != null && !district.isBlank())
+                ? District.fromDisplayName(district)
+                : null;
+
         List<Order> orders;
-        if (status != null) {
+        if (status != null && districtEnum != null) {
+            orders = deliveryRepository.findByDeliveryStatusAndDistrict(status, districtEnum);
+        } else if (status != null) {
             orders = deliveryRepository.findByDeliveryStatus(status);
+        } else if (districtEnum != null) {
+            orders = deliveryRepository.findByDeliveryStatusNotNullAndDistrict(districtEnum);
         } else {
-            orders = orderRepository.findAll().stream()
-                    .filter(o -> o.getDeliveryStatus() != null)
-                    .toList();
-        }
-        if (district != null && !district.isBlank()) {
-            orders = orders.stream()
-                    .filter(o -> district.equals(o.getDistrict()))
-                    .toList();
+            orders = deliveryRepository.findByDeliveryStatusNotNull();
         }
         return orders.stream().map(this::toDeliveryResponse).toList();
     }

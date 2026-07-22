@@ -129,20 +129,10 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void initializeDelivery_setsPending() {
-        Order newOrder = Order.builder().id(UUID.randomUUID()).build();
-        assertThat(newOrder.getDeliveryStatus()).isNull();
-
-        deliveryService.initializeDelivery(newOrder);
-
-        assertThat(newOrder.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
-    }
-
-    @Test
     void assignDelivery_success() {
         order.setDeliveryStatus(DeliveryStatus.PENDING);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
         when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -165,7 +155,7 @@ class DeliveryServiceTest {
     void assignDelivery_notPending_throws() {
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> deliveryService.assignDelivery(orderId, driverUserId))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -178,7 +168,7 @@ class DeliveryServiceTest {
         User adminUser = User.builder().id(adminId).role(RoleType.ADMIN).build();
         order.setDeliveryStatus(DeliveryStatus.PENDING);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
         when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
 
         assertThatThrownBy(() -> deliveryService.assignDelivery(orderId, adminId))
@@ -191,7 +181,7 @@ class DeliveryServiceTest {
         driverProfile.setAvailability(DriverAvailability.SUSPENDED);
         order.setDeliveryStatus(DeliveryStatus.PENDING);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
         when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
 
@@ -320,7 +310,7 @@ class DeliveryServiceTest {
         driverProfile.setFcmToken("ExponentPushToken[test-token-12345]");
         order.setDeliveryStatus(DeliveryStatus.PENDING);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
         when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -342,7 +332,7 @@ class DeliveryServiceTest {
         driverProfile.setFcmToken(null);
         order.setDeliveryStatus(DeliveryStatus.PENDING);
 
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
         when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
         when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

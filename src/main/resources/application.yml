@@ -126,6 +126,10 @@ app:
     last-name: Admin
   ip-whitelist:
     super-admin-ips: ${SUPER_ADMIN_IPS:}
+  delivery:
+    timeout:
+      pickup: ${DELIVERY_TIMEOUT_PICKUP:2h}
+      in-transit: ${DELIVERY_TIMEOUT_IN_TRANSIT:24h}
 
 rate-limiting:
   login:

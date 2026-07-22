@@ -38,14 +38,23 @@ public class MinioService implements StoragePort {
         }
 
         String safeObjectName = objectName.replaceAll("[^a-zA-Z0-9._-]", "_");
-        String ext = ".webp";
-        String uploadContentType = "image/webp";
+        String ext;
+        String uploadContentType;
         byte[] fileBytes;
 
         try {
             if (imageConversionService.isImage(contentType)) {
-                fileBytes = imageConversionService.convertToWebP(file);
-                log.debug("Converted {} to WebP: {} bytes", file.getOriginalFilename(), fileBytes.length);
+                byte[] webpBytes = imageConversionService.convertToWebP(file);
+                if (webpBytes != null) {
+                    ext = ".webp";
+                    uploadContentType = "image/webp";
+                    fileBytes = webpBytes;
+                    log.debug("Converted {} to WebP: {} bytes", file.getOriginalFilename(), fileBytes.length);
+                } else {
+                    ext = getOriginalExtension(file.getOriginalFilename());
+                    uploadContentType = contentType;
+                    fileBytes = file.getBytes();
+                }
             } else {
                 ext = getOriginalExtension(file.getOriginalFilename());
                 uploadContentType = contentType;

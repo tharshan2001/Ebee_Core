@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -11,6 +12,7 @@ import javax.imageio.stream.ImageOutputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Set;
 
 @Slf4j
@@ -33,11 +35,16 @@ public class ImageConversionService {
             throw new IOException("Cannot read image from file: " + file.getOriginalFilename());
         }
 
-        ImageWriter writer = null;
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("webp");
+        if (!writers.hasNext()) {
+            log.warn("No WebP writer available, uploading original format");
+            return null;
+        }
+
+        ImageWriter writer = writers.next();
         ImageOutputStream ios = null;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
-            writer = ImageIO.getImageWritersByMIMEType("image/webp").next();
             ios = ImageIO.createImageOutputStream(baos);
             writer.setOutput(ios);
 
@@ -45,7 +52,7 @@ public class ImageConversionService {
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             param.setCompressionQuality(WEBP_QUALITY);
 
-            writer.write(null, new javax.imageio.IIOImage(image, null, null), param);
+            writer.write(null, new IIOImage(image, null, null), param);
 
             byte[] webpBytes = baos.toByteArray();
             log.debug("Converted {} to WebP: {} bytes (original: {} bytes)",
@@ -55,9 +62,7 @@ public class ImageConversionService {
             if (ios != null) {
                 try { ios.close(); } catch (IOException ignored) {}
             }
-            if (writer != null) {
-                writer.dispose();
-            }
+            writer.dispose();
         }
     }
 }

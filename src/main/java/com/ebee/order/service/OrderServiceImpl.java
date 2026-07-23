@@ -327,6 +327,8 @@ public class OrderServiceImpl implements OrderService {
             throw ex;
         }
 
+        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+
         Commission commission = null;
         if (agent != null) {
             commission = commissionCalculationService.calculateCommissionForOrder(savedOrder);

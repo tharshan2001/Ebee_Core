@@ -61,7 +61,9 @@ public class OrderPaymentService {
             order.setOutstandingBalance(BigDecimal.ZERO);
             order.setPaidAt(LocalDateTime.now());
         }
-        syncCustomerOutstanding(order.getCustomer());
+        // NOTE: syncCustomerOutstanding is NOT called here because initPayment
+        // runs BEFORE orderRepository.save() in OrderServiceImpl.createOrder().
+        // The sync is called after save in createOrder() instead.
     }
 
     @Transactional
@@ -149,7 +151,7 @@ public class OrderPaymentService {
      * (sum of unpaid/partially-paid order outstanding balances). Called after every
      * payment mutation to prevent incremental counter drift.
      */
-    private void syncCustomerOutstanding(Customer customer) {
+    void syncCustomerOutstanding(Customer customer) {
         if (customer == null) return;
         BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
         if (customer.getOutstandingBalance().compareTo(actual) != 0) {

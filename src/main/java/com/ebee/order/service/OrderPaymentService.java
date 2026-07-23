@@ -61,6 +61,7 @@ public class OrderPaymentService {
             order.setOutstandingBalance(BigDecimal.ZERO);
             order.setPaidAt(LocalDateTime.now());
         }
+        syncCustomerOutstanding(order.getCustomer());
     }
 
     @Transactional
@@ -102,6 +103,7 @@ public class OrderPaymentService {
 
         if (isCreditOrder || isCodOrder) {
             updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
+            syncCustomerOutstanding(order.getCustomer());
         }
 
         auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
@@ -127,6 +129,7 @@ public class OrderPaymentService {
         } else {
             order.setOutstandingBalance(BigDecimal.ZERO);
         }
+        syncCustomerOutstanding(order.getCustomer());
     }
 
     private void updateCustomerOutstandingBalance(Customer customer, BigDecimal outstandingBalance, boolean isAdd) {
@@ -138,6 +141,21 @@ public class OrderPaymentService {
             if (customer.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
                 customer.setOutstandingBalance(BigDecimal.ZERO);
             }
+        }
+    }
+
+    /**
+     * Safety net: recalculates customer.outstandingBalance from the source of truth
+     * (sum of unpaid/partially-paid order outstanding balances). Called after every
+     * payment mutation to prevent incremental counter drift.
+     */
+    private void syncCustomerOutstanding(Customer customer) {
+        if (customer == null) return;
+        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
+        if (customer.getOutstandingBalance().compareTo(actual) != 0) {
+            log.warn("Auto-correcting customer {} outstanding: recorded={} actual={}",
+                    customer.getId(), customer.getOutstandingBalance(), actual);
+            customer.setOutstandingBalance(actual);
         }
     }
 }

@@ -116,4 +116,22 @@ public class CustomerController {
         CustomerPaymentResponse response = customerService.recordCustomerPayment(id, request);
         return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
     }
+
+    @PostMapping("/recalculate-outstanding")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<String>> recalculateAllOutstanding() {
+        int corrected = customerService.recalculateAllCustomerOutstanding();
+        return ResponseEntity.ok(ApiResponse.success(
+                corrected > 0
+                        ? "Recalculated outstanding balances. " + corrected + " customer(s) corrected."
+                        : "All customer outstanding balances are consistent.",
+                null));
+    }
+
+    @PostMapping("/{id}/recalculate-outstanding")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerResponse>> recalculateCustomerOutstanding(@PathVariable UUID id) {
+        CustomerResponse response = customerService.recalculateCustomerOutstanding(id);
+        return ResponseEntity.ok(ApiResponse.success("Outstanding balance recalculated", response));
+    }
 }

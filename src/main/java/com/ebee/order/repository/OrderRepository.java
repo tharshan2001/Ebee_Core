@@ -80,6 +80,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COALESCE(SUM(o.outstandingBalance), 0) FROM Order o WHERE o.paymentStatus IN ('UNPAID', 'PARTIALLY_PAID') AND o.createdAt >= :start AND o.createdAt < :end")
     BigDecimal sumOutstandingByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    @Query("SELECT COALESCE(SUM(o.outstandingBalance), 0) FROM Order o WHERE o.customer.id = :customerId AND o.paymentStatus IN ('UNPAID', 'PARTIALLY_PAID')")
+    BigDecimal sumOutstandingByCustomerId(@Param("customerId") UUID customerId);
+
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
     Long countOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 

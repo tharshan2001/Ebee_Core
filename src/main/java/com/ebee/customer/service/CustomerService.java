@@ -194,6 +194,42 @@ public class CustomerService {
     }
 
     @Transactional
+    public CustomerResponse recalculateCustomerOutstanding(UUID customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customerId);
+        customer.setOutstandingBalance(actual);
+        customer = customerRepository.save(customer);
+        return toResponse(customer);
+    }
+
+    @Transactional
+    public int recalculateAllCustomerOutstanding() {
+        List<Customer> all = customerRepository.findAll();
+        int corrected = 0;
+        for (Customer customer : all) {
+            BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
+            if (customer.getOutstandingBalance().compareTo(actual) != 0) {
+                log.warn("Customer {} outstanding drift: recorded={} actual={}",
+                        customer.getId(), customer.getOutstandingBalance(), actual);
+                customer.setOutstandingBalance(actual);
+                customerRepository.save(customer);
+                corrected++;
+            }
+        }
+        return corrected;
+    }
+
+    public void syncCustomerOutstanding(Customer customer) {
+        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
+        if (customer.getOutstandingBalance().compareTo(actual) != 0) {
+            log.warn("Auto-correcting customer {} outstanding: recorded={} actual={}",
+                    customer.getId(), customer.getOutstandingBalance(), actual);
+            customer.setOutstandingBalance(actual);
+        }
+    }
+
+    @Transactional
     public CustomerResponse updateCreditLimit(UUID id, CreditLimitRequest request) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));

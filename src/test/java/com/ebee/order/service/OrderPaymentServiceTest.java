@@ -67,6 +67,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(BigDecimal.ZERO);
 
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
         orderPaymentService.recordPayment(order.getId(), request);
@@ -90,6 +91,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(new BigDecimal("1200.00"));
 
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
         orderPaymentService.recordPayment(order.getId(), request);
@@ -103,17 +105,18 @@ class OrderPaymentServiceTest {
     }
 
     @Test
-    void recordPayment_onCodOrder_doesNotUpdateCustomerBalance() {
+    void recordPayment_onCodOrder_syncsCustomerBalanceFromOrders() {
         Order order = unpaidOrder(new BigDecimal("2000.00"), PaymentMethod.COD);
 
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(new BigDecimal("1200.00"));
 
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
         orderPaymentService.recordPayment(order.getId(), request);
 
-        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(new BigDecimal("1200.00"));
     }
 
     @Test
@@ -138,6 +141,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(BigDecimal.ZERO);
 
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("1200.00"), PaymentMethod.CASH);
         orderPaymentService.recordPayment(order.getId(), request);

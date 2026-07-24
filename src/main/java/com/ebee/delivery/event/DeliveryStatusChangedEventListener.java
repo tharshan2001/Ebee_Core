@@ -33,7 +33,7 @@ public class DeliveryStatusChangedEventListener {
         );
         try {
             messagingTemplate.convertAndSend(TOPIC, message);
-            log.debug("Broadcast delivery status change: order={} {} → {}",
+            log.info("Broadcast delivery {} {} → {}",
                     event.getOrderNumber(), event.getPreviousStatus(), event.getNewStatus());
         } catch (Exception e) {
             log.error("Failed to broadcast delivery status change for order {}: {}",

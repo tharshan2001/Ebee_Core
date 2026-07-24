@@ -34,7 +34,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private static final String DELIVERY_TOPIC = "/topic/deliveries";
     private static final String ORDER_TOPIC = "/topic/orders";
     private static final Set<RoleType> DELIVERY_FEED_ROLES = Set.of(
-            RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.AGENT);
+            RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.AGENT, RoleType.DRIVER);
     private static final Set<RoleType> ORDER_FEED_ROLES = Set.of(
             RoleType.ADMIN, RoleType.SUPER_ADMIN);
 

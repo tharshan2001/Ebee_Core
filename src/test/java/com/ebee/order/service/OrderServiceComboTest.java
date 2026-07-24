@@ -72,6 +72,7 @@ class OrderServiceComboTest {
     @Mock private OrderPaymentService orderPaymentService;
     @Mock private OrderPdfService orderPdfService;
     @Mock private ComboRepository comboRepository;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private OrderServiceImpl orderService;
 

@@ -8,15 +8,39 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+/**
+ * Listens for {@link OrderStatusChangedEvent} and broadcasts an
+ * {@link OrderStatusChangedMessage} to all STOMP subscribers on
+ * {@code /topic/orders}.
+ *
+ * <p>The listener fires only after the enclosing transaction commits
+ * ({@code AFTER_COMMIT}), ensuring clients never receive updates for rolled-back
+ * changes. The broadcast is fire-and-forget — a messaging failure is logged but
+ * does not propagate, so a broken WebSocket connection cannot bring down the
+ * transaction that triggered it.
+ *
+ * <p>Topic access is enforced server-side by
+ * {@link com.ebee.driver.config.WebSocketAuthInterceptor} which checks the
+ * subscriber's role against the registered authorizations. Only ADMIN and
+ * SUPER_ADMIN roles may subscribe to this topic.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderStatusChangedEventListener {
 
+    /** STOMP destination broadcast on every order status change. */
     public static final String TOPIC = "/topic/orders";
 
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Convert the event into a lightweight DTO and send it to all connected
+     * subscribers on {@link #TOPIC}.
+     *
+     * @param event order status change published by
+     *              {@link com.ebee.order.service.OrderServiceImpl}
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOrderStatusChanged(OrderStatusChangedEvent event) {
         OrderStatusChangedMessage message = new OrderStatusChangedMessage(

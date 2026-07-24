@@ -15,8 +15,25 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Set;
 
+/**
+ * Intercepts inbound STOMP frames on the {@code /ws} endpoint and enforces
+ * two distinct security checks:
+ *
+ * <ol>
+ *   <li><b>CONNECT</b> &mdash; validates the {@code Authorization: Bearer …}
+ *       header against {@link JwtService} and sets the authenticated principal
+ *       (email + role) on the STOMP session.</li>
+ *   <li><b>SUBSCRIBE</b> &mdash; consults {@link TopicAuthorizationRegistry}
+ *       to verify the principal's role is permitted for the requested
+ *       {@code /topic/*} destination. Unregistered destinations are allowed
+ *       through (open by default for user-specific queues).</li>
+ * </ol>
+ *
+ * <p>This interceptor does <em>not</em> handle SEND or DISCONNECT frames.
+ * The JWT is validated once on CONNECT; subsequent frames rely on the
+ * session principal set during that handshake.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -41,6 +58,14 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         return message;
     }
 
+    /**
+     * Validate the JWT bearer token on STOMP CONNECT and set the authenticated
+     * principal on the session. The principal's email and role are later read
+     * by {@link #authorize(StompHeaderAccessor)} during SUBSCRIBE frames.
+     *
+     * @throws IllegalArgumentException if the header is missing, the token is
+     *         invalid/expired, or the JWT carries no role claim
+     */
     private void authenticate(StompHeaderAccessor accessor) {
         String authHeader = accessor.getFirstNativeHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -66,6 +91,16 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         }
     }
 
+    /**
+     * Enforce role-based authorization for STOMP SUBSCRIBE frames. If the
+     * destination matches a registered topic prefix in
+     * {@link TopicAuthorizationRegistry}, the subscriber's role must be in the
+     * allowed set. Destinations that do not match any prefix pass through
+     * without restriction.
+     *
+     * @throws IllegalArgumentException if the subscriber is unauthenticated or
+     *         lacks the required role
+     */
     private void authorize(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
         if (destination == null) return;
@@ -82,6 +117,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         });
     }
 
+    /**
+     * Extract the {@link RoleType} from the STOMP session's authentication
+     * principal. The role was stored as a granted authority during CONNECT
+     * ({@code ROLE_ADMIN}, {@code ROLE_DRIVER}, etc.).
+     */
     private RoleType extractRole(StompHeaderAccessor accessor) {
         if (accessor.getUser() instanceof UsernamePasswordAuthenticationToken auth) {
             return auth.getAuthorities().stream()

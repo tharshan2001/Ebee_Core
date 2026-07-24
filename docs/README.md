@@ -72,6 +72,7 @@ See [Authentication API](AUTH_API.md) for login, refresh, and token details.
 | Suppliers | [SUPPLIER_API.md](SUPPLIER_API.md) | ADMIN |
 | Purchase Orders | [PURCHASE_API.md](PURCHASE_API.md) | ADMIN |
 | Database Backup | [ADMIN_BACKUP_API.md](ADMIN_BACKUP_API.md) | ADMIN |
+| WebSocket Feeds | [WEBSOCKET_API.md](WEBSOCKET_API.md) | ADMIN, SUPER_ADMIN (orders), + AGENT, DRIVER (deliveries) |
 
 ---
 

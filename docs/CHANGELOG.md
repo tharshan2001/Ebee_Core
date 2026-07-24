@@ -2,6 +2,18 @@
 
 All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD format.
 
+## [Unreleased] — 2026-07-25
+
+### Real-Time WebSocket Broadcasts
+
+- **Order feed** — New `OrderStatusChangedEvent` (Spring ApplicationEvent) published by `OrderServiceImpl` on create, status update, cancel, and return. `OrderStatusChangedEventListener` fires `@TransactionalEventListener(AFTER_COMMIT)` and broadcasts `OrderStatusChangedMessage` to `/topic/orders`. Only `ADMIN` and `SUPER_ADMIN` roles may subscribe.
+- **Delivery feed** — `DeliveryStatusChangedEventListener` broadcasts `DeliveryStatusChangedMessage` to `/topic/deliveries`. Available to `ADMIN`, `SUPER_ADMIN`, `AGENT`, and `DRIVER` roles.
+- **WebSocket auth** — `WebSocketAuthInterceptor` validates JWT on STOMP CONNECT and enforces role-based SUBSCRIBE access. `TopicAuthorizationRegistry` holds topic→role mappings (new topics added by registering, not editing the interceptor).
+- **CORS** — `/ws/**` added to `SecurityConfig.corsConfigurationSource()`. `frameOptions.sameOrigin()` enables SockJS iframe transport.
+- **Front-end** — Singleton STOMP client (`stompClient.ts`), generic `useStompFeed` hook, `useOrderFeed` and `useDeliveryFeed` wrappers. Optimistic mutations on Orders, OrderDetail, and Delivery pages. Delivery Kanban auto-refreshes on `SHIPPED` order status.
+- **JavaDoc** — All 9 WebSocket-related backend classes documented.
+- **`WEBSOCKET_API.md`** — Full API documentation added to `docs/`.
+
 ## [Unreleased] — 2026-07-15
 
 ### Combo (Product Bundle) Feature

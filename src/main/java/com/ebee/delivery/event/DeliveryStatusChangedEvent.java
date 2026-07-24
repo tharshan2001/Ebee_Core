@@ -8,6 +8,19 @@ import org.springframework.context.ApplicationEvent;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Published after a delivery status change commits. Consumed by
+ * {@link DeliveryStatusChangedEventListener} which broadcasts a STOMP message
+ * to {@code /topic/deliveries} for real-time admin/front-end updates.
+ *
+ * <p>Unlike {@link com.ebee.order.event.OrderStatusChangedEvent} which carries
+ * the full {@code Order} entity, this event extracts the fields it needs at
+ * construction time. This avoids accidentally leaking uncommitted entity state
+ * through the event payload.
+ *
+ * <p>The {@code driverId} and {@code driverName} fields are nullable — they are
+ * only populated when an assignment exists on the order.
+ */
 @Getter
 public class DeliveryStatusChangedEvent extends ApplicationEvent {
 
@@ -22,6 +35,16 @@ public class DeliveryStatusChangedEvent extends ApplicationEvent {
     private final String reason;
     private final LocalDateTime occurredAt;
 
+    /**
+     * @param source         the publishing service (typically {@code this})
+     * @param order          the order whose delivery status changed
+     * @param previousStatus the delivery status before the change
+     * @param reason         human-readable reason for the change (e.g.
+     *                       customer rejection, failed attempt); may be
+     *                       {@code null} for status transitions that don't
+     *                       require one
+     * @param occurredAt     timestamp of the status change
+     */
     public DeliveryStatusChangedEvent(Object source, Order order,
                                       DeliveryStatus previousStatus,
                                       String reason,

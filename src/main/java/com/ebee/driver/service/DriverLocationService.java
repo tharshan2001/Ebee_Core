@@ -6,6 +6,7 @@ import com.ebee.driver.repository.DriverRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -60,7 +62,11 @@ public class DriverLocationService {
             throw new RuntimeException("Failed to serialize location", e);
         }
 
-        messagingTemplate.convertAndSend("/topic/driver-locations", response);
+        try {
+            messagingTemplate.convertAndSend("/topic/driver-locations", response);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast location for driver {}: {}", driverId, e.getMessage());
+        }
 
         return response;
     }

@@ -38,8 +38,10 @@ import com.ebee.product.repository.ProductRepository;
 import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
+import com.ebee.order.event.OrderStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -76,6 +79,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderPaymentService orderPaymentService;
     private final OrderPdfService orderPdfService;
     private final ComboRepository comboRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
@@ -345,6 +349,8 @@ public class OrderServiceImpl implements OrderService {
 
         orderNotificationService.sendOrderCreated(savedOrder, commission);
 
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, savedOrder, null, LocalDateTime.now()));
+
         return orderMapper.toResponse(savedOrder);
     }
 
@@ -454,6 +460,8 @@ public class OrderServiceImpl implements OrderService {
 
         orderNotificationService.sendOrderStatus(updatedOrder);
 
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
+
         return orderMapper.toResponse(updatedOrder);
     }
 
@@ -495,6 +503,7 @@ public class OrderServiceImpl implements OrderService {
 
         orderPaymentService.handlePaymentRefund(order);
 
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
 
@@ -503,6 +512,8 @@ public class OrderServiceImpl implements OrderService {
                         + (hasRefund ? " - refunded " + refundAmount : ""));
 
         orderNotificationService.sendOrderCancelled(updatedOrder);
+
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
 
         return orderMapper.toResponse(updatedOrder);
     }
@@ -535,6 +546,7 @@ public class OrderServiceImpl implements OrderService {
 
         orderPaymentService.handlePaymentRefund(order);
 
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.RETURNED);
         Order updatedOrder = orderRepository.save(order);
 
@@ -543,6 +555,8 @@ public class OrderServiceImpl implements OrderService {
                         + (hasRefund ? " - refunded " + refundAmount : ""));
 
         orderNotificationService.sendOrderStatus(updatedOrder);
+
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
 
         return orderMapper.toResponse(updatedOrder);
     }

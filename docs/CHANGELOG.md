@@ -10,9 +10,9 @@ All notable changes to the Ebee backend are documented here. Dates in YYYY-MM-DD
 - **Delivery feed** — `DeliveryStatusChangedEventListener` broadcasts `DeliveryStatusChangedMessage` to `/topic/deliveries`. Available to `ADMIN`, `SUPER_ADMIN`, `AGENT`, and `DRIVER` roles.
 - **WebSocket auth** — `WebSocketAuthInterceptor` validates JWT on STOMP CONNECT and enforces role-based SUBSCRIBE access. `TopicAuthorizationRegistry` holds topic→role mappings (new topics added by registering, not editing the interceptor).
 - **CORS** — `/ws/**` added to `SecurityConfig.corsConfigurationSource()`. `frameOptions.sameOrigin()` enables SockJS iframe transport.
-- **Front-end** — Singleton STOMP client (`stompClient.ts`), generic `useStompFeed` hook, `useOrderFeed` and `useDeliveryFeed` wrappers. Optimistic mutations on Orders, OrderDetail, and Delivery pages. Delivery Kanban auto-refreshes on `SHIPPED` order status.
+- **Front-end** — Singleton STOMP client (`stompClient.ts`), generic `useStompFeed` hook, `useOrderFeed`, `useDeliveryFeed`, and `useDriverTracking` wrappers (all sharing one WebSocket connection). Optimistic mutations on Orders, OrderDetail, and Delivery pages. Delivery Kanban auto-refreshes on `SHIPPED` order status.
 - **JavaDoc** — All 9 WebSocket-related backend classes documented.
-- **`WEBSOCKET_API.md`** — Full API documentation added to `docs/`.
+- **`WEBSOCKET_API.md`** — Full API documentation added to `docs/`, including the `/topic/driver-locations` live tracking feed.
 
 ## [Unreleased] — 2026-07-15
 

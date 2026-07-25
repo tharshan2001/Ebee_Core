@@ -57,8 +57,9 @@ The `/ws/**` path is included in the CORS configuration alongside REST endpoints
 |-------|-------|-------------|
 | `/topic/orders` | `ADMIN`, `SUPER_ADMIN` | Order creation and status changes |
 | `/topic/deliveries` | `ADMIN`, `SUPER_ADMIN`, `AGENT`, `DRIVER` | Delivery assignment and status changes |
+| `/topic/driver-locations` | _open_ (any authenticated) | Live driver GPS pings from the mobile app |
 
-Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/user/queue/...`) are open to all authenticated users.
+Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/topic/driver-locations`, `/user/queue/...`) are open to all authenticated users.
 
 ---
 
@@ -149,6 +150,53 @@ Subscribing with a role that is not in the allowed set results in an immediate D
 
 ---
 
+## Driver Locations — `/topic/driver-locations`
+
+Live GPS pings from the bee-driver mobile app. Each location update is also stored in Redis (`driver:location:{driverId}`) with a 5-minute TTL so late subscribers can hydrate the map on load.
+
+### Payload
+
+```json
+{
+  "driverId": "uuid",
+  "driverName": "Driver One",
+  "latitude": 6.9271,
+  "longitude": 79.8612,
+  "accuracy": 10.0,
+  "bearing": 90.0,
+  "speed": 15.5,
+  "recordedAt": "2026-07-25T10:30:00Z",
+  "photoUrl": "https://storage.ebee.lk/.../avatar.jpg or null"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `driverId` | UUID | Driver's user ID |
+| `driverName` | String | Driver's full name |
+| `latitude` | number | GPS latitude |
+| `longitude` | number | GPS longitude |
+| `accuracy` | number/null | Horizontal accuracy in meters |
+| `bearing` | number/null | Heading in degrees (0–360) |
+| `speed` | number/null | Speed in m/s |
+| `recordedAt` | Instant | Server timestamp when the location was received |
+| `photoUrl` | String/null | Driver's profile picture URL (enriched from DB if missing) |
+
+### Source
+
+The bee-driver mobile app posts to `POST /api/driver/location` every ~15 seconds while location tracking is active. Each post is broadcast to `/topic/driver-locations` and cached in Redis.
+
+### REST companion endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/admin/driver-locations/active` | ADMIN, SUPER_ADMIN | All currently cached driver locations (from Redis) |
+| `GET` | `/api/admin/driver-locations/{driverId}` | ADMIN, SUPER_ADMIN | Latest known location for one driver |
+| `POST` | `/api/driver/location` | DRIVER | Submit a new location ping (throttled to 15s on the client) |
+| `GET` | `/api/driver/location` | DRIVER | Get the driver's own last known location |
+
+---
+
 ## Server-Side Components
 
 ### Configuration
@@ -177,6 +225,16 @@ Subscribing with a role that is not in the allowed set results in an immediate D
 | `DeliveryStatusChangedEventListener` | `@TransactionalEventListener(AFTER_COMMIT)` — builds `DeliveryStatusChangedMessage` and sends to `/topic/deliveries` |
 | `DeliveryStatusChangedMessage` | Immutable record DTO serialized to JSON |
 
+### Driver location broadcast
+
+| Class | Role |
+|-------|------|
+| `DriverLocationService` | Caches location in Redis (5-min TTL) and broadcasts to `/topic/driver-locations` |
+| `DriverLocationRequest` | Inbound DTO from the mobile app (`latitude`, `longitude`, `accuracy`, `bearing`, `speed`) |
+| `DriverLocationResponse` | Outbound DTO broadcast to subscribers (enriched with `photoUrl` from DB) |
+| `DriverAppController` | `POST /api/driver/location` — receives pings from the mobile app |
+| `DriverLocationAdminController` | `GET /api/admin/driver-locations/active` and `/{driverId}` — reads cached locations from Redis |
+
 ---
 
 ## Front-End Integration
@@ -191,7 +249,8 @@ A singleton SockJS+STOMP client shared across all hooks. Connects on first `subs
 |------|-------|---------|
 | `useOrderFeed(onUpdate)` | `/topic/orders` | Calls `onUpdate` for every order message |
 | `useDeliveryFeed(onUpdate)` | `/topic/deliveries` | Calls `onUpdate` for every delivery message |
-| `useStompFeed<T>(topic, parse, onUpdate)` | any | Generic hook used by the above two |
+| `useDriverTracking()` | `/topic/driver-locations` | Hydrates from Redis on mount, then live-updates via STOMP. Returns `{ locations, connected }` |
+| `useStompFeed<T>(topic, parse, onUpdate)` | any | Generic hook used by `useOrderFeed` and `useDeliveryFeed` |
 
 ### Optimistic UI pattern
 

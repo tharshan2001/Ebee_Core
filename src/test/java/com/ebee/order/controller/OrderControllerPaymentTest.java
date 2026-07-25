@@ -71,7 +71,7 @@ class OrderControllerPaymentTest {
     @WithMockUser(roles = "ADMIN")
     void recordPayment_shouldReturnUpdatedOrder() throws Exception {
         UUID orderId = UUID.randomUUID();
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH, null, null);
 
         OrderResponse response = new OrderResponse();
         response.setId(orderId);
@@ -98,7 +98,7 @@ class OrderControllerPaymentTest {
     @WithMockUser(roles = "ADMIN")
     void recordPayment_partialPayment_shouldReturnUpdatedOrder() throws Exception {
         UUID orderId = UUID.randomUUID();
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH, null, null);
 
         OrderResponse response = new OrderResponse();
         response.setId(orderId);
@@ -124,7 +124,7 @@ class OrderControllerPaymentTest {
     @WithMockUser(roles = "AGENT")
     void recordPayment_asAgent_shouldSucceed() throws Exception {
         UUID orderId = UUID.randomUUID();
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH, null, null);
 
         OrderResponse response = new OrderResponse();
         response.setId(orderId);
@@ -141,7 +141,7 @@ class OrderControllerPaymentTest {
 
     @Test
     void recordPayment_withoutAuth_shouldReturnUnauthorized() throws Exception {
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH, null, null);
 
         mockMvc.perform(post("/api/orders/{id}/payment", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -152,7 +152,7 @@ class OrderControllerPaymentTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void recordPayment_withInvalidAmount_shouldReturnBadRequest() throws Exception {
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("-100.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("-100.00"), PaymentMethod.CASH, null, null);
 
         mockMvc.perform(post("/api/orders/{id}/payment", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)

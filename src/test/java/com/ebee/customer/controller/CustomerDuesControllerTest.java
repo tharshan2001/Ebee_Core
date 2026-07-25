@@ -133,7 +133,7 @@ class CustomerDuesControllerTest {
     @WithMockUser(roles = "ADMIN")
     void recordCustomerPayment_shouldReturnPaymentResponse() throws Exception {
         UUID id = UUID.randomUUID();
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("20000.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("20000.00"), PaymentMethod.CASH, null, null);
 
         CustomerPaymentResponse response = new CustomerPaymentResponse(
                 id, "Kamal Perera", new BigDecimal("20000.00"), 2, new BigDecimal("5000.00"));

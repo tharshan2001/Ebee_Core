@@ -15,9 +15,11 @@ import com.ebee.common.enums.District;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
+import com.ebee.order.entity.Payment;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
@@ -27,6 +29,7 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.repository.PaymentRepository;
 import com.ebee.order.util.OrderItemSummaryBuilder;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.service.CustomerService;
@@ -79,6 +82,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderPaymentService orderPaymentService;
     private final OrderPdfService orderPdfService;
     private final ComboRepository comboRepository;
+    private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
@@ -320,7 +324,7 @@ public class OrderServiceImpl implements OrderService {
         inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
 
         order.setTotalAmount(totalAmount);
-        orderPaymentService.initPayment(order, request.getPaymentMethod(), request.getPaidAmount());
+        orderPaymentService.initPayment(order, request.getPaymentMethod(), request.getPaidAmount(), request.getChequeNumber(), request.getProofFileUrl());
         Order savedOrder;
         try {
             savedOrder = orderRepository.save(order);
@@ -332,6 +336,19 @@ public class OrderServiceImpl implements OrderService {
         }
 
         orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+
+        // Record initial payment in payments table
+        if (savedOrder.getPaidAmount() != null && savedOrder.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            Payment initialPayment = new Payment();
+            initialPayment.setOrderId(savedOrder.getId());
+            initialPayment.setAmount(savedOrder.getPaidAmount());
+            initialPayment.setPaymentMethod(savedOrder.getPaymentMethod());
+            initialPayment.setChequeNumber(request.getChequeNumber());
+            initialPayment.setProofFileUrl(request.getProofFileUrl());
+            initialPayment.setRecordedBy(securityService.getCurrentUserId());
+            initialPayment.setRecordedByName(securityService.getCurrentUserEmail());
+            paymentRepository.save(initialPayment);
+        }
 
         Commission commission = null;
         if (agent != null) {
@@ -583,6 +600,11 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
         return orderPaymentService.recordPayment(id, request);
+    }
+
+    @Override
+    public List<PaymentResponse> getPaymentHistory(UUID orderId) {
+        return orderPaymentService.getPaymentHistory(orderId);
     }
 
     @Recover

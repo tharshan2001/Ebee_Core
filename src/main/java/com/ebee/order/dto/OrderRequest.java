@@ -30,4 +30,8 @@ public class OrderRequest {
     private List<OrderItemRequest> items;
 
     private BigDecimal paidAmount;
+
+    private String chequeNumber;
+
+    private String proofFileUrl;
 }

@@ -12,5 +12,9 @@ public record RecordPaymentRequest(
         BigDecimal amount,
 
         @NotNull(message = "Payment method is required")
-        PaymentMethod paymentMethod
+        PaymentMethod paymentMethod,
+
+        String chequeNumber,
+
+        String proofFileUrl
 ) {}

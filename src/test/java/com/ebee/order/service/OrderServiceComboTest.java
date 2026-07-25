@@ -29,6 +29,7 @@ import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.repository.PaymentRepository;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
 import com.ebee.stock.enums.StockMovementType;
@@ -72,6 +73,7 @@ class OrderServiceComboTest {
     @Mock private OrderPaymentService orderPaymentService;
     @Mock private OrderPdfService orderPdfService;
     @Mock private ComboRepository comboRepository;
+    @Mock private PaymentRepository paymentRepository;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private OrderServiceImpl orderService;
@@ -218,7 +220,7 @@ class OrderServiceComboTest {
                 order.setPaidAt(LocalDateTime.now());
             }
             return null;
-        }).when(orderPaymentService).initPayment(any(), any(), any());
+        }).when(orderPaymentService).initPayment(any(), any(), any(), any(), any());
     }
 
     private void mockOrderSave() {

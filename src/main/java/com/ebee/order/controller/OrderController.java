@@ -6,6 +6,7 @@ import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentStatus;
@@ -133,6 +134,13 @@ public class OrderController {
             @Valid @RequestBody RecordPaymentRequest request) {
         OrderResponse response = orderService.recordPayment(id, request);
         return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
+    }
+
+    @GetMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getPaymentHistory(@PathVariable UUID id) {
+        List<PaymentResponse> response = orderService.getPaymentHistory(id);
+        return ResponseEntity.ok(ApiResponse.success("Payment history retrieved successfully", response));
     }
 
     @GetMapping("/{id}/invoice")

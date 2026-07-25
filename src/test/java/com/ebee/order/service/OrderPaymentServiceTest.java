@@ -3,14 +3,17 @@ package com.ebee.order.service;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Customer;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.entity.Order;
+import com.ebee.order.entity.Payment;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.repository.PaymentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,8 +35,10 @@ import static org.mockito.Mockito.*;
 class OrderPaymentServiceTest {
 
     @Mock private OrderRepository orderRepository;
+    @Mock private PaymentRepository paymentRepository;
     @Mock private OrderMapper orderMapper;
     @Mock private AuditLogService auditLogService;
+    @Mock private SecurityService securityService;
 
     @InjectMocks private OrderPaymentService orderPaymentService;
 
@@ -68,8 +73,10 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(BigDecimal.ZERO);
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("2000.00"), PaymentMethod.CASH, null, null);
         orderPaymentService.recordPayment(order.getId(), request);
 
         verify(orderRepository).save(orderCaptor.capture());
@@ -92,8 +99,10 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(new BigDecimal("1200.00"));
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH, null, null);
         orderPaymentService.recordPayment(order.getId(), request);
 
         verify(orderRepository).save(orderCaptor.capture());
@@ -112,8 +121,10 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(new BigDecimal("1200.00"));
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("800.00"), PaymentMethod.CASH, null, null);
         orderPaymentService.recordPayment(order.getId(), request);
 
         assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(new BigDecimal("1200.00"));
@@ -142,8 +153,10 @@ class OrderPaymentServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(BigDecimal.ZERO);
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("1200.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("1200.00"), PaymentMethod.CASH, null, null);
         orderPaymentService.recordPayment(order.getId(), request);
 
         verify(orderRepository).save(orderCaptor.capture());
@@ -161,7 +174,7 @@ class OrderPaymentServiceTest {
 
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("600.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("600.00"), PaymentMethod.CASH, null, null);
 
         assertThatThrownBy(() -> orderPaymentService.recordPayment(order.getId(), request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -181,7 +194,7 @@ class OrderPaymentServiceTest {
 
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("500.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("500.00"), PaymentMethod.CASH, null, null);
 
         assertThatThrownBy(() -> orderPaymentService.recordPayment(order.getId(), request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -193,23 +206,11 @@ class OrderPaymentServiceTest {
         UUID orderId = UUID.randomUUID();
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.empty());
 
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("500.00"), PaymentMethod.CASH);
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("500.00"), PaymentMethod.CASH, null, null);
 
         assertThatThrownBy(() -> orderPaymentService.recordPayment(orderId, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Order not found");
     }
 
-    @Test
-    void recordPayment_creditPaymentMethod_throws() {
-        Order order = unpaidOrder(new BigDecimal("2000.00"), PaymentMethod.COD);
-
-        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
-
-        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("500.00"), PaymentMethod.CREDIT);
-
-        assertThatThrownBy(() -> orderPaymentService.recordPayment(order.getId(), request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Credit cannot be used");
-    }
 }

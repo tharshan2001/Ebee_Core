@@ -541,8 +541,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if (order.getStatus() != OrderStatus.DELIVERED) {
-            throw new IllegalArgumentException("Only delivered orders can be returned");
+        if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cannot return an order that is already " + order.getStatus());
         }
 
         List<UUID> stockProductIds = order.getItems().stream()

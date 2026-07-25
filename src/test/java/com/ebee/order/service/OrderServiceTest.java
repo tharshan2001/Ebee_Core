@@ -829,13 +829,23 @@ class OrderServiceTest {
     }
 
     @Test
-    void returnOrder_notDelivered_throws() {
-        order.setStatus(OrderStatus.SHIPPED);
+    void returnOrder_cancelled_throws() {
+        order.setStatus(OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> orderService.returnOrder(order.getId()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Only delivered orders can be returned");
+                .hasMessageContaining("Cannot return an order that is already");
+    }
+
+    @Test
+    void returnOrder_alreadyReturned_throws() {
+        order.setStatus(OrderStatus.RETURNED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot return an order that is already");
     }
 
     @Test

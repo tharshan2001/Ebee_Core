@@ -42,10 +42,10 @@ public class OrderPaymentService {
             throw new IllegalArgumentException("Cheque number is required for CHEQUE payment method");
         }
 
-        if (paymentMethod == PaymentMethod.BANK_TRANSFER
+        if ((paymentMethod == PaymentMethod.BANK_TRANSFER || paymentMethod == PaymentMethod.CARD_PAYMENT)
                 && paidAmount != null && paidAmount.compareTo(BigDecimal.ZERO) > 0
                 && (proofFileUrl == null || proofFileUrl.isBlank())) {
-            throw new IllegalArgumentException("Bank transfer proof (slip/receipt) is required when paying upfront");
+            throw new IllegalArgumentException("Payment proof (slip/receipt) is required for " + paymentMethod + " when paying upfront");
         }
 
         if (paymentMethod == PaymentMethod.COD) {
@@ -117,9 +117,9 @@ public class OrderPaymentService {
             throw new IllegalArgumentException("Cheque number is required when paying by cheque");
         }
 
-        if (request.paymentMethod() == PaymentMethod.BANK_TRANSFER
+        if ((request.paymentMethod() == PaymentMethod.BANK_TRANSFER || request.paymentMethod() == PaymentMethod.CARD_PAYMENT)
                 && (request.proofFileUrl() == null || request.proofFileUrl().isBlank())) {
-            throw new IllegalArgumentException("Bank transfer proof (slip/receipt) is required");
+            throw new IllegalArgumentException("Payment proof (slip/receipt) is required for " + request.paymentMethod());
         }
 
         boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;

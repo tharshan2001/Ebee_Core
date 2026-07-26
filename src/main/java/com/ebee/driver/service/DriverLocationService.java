@@ -3,11 +3,16 @@ package com.ebee.driver.service;
 import com.ebee.common.exception.RateLimitException;
 import com.ebee.driver.dto.DriverLocationRequest;
 import com.ebee.driver.dto.DriverLocationResponse;
+import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
+import com.ebee.user.entity.User;
+import com.ebee.user.service.UserLookupService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -17,9 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -29,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class DriverLocationService {
 
     private static final String LOCATION_KEY_PREFIX = "driver:location:";
+    private static final String RATE_LIMIT_KEY_PREFIX = "driver:ratelimit:";
     private static final long LOCATION_TTL_MINUTES = 5;
     private static final long RATE_LIMIT_MS = 1_000;
 
@@ -36,16 +40,19 @@ public class DriverLocationService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
     private final DriverRepository driverRepository;
-
-    private final ConcurrentHashMap<UUID, Long> lastUpdateTime = new ConcurrentHashMap<>();
+    private final UserLookupService userLookupService;
 
     public DriverLocationResponse updateLocation(UUID driverId, String driverName, DriverLocationRequest request) {
-        long now = System.currentTimeMillis();
-        Long previous = lastUpdateTime.get(driverId);
-        if (previous != null && (now - previous) < RATE_LIMIT_MS) {
-            throw new RateLimitException("Location update too frequent; minimum interval is " + RATE_LIMIT_MS + "ms");
+        String rateKey = RATE_LIMIT_KEY_PREFIX + driverId;
+        String rateVal = stringRedisTemplate.opsForValue().get(rateKey);
+        if (rateVal != null) {
+            long previous = Long.parseLong(rateVal);
+            long now = System.currentTimeMillis();
+            if ((now - previous) < RATE_LIMIT_MS) {
+                throw new RateLimitException("Location update too frequent; minimum interval is " + RATE_LIMIT_MS + "ms");
+            }
         }
-        lastUpdateTime.put(driverId, now);
+        stringRedisTemplate.opsForValue().set(rateKey, String.valueOf(System.currentTimeMillis()), 5, TimeUnit.SECONDS);
 
         String photoUrl = driverRepository.findById(driverId)
             .map(driver -> driver.getUser().getProfilePictureUrl())
@@ -76,6 +83,7 @@ public class DriverLocationService {
 
         try {
             messagingTemplate.convertAndSend("/topic/driver-locations", response);
+            log.debug("Broadcast location for driver {} at ({}, {})", driverId, request.latitude(), request.longitude());
         } catch (Exception e) {
             log.warn("Failed to broadcast location for driver {}: {}", driverId, e.getMessage());
         }
@@ -95,20 +103,27 @@ public class DriverLocationService {
     }
 
     public List<DriverLocationResponse> getActiveLocations() {
-        Set<String> keys = stringRedisTemplate.keys(LOCATION_KEY_PREFIX + "*");
-        if (keys == null || keys.isEmpty()) return List.of();
-
         List<DriverLocationResponse> locations = new ArrayList<>();
-        for (String key : keys) {
-            String json = stringRedisTemplate.opsForValue().get(key);
-            if (json != null) {
-                try {
-                    DriverLocationResponse loc = objectMapper.readValue(json, DriverLocationResponse.class);
-                    locations.add(enrichPhotoUrl(loc.driverId(), loc));
-                } catch (JsonProcessingException ignored) {
+
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(LOCATION_KEY_PREFIX + "*")
+                .count(100)
+                .build();
+
+        try (Cursor<String> cursor = stringRedisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                String json = stringRedisTemplate.opsForValue().get(key);
+                if (json != null) {
+                    try {
+                        DriverLocationResponse loc = objectMapper.readValue(json, DriverLocationResponse.class);
+                        locations.add(enrichPhotoUrl(loc.driverId(), loc));
+                    } catch (JsonProcessingException ignored) {
+                    }
                 }
             }
         }
+
         return locations;
     }
 
@@ -133,5 +148,10 @@ public class DriverLocationService {
 
     public void removeLocation(UUID driverId) {
         stringRedisTemplate.delete(LOCATION_KEY_PREFIX + driverId);
+    }
+
+    public Optional<Driver> resolveDriverByEmail(String email) {
+        return userLookupService.findByEmail(email)
+                .flatMap(user -> driverRepository.findByUserId(user.getId()));
     }
 }

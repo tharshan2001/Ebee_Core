@@ -14,8 +14,6 @@ import com.ebee.driver.service.DriverLocationService;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
 import com.ebee.expense.enums.ExpenseStatus;
-import com.ebee.notification.NotificationPort;
-import com.ebee.notification.model.SmsRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,7 +39,6 @@ public class DriverAppController {
 
     private final DriverAppService driverAppService;
     private final DriverLocationService driverLocationService;
-    private final NotificationPort notificationPort;
 
     @GetMapping("/dashboard")
     public ResponseEntity<ApiResponse<DriverDashboardResponse>> getDashboard() {
@@ -143,19 +140,6 @@ public class DriverAppController {
             @RequestParam("photo") MultipartFile photo) {
         DriverProfileResponse response = driverAppService.uploadProfilePhoto(photo);
         return ResponseEntity.ok(ApiResponse.success("Profile photo updated successfully", response));
-    }
-
-    @PostMapping("/test-sms")
-    public ResponseEntity<ApiResponse<Void>> testSms(@RequestBody Map<String, String> body) {
-        String phone = body.get("phone");
-        if (phone == null || phone.isBlank()) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("phone is required"));
-        }
-        notificationPort.sendSms(SmsRequest.builder()
-                .phoneNumbers(List.of(phone))
-                .message("Ebee: This is a test SMS from the platform.")
-                .build());
-        return ResponseEntity.ok(ApiResponse.success("SMS sent successfully"));
     }
 
     @PostMapping("/device-token")

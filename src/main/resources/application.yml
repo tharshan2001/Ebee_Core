@@ -43,7 +43,7 @@ spring:
     from: ${APP_GMAIL_USERNAME:}
     properties:
       mail:
-        debug: true
+        debug: ${MAIL_DEBUG:false}
         smtp:
           auth: true
           starttls:
@@ -104,20 +104,20 @@ whatsapp:
   api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com}
   phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
   access-token: ${WHATSAPP_ACCESS_TOKEN:}
-  verify-token: ${WHATSAPP_VERIFY_TOKEN:ebee_wh_verify_2024}
+  verify-token: ${WHATSAPP_VERIFY_TOKEN:}
 
 app:
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:8085}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
   backup:
     dir: ${BACKUP_DIR:${user.dir}/backups}
   print:
-    company-name: ${PRINT_COMPANY_NAME:Kismet Plus (Pvt) Ltd}
-    company-address: ${PRINT_COMPANY_ADDRESS:Vavuniya}
+    company-name: ${PRINT_COMPANY_NAME:}
+    company-address: ${PRINT_COMPANY_ADDRESS:}
     company-phone: ${PRINT_COMPANY_PHONE:}
     company-email: ${PRINT_COMPANY_EMAIL:}
     company-registration: ${PRINT_COMPANY_REGISTRATION:}
-    logo-url: ${PRINT_LOGO_URL:https://storage.ebee.lk/ebee-store/products/8bced4aa-90b9-4a5b-a609-4deaad146fe3/eeb6cb2f-dbc3-4aec-a9a2-cb43a899c673-Untitled_-_05_June_2026_at_19.30.26_copy.png}
+    logo-url: ${PRINT_LOGO_URL:}
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:super@ebee.lk}
     phone-number: ${SUPER_ADMIN_PHONE:}

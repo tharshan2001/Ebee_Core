@@ -4,10 +4,7 @@ import com.ebee.common.exception.RateLimitException;
 import com.ebee.driver.dto.DriverLocationRequest;
 import com.ebee.driver.dto.DriverLocationResponse;
 import com.ebee.driver.entity.Driver;
-import com.ebee.driver.repository.DriverRepository;
 import com.ebee.driver.service.DriverLocationService;
-import com.ebee.user.entity.User;
-import com.ebee.user.service.UserLookupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +16,6 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Controller
@@ -27,13 +23,14 @@ import java.util.UUID;
 public class DriverLocationSnapshotController {
 
     private final DriverLocationService driverLocationService;
-    private final UserLookupService userLookupService;
-    private final DriverRepository driverRepository;
 
     @MessageMapping("/driver-locations/snapshot")
     @SendToUser("/queue/driver-locations-snapshot")
-    public List<DriverLocationResponse> requestSnapshot() {
-        return driverLocationService.getActiveLocations();
+    public List<DriverLocationResponse> requestSnapshot(Principal principal) {
+        String email = principal != null ? principal.getName() : "anonymous";
+        List<DriverLocationResponse> locations = driverLocationService.getActiveLocations();
+        log.debug("Snapshot requested by {} — returning {} locations", email, locations.size());
+        return locations;
     }
 
     @MessageMapping("/driver-locations/update")
@@ -43,18 +40,14 @@ public class DriverLocationSnapshotController {
             return;
         }
         String email = principal.getName();
-        User user = userLookupService.findByEmail(email).orElse(null);
-        if (user == null) {
-            log.warn("STOMP location update rejected: user not found for {}", email);
-            return;
-        }
-        Driver driver = driverRepository.findByUserId(user.getId()).orElse(null);
+        Driver driver = driverLocationService.resolveDriverByEmail(email).orElse(null);
         if (driver == null) {
-            log.warn("STOMP location update rejected: driver not found for userId {}", user.getId());
+            log.warn("STOMP location update rejected: driver not found for {}", email);
             return;
         }
-        String driverName = user.getFirstName() + " " + user.getLastName();
+        String driverName = driver.getUser().getFirstName() + " " + driver.getUser().getLastName();
         driverLocationService.updateLocation(driver.getId(), driverName, request);
+        log.debug("STOMP location updated for driver {} ({})", driverName, driver.getId());
     }
 
     @MessageExceptionHandler(RateLimitException.class)

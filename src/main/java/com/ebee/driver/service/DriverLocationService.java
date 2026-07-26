@@ -1,5 +1,6 @@
 package com.ebee.driver.service;
 
+import com.ebee.common.exception.RateLimitException;
 import com.ebee.driver.dto.DriverLocationRequest;
 import com.ebee.driver.dto.DriverLocationResponse;
 import com.ebee.driver.repository.DriverRepository;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -28,13 +30,23 @@ public class DriverLocationService {
 
     private static final String LOCATION_KEY_PREFIX = "driver:location:";
     private static final long LOCATION_TTL_MINUTES = 5;
+    private static final long RATE_LIMIT_MS = 1_000;
 
     private final StringRedisTemplate stringRedisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
     private final DriverRepository driverRepository;
 
+    private final ConcurrentHashMap<UUID, Long> lastUpdateTime = new ConcurrentHashMap<>();
+
     public DriverLocationResponse updateLocation(UUID driverId, String driverName, DriverLocationRequest request) {
+        long now = System.currentTimeMillis();
+        Long previous = lastUpdateTime.get(driverId);
+        if (previous != null && (now - previous) < RATE_LIMIT_MS) {
+            throw new RateLimitException("Location update too frequent; minimum interval is " + RATE_LIMIT_MS + "ms");
+        }
+        lastUpdateTime.put(driverId, now);
+
         String photoUrl = driverRepository.findById(driverId)
             .map(driver -> driver.getUser().getProfilePictureUrl())
             .orElse(null);

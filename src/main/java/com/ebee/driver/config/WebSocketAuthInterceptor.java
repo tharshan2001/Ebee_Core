@@ -52,7 +52,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             authenticate(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-            authorize(accessor);
+            authorizeSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(accessor.getCommand())) {
+            authorizeSend(accessor);
         }
 
         return message;
@@ -101,7 +103,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      * @throws IllegalArgumentException if the subscriber is unauthenticated or
      *         lacks the required role
      */
-    private void authorize(StompHeaderAccessor accessor) {
+    private void authorizeSubscribe(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
         if (destination == null) return;
 
@@ -115,6 +117,29 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             }
             log.info("WebSocket SUBSCRIBE OK: destination={} role={}", destination, role);
         });
+    }
+
+    /**
+     * Enforce role-based authorization for STOMP SEND frames. Only drivers
+     * may send to {@code /app/driver-locations/*} destinations. Unregistered
+     * destinations pass through without restriction.
+     *
+     * @throws IllegalArgumentException if the sender is unauthenticated or
+     *         lacks the required role
+     */
+    private void authorizeSend(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null) return;
+
+        if (destination.equals("/app/driver-locations/update")) {
+            if (accessor.getUser() == null) {
+                throw new IllegalArgumentException("Authentication required for driver location updates");
+            }
+            RoleType role = extractRole(accessor);
+            if (role == null || role != RoleType.DRIVER) {
+                throw new IllegalArgumentException("Only drivers may send location updates via STOMP");
+            }
+        }
     }
 
     /**

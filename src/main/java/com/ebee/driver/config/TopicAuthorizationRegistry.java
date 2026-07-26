@@ -29,6 +29,8 @@ public class TopicAuthorizationRegistry {
             new TopicAuthorization("/topic/deliveries",
                     Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.AGENT, RoleType.DRIVER)),
             new TopicAuthorization("/topic/orders",
+                    Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN)),
+            new TopicAuthorization("/topic/driver-locations",
                     Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN))
     );
 

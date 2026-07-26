@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
@@ -65,21 +66,21 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      * principal on the session. The principal's email and role are later read
      * by {@link #authorize(StompHeaderAccessor)} during SUBSCRIBE frames.
      *
-     * @throws IllegalArgumentException if the header is missing, the token is
+     * @throws MessageDeliveryException if the header is missing, the token is
      *         invalid/expired, or the JWT carries no role claim
      */
     private void authenticate(StompHeaderAccessor accessor) {
         String authHeader = accessor.getFirstNativeHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             log.warn("WebSocket CONNECT rejected: missing or invalid Authorization header");
-            throw new IllegalArgumentException("Missing or invalid Authorization header");
+            throw new MessageDeliveryException((Message<?>) null, "Missing or invalid Authorization header");
         }
         String token = authHeader.substring(7);
         try {
             String email = jwtService.extractEmail(token);
             RoleType role = jwtService.extractRole(token);
             if (role == null) {
-                throw new IllegalArgumentException("JWT has no role claim");
+                throw new MessageDeliveryException((Message<?>) null, "JWT has no role claim");
             }
             var authentication = new UsernamePasswordAuthenticationToken(
                     email, null,
@@ -87,9 +88,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             );
             accessor.setUser(authentication);
             log.info("WebSocket CONNECT OK: email={} role={}", email, role);
+        } catch (MessageDeliveryException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("WebSocket CONNECT rejected: {}", e.getMessage());
-            throw new IllegalArgumentException("Invalid JWT: " + e.getMessage(), e);
+            throw new MessageDeliveryException((Message<?>) null, "Invalid JWT: " + e.getMessage(), e);
         }
     }
 
@@ -100,7 +103,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      * allowed set. Destinations that do not match any prefix pass through
      * without restriction.
      *
-     * @throws IllegalArgumentException if the subscriber is unauthenticated or
+     * @throws MessageDeliveryException if the subscriber is unauthenticated or
      *         lacks the required role
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
@@ -109,11 +112,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
         authorizationRegistry.getAllowedRoles(destination).ifPresent(allowedRoles -> {
             if (accessor.getUser() == null) {
-                throw new IllegalArgumentException("Authentication required for feed subscription");
+                throw new MessageDeliveryException((Message<?>) null, "Authentication required for feed subscription");
             }
             RoleType role = extractRole(accessor);
             if (role == null || !allowedRoles.contains(role)) {
-                throw new IllegalArgumentException("Insufficient privileges to subscribe to " + destination);
+                throw new MessageDeliveryException((Message<?>) null, "Insufficient privileges to subscribe to " + destination);
             }
             log.info("WebSocket SUBSCRIBE OK: destination={} role={}", destination, role);
         });
@@ -124,7 +127,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      * may send to {@code /app/driver-locations/*} destinations. Unregistered
      * destinations pass through without restriction.
      *
-     * @throws IllegalArgumentException if the sender is unauthenticated or
+     * @throws MessageDeliveryException if the sender is unauthenticated or
      *         lacks the required role
      */
     private void authorizeSend(StompHeaderAccessor accessor) {
@@ -133,11 +136,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
         if (destination.equals("/app/driver-locations/update")) {
             if (accessor.getUser() == null) {
-                throw new IllegalArgumentException("Authentication required for driver location updates");
+                throw new MessageDeliveryException((Message<?>) null, "Authentication required for driver location updates");
             }
             RoleType role = extractRole(accessor);
             if (role == null || role != RoleType.DRIVER) {
-                throw new IllegalArgumentException("Only drivers may send location updates via STOMP");
+                throw new MessageDeliveryException((Message<?>) null, "Only drivers may send location updates via STOMP");
             }
         }
     }

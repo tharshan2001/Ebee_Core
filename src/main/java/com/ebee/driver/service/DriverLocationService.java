@@ -83,7 +83,7 @@ public class DriverLocationService {
 
         try {
             messagingTemplate.convertAndSend("/topic/driver-locations", response);
-            log.debug("Broadcast location for driver {} at ({}, {})", driverId, request.latitude(), request.longitude());
+            log.info("Broadcast location for driver {} at ({}, {})", driverId, request.latitude(), request.longitude());
         } catch (Exception e) {
             log.warn("Failed to broadcast location for driver {}: {}", driverId, e.getMessage());
         }

@@ -29,7 +29,7 @@ public class DriverLocationSnapshotController {
     public List<DriverLocationResponse> requestSnapshot(Principal principal) {
         String email = principal != null ? principal.getName() : "anonymous";
         List<DriverLocationResponse> locations = driverLocationService.getActiveLocations();
-        log.debug("Snapshot requested by {} — returning {} locations", email, locations.size());
+        log.info("Snapshot requested by {} — returning {} locations", email, locations.size());
         return locations;
     }
 

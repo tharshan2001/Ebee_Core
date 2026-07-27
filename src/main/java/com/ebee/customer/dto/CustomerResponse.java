@@ -18,6 +18,7 @@ public class CustomerResponse {
     private Integer totalOrders;
     private BigDecimal creditLimit;
     private BigDecimal outstandingBalance;
+    private BigDecimal advanceBalance;
     private AddressResponse address;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

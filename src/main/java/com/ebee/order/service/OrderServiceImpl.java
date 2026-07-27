@@ -12,26 +12,10 @@ import com.ebee.combo.repository.ComboRepository;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.enums.District;
-import com.ebee.order.dto.OrderItemRequest;
-import com.ebee.order.dto.OrderRequest;
-import com.ebee.order.dto.OrderResponse;
-import com.ebee.order.dto.PaymentResponse;
-import com.ebee.order.dto.RecordPaymentRequest;
-import com.ebee.order.entity.Order;
-import com.ebee.order.entity.OrderItem;
-import com.ebee.order.entity.Payment;
-import com.ebee.order.enums.OrderSource;
-import com.ebee.order.enums.OrderStatus;
-import com.ebee.order.enums.PaymentMethod;
-import com.ebee.order.enums.PaymentStatus;
-import com.ebee.order.exception.DuplicateOrderNumberException;
-import com.ebee.common.exception.ResourceNotFoundException;
-import com.ebee.common.security.SecurityService;
-import com.ebee.order.mapper.OrderMapper;
-import com.ebee.order.repository.OrderRepository;
-import com.ebee.order.repository.PaymentRepository;
-import com.ebee.order.util.OrderItemSummaryBuilder;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.enums.DuesChangeType;
+import com.ebee.customer.event.CustomerDuesChangedEvent;
+import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.inventory.service.InventoryService;
@@ -41,7 +25,29 @@ import com.ebee.product.repository.ProductRepository;
 import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
+import com.ebee.order.dto.OrderItemRequest;
+import com.ebee.order.dto.OrderRequest;
+import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.OrderSettlementRequest;
+import com.ebee.order.dto.PaymentResponse;
+import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.UseAdvanceRequest;
+import com.ebee.order.entity.Order;
+import com.ebee.order.entity.OrderItem;
+import com.ebee.order.entity.Payment;
+import com.ebee.order.enums.OrderSource;
+import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.enums.PaymentMethod;
+import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.enums.RefundChoice;
 import com.ebee.order.event.OrderStatusChangedEvent;
+import com.ebee.order.exception.DuplicateOrderNumberException;
+import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
+import com.ebee.order.mapper.OrderMapper;
+import com.ebee.order.repository.OrderRepository;
+import com.ebee.order.repository.PaymentRepository;
+import com.ebee.order.util.OrderItemSummaryBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -76,6 +82,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderNumberService orderNumberService;
     private final CommissionCalculationService commissionCalculationService;
     private final CommissionLifecycleService commissionLifecycleService;
+    private final CustomerRepository customerRepository;
     private final CustomerService customerService;
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
@@ -335,7 +342,20 @@ public class OrderServiceImpl implements OrderService {
             throw ex;
         }
 
-        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+        if (customer != null) {
+            BigDecimal previousOutstanding = customer.getOutstandingBalance();
+            BigDecimal previousAdvance = customer.getAdvanceBalance();
+            orderPaymentService.syncCustomerOutstanding(customer);
+            customerRepository.save(customer);
+            eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                    this, customer,
+                    previousOutstanding, customer.getOutstandingBalance(),
+                    previousAdvance, customer.getAdvanceBalance(),
+                    DuesChangeType.ORDER_CREATED
+            ));
+        } else {
+            orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+        }
 
         // Record initial payment in payments table
         if (savedOrder.getPaidAmount() != null && savedOrder.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
@@ -484,7 +504,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public OrderResponse cancelOrder(UUID id) {
+    public OrderResponse cancelOrder(UUID id, OrderSettlementRequest request) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -515,18 +535,38 @@ public class OrderServiceImpl implements OrderService {
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 
-        BigDecimal refundAmount = order.getPaidAmount();
-        boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal previousOutstanding = order.getCustomer().getOutstandingBalance();
+        BigDecimal previousAdvance = order.getCustomer().getAdvanceBalance();
 
-        orderPaymentService.handlePaymentRefund(order);
+        boolean hasPaidAmount = order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0;
+        DuesChangeType changeType;
+
+        if (hasPaidAmount) {
+            changeType = request.refundChoice() == RefundChoice.CREDIT_ADVANCE
+                    ? DuesChangeType.CANCEL_ADVANCE
+                    : DuesChangeType.CANCEL_REFUND;
+            orderPaymentService.handleOrderSettlement(order, request.refundChoice(), changeType);
+        } else {
+            changeType = DuesChangeType.CANCEL_UNPAID;
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        }
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
 
+        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+        customerRepository.save(order.getCustomer());
+
+        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                this, order.getCustomer(),
+                previousOutstanding, order.getCustomer().getOutstandingBalance(),
+                previousAdvance, order.getCustomer().getAdvanceBalance(),
+                changeType
+        ));
+
         auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " cancelled"
-                        + (hasRefund ? " - refunded " + refundAmount : ""));
+                "Order " + updatedOrder.getOrderNumber() + " cancelled");
 
         orderNotificationService.sendOrderCancelled(updatedOrder);
 
@@ -537,7 +577,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public OrderResponse returnOrder(UUID id) {
+    public OrderResponse returnOrder(UUID id, OrderSettlementRequest request) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -558,18 +598,38 @@ public class OrderServiceImpl implements OrderService {
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 
-        BigDecimal refundAmount = order.getPaidAmount();
-        boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal previousOutstanding = order.getCustomer().getOutstandingBalance();
+        BigDecimal previousAdvance = order.getCustomer().getAdvanceBalance();
 
-        orderPaymentService.handlePaymentRefund(order);
+        boolean hasPaidAmount = order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0;
+        DuesChangeType changeType;
+
+        if (hasPaidAmount) {
+            changeType = request.refundChoice() == RefundChoice.CREDIT_ADVANCE
+                    ? DuesChangeType.RETURN_ADVANCE
+                    : DuesChangeType.RETURN_REFUND;
+            orderPaymentService.handleOrderSettlement(order, request.refundChoice(), changeType);
+        } else {
+            changeType = DuesChangeType.CANCEL_UNPAID;
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        }
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.RETURNED);
         Order updatedOrder = orderRepository.save(order);
 
+        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+        customerRepository.save(order.getCustomer());
+
+        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                this, order.getCustomer(),
+                previousOutstanding, order.getCustomer().getOutstandingBalance(),
+                previousAdvance, order.getCustomer().getAdvanceBalance(),
+                changeType
+        ));
+
         auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " returned"
-                        + (hasRefund ? " - refunded " + refundAmount : ""));
+                "Order " + updatedOrder.getOrderNumber() + " returned");
 
         orderNotificationService.sendOrderStatus(updatedOrder);
 
@@ -605,6 +665,38 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<PaymentResponse> getPaymentHistory(UUID orderId) {
         return orderPaymentService.getPaymentHistory(orderId);
+    }
+
+    @Transactional
+    @Override
+    public OrderResponse useAdvance(UUID orderId, UseAdvanceRequest request) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        Customer customer = order.getCustomer();
+        if (customer == null) {
+            throw new IllegalArgumentException("Order has no customer assigned");
+        }
+
+        BigDecimal previousOutstanding = customer.getOutstandingBalance();
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+
+        orderPaymentService.useAdvanceForOrder(order, request.amount());
+
+        Order updatedOrder = orderRepository.save(order);
+        customerRepository.save(customer);
+
+        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                this, customer,
+                previousOutstanding, customer.getOutstandingBalance(),
+                previousAdvance, customer.getAdvanceBalance(),
+                DuesChangeType.ADVANCE_USED
+        ));
+
+        auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
+                "Used advance " + request.amount() + " for order " + order.getOrderNumber());
+
+        return orderMapper.toResponse(updatedOrder);
     }
 
     @Recover

@@ -4,10 +4,14 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
+import com.ebee.customer.dto.AdjustAdvanceRequest;
+import com.ebee.customer.dto.AdvanceTransactionResponse;
 import com.ebee.customer.dto.CreditLimitRequest;
+import com.ebee.customer.dto.CustomerBalanceResponse;
 import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
+import com.ebee.customer.entity.CustomerAdvanceTransaction;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.order.dto.RecordPaymentRequest;
 import jakarta.validation.Valid;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.ebee.common.util.SortUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -117,21 +122,52 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("Payment recorded successfully", response));
     }
 
-    @PostMapping("/recalculate-outstanding")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<String>> recalculateAllOutstanding() {
-        int corrected = customerService.recalculateAllCustomerOutstanding();
-        return ResponseEntity.ok(ApiResponse.success(
-                corrected > 0
-                        ? "Recalculated outstanding balances. " + corrected + " customer(s) corrected."
-                        : "All customer outstanding balances are consistent.",
-                null));
+    @GetMapping("/{id}/balance")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerBalanceResponse>> getCustomerBalance(@PathVariable UUID id) {
+        CustomerResponse customer = customerService.getCustomerById(id);
+        CustomerBalanceResponse response = new CustomerBalanceResponse(
+                customer.getId(),
+                customer.getFirstName() + " " + customer.getLastName(),
+                customer.getOutstandingBalance(),
+                customer.getAdvanceBalance()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Customer balance retrieved successfully", response));
     }
 
-    @PostMapping("/{id}/recalculate-outstanding")
+    @GetMapping("/{id}/advance-history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<AdvanceTransactionResponse>>> getAdvanceHistory(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AdvanceTransactionResponse> history = customerService.getAdvanceHistory(id, pageable);
+        PageResponse<AdvanceTransactionResponse> response = PageResponse.from(history);
+        return ResponseEntity.ok(ApiResponse.success("Advance history retrieved successfully", response));
+    }
+
+    @PostMapping("/{id}/adjust-advance")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<CustomerResponse>> recalculateCustomerOutstanding(@PathVariable UUID id) {
-        CustomerResponse response = customerService.recalculateCustomerOutstanding(id);
-        return ResponseEntity.ok(ApiResponse.success("Outstanding balance recalculated", response));
+    public ResponseEntity<ApiResponse<AdvanceTransactionResponse>> adjustAdvance(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdjustAdvanceRequest request) {
+        CustomerAdvanceTransaction transaction = customerService.manualAdjustAdvance(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Advance balance adjusted successfully", toAdvanceResponse(transaction)));
+    }
+
+    private AdvanceTransactionResponse toAdvanceResponse(CustomerAdvanceTransaction tx) {
+        return new AdvanceTransactionResponse(
+                tx.getId(),
+                tx.getCustomer().getId(),
+                tx.getOrder() != null ? tx.getOrder().getId() : null,
+                tx.getAmount(),
+                tx.getBalanceAfter(),
+                tx.getTransactionType(),
+                tx.getReferenceType(),
+                tx.getReferenceId(),
+                tx.getDescription(),
+                tx.getCreatedAt()
+        );
     }
 }

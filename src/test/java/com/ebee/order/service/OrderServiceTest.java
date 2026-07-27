@@ -13,18 +13,22 @@ import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.enums.RefundChoice;
+import com.ebee.customer.enums.DuesChangeType;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
@@ -68,6 +72,7 @@ class OrderServiceTest {
     @Mock private OrderNumberService orderNumberService;
     @Mock private CommissionCalculationService commissionCalculationService;
     @Mock private CommissionLifecycleService commissionLifecycleService;
+    @Mock private CustomerRepository customerRepository;
     @Mock private CustomerService customerService;
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;
@@ -261,6 +266,42 @@ class OrderServiceTest {
             }
             return null;
         }).when(orderPaymentService).handlePaymentRefund(any());
+
+        lenient().doAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            RefundChoice choice = invocation.getArgument(1);
+            DuesChangeType changeType = invocation.getArgument(2);
+            BigDecimal paidAmount = order.getPaidAmount();
+            BigDecimal remainingOutstanding = order.getOutstandingBalance();
+
+            if (choice == RefundChoice.CREDIT_ADVANCE && paidAmount.compareTo(BigDecimal.ZERO) > 0) {
+                order.getCustomer().setAdvanceBalance(
+                        order.getCustomer().getAdvanceBalance().add(paidAmount));
+            } else if (choice == RefundChoice.REFUND) {
+                order.setPaymentStatus(PaymentStatus.REFUNDED);
+                order.setPaidAmount(BigDecimal.ZERO);
+            }
+
+            if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal newBalance = order.getCustomer().getOutstandingBalance()
+                        .subtract(remainingOutstanding);
+                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                    newBalance = BigDecimal.ZERO;
+                }
+                order.getCustomer().setOutstandingBalance(newBalance);
+            }
+
+            order.setOutstandingBalance(BigDecimal.ZERO);
+            return null;
+        }).when(orderPaymentService).handleOrderSettlement(any(), any(), any());
+
+        lenient().doAnswer(invocation -> {
+            Customer customer = invocation.getArgument(0);
+            if (customer != null) {
+                customer.setOutstandingBalance(BigDecimal.ZERO);
+            }
+            return null;
+        }).when(orderPaymentService).syncCustomerOutstanding(any());
     }
 
     @Test
@@ -674,7 +715,7 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(orderId);
+        orderService.cancelOrder(orderId, any());
 
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
@@ -694,7 +735,7 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId(), any()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Order is already cancelled");
     }
@@ -704,7 +745,7 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.SHIPPED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId(), any()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot cancel a shipped order");
     }
@@ -714,7 +755,7 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.DELIVERED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(order.getId()))
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId(), any()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot cancel a delivered order");
     }
@@ -730,7 +771,7 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(order.getId());
+        orderService.cancelOrder(order.getId(), any());
 
         verify(orderRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -752,15 +793,13 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(orderId);
+        orderService.cancelOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
 
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId),
-                contains("refunded 6500.00"));
     }
 
     @Test
@@ -775,7 +814,7 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(order.getId());
+        orderService.cancelOrder(order.getId(), new OrderSettlementRequest(RefundChoice.CREDIT_ADVANCE, null));
 
         assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
@@ -792,7 +831,7 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(order.getId());
+        orderService.cancelOrder(order.getId(), new OrderSettlementRequest(RefundChoice.REFUND, null));
 
         assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(orderRepository).save(orderCaptor.capture());
@@ -814,7 +853,7 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.returnOrder(orderId);
+        orderService.returnOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
 
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
@@ -833,7 +872,7 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.returnOrder(order.getId()))
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), any()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot return an order that is already");
     }
@@ -843,7 +882,7 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.RETURNED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.returnOrder(order.getId()))
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), any()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot return an order that is already");
     }

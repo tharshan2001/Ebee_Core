@@ -1,0 +1,15 @@
+package com.ebee.customer.enums;
+
+public enum DuesChangeType {
+    ORDER_CREATED,
+    PAYMENT_OUTSTANDING,
+    PAYMENT_ADVANCE,
+    CANCEL_UNPAID,
+    CANCEL_REFUND,
+    CANCEL_ADVANCE,
+    RETURN_REFUND,
+    RETURN_ADVANCE,
+    ADVANCE_CREDITED,
+    ADVANCE_USED,
+    MANUAL_ADJUSTMENT
+}

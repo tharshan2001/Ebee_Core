@@ -2,8 +2,10 @@ package com.ebee.order.service;
 
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.UseAdvanceRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
@@ -36,9 +38,9 @@ public interface OrderService {
 
     OrderResponse updateOrderStatus(UUID id, OrderStatus status);
 
-    OrderResponse cancelOrder(UUID id);
+    OrderResponse cancelOrder(UUID id, OrderSettlementRequest request);
 
-    OrderResponse returnOrder(UUID id);
+    OrderResponse returnOrder(UUID id, OrderSettlementRequest request);
 
     byte[] generateInvoicePdf(UUID id);
 
@@ -49,4 +51,6 @@ public interface OrderService {
     OrderResponse recordPayment(UUID id, RecordPaymentRequest request);
 
     List<PaymentResponse> getPaymentHistory(UUID orderId);
+
+    OrderResponse useAdvance(UUID orderId, UseAdvanceRequest request);
 }

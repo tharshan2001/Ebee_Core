@@ -56,6 +56,10 @@ public class Customer {
     @Builder.Default
     private BigDecimal outstandingBalance = BigDecimal.ZERO;
 
+    @Column(name = "advance_balance", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal advanceBalance = BigDecimal.ZERO;
+
     @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true, optional = false)
     private Address address;
 

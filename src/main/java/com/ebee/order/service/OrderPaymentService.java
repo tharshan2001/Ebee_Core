@@ -5,6 +5,12 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.entity.CustomerAdvanceTransaction;
+import com.ebee.customer.enums.AdvanceReferenceType;
+import com.ebee.customer.enums.AdvanceTransactionType;
+import com.ebee.customer.enums.DuesChangeType;
+import com.ebee.customer.event.CustomerDuesChangedEvent;
+import com.ebee.customer.repository.CustomerAdvanceTransactionRepository;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.PaymentResponse;
@@ -12,11 +18,13 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.Payment;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.enums.RefundChoice;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +40,11 @@ public class OrderPaymentService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final CustomerAdvanceTransactionRepository advanceTransactionRepository;
     private final OrderMapper orderMapper;
     private final AuditLogService auditLogService;
     private final SecurityService securityService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
         if (paymentMethod == PaymentMethod.CHEQUE
@@ -199,6 +209,117 @@ public class OrderPaymentService {
         }
         syncCustomerOutstanding(order.getCustomer());
     }
+    public void handleOrderSettlement(Order order, RefundChoice choice, DuesChangeType changeType) {
+        BigDecimal paidAmount = order.getPaidAmount();
+
+        if (choice == RefundChoice.CREDIT_ADVANCE && paidAmount.compareTo(BigDecimal.ZERO) > 0) {
+            String description = "Credited from " + (changeType == DuesChangeType.CANCEL_ADVANCE
+                    ? "order cancellation"
+                    : "order return")
+                    + " - Order #" + order.getOrderNumber();
+            creditToAdvance(order.getCustomer(), paidAmount,
+                    changeType == DuesChangeType.CANCEL_ADVANCE
+                            ? AdvanceReferenceType.ORDER_CANCELLED
+                            : AdvanceReferenceType.ORDER_RETURNED,
+                    order.getId(), description);
+        } else if (choice == RefundChoice.REFUND) {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setPaidAmount(BigDecimal.ZERO);
+        }
+
+        BigDecimal remainingOutstanding = order.getOutstandingBalance();
+        if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
+            updateCustomerOutstandingBalance(order.getCustomer(), remainingOutstanding, false);
+        }
+
+        order.setOutstandingBalance(BigDecimal.ZERO);
+    }
+    @Transactional
+    public void useAdvanceForOrder(Order order, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        Customer customer = order.getCustomer();
+        if (customer.getAdvanceBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient advance balance");
+        }
+
+        BigDecimal previousOutstanding = customer.getOutstandingBalance();
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+
+        BigDecimal newAdvance = previousAdvance.subtract(amount);
+        customer.setAdvanceBalance(newAdvance);
+
+        BigDecimal newPaidAmount = order.getPaidAmount().add(amount);
+        if (newPaidAmount.compareTo(order.getTotalAmount()) >= 0) {
+            order.setPaymentStatus(PaymentStatus.PAID);
+            order.setPaidAmount(order.getTotalAmount());
+            order.setOutstandingBalance(BigDecimal.ZERO);
+        } else {
+            order.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+            order.setPaidAmount(newPaidAmount);
+            order.setOutstandingBalance(order.getTotalAmount().subtract(newPaidAmount));
+        }
+        order.setPaidAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+
+        UUID currentUserId = securityService.getCurrentUserId();
+        String currentUserName = securityService.getCurrentUserEmail();
+        Payment payment = Payment.builder()
+                .orderId(order.getId())
+                .amount(amount)
+                .paymentMethod(PaymentMethod.CREDIT)
+                .recordedBy(currentUserId)
+                .recordedByName(currentUserName)
+                .build();
+        paymentRepository.save(payment);
+
+        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
+                .customer(customer)
+                .order(order)
+                .amount(amount.negate())
+                .balanceAfter(newAdvance)
+                .transactionType(AdvanceTransactionType.ADVANCE_USED)
+                .referenceType(AdvanceReferenceType.PAYMENT)
+                .referenceId(order.getId())
+                .description("Used advance for order #" + order.getOrderNumber())
+                .build();
+        advanceTransactionRepository.save(transaction);
+
+        syncCustomerOutstanding(customer);
+        publishDuesChange(customer, previousOutstanding, previousAdvance, DuesChangeType.ADVANCE_USED);
+    }
+
+    private void creditToAdvance(Customer customer, BigDecimal amount,
+                                 AdvanceReferenceType refType, UUID referenceId, String description) {
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+        BigDecimal newBalance = previousAdvance.add(amount);
+
+        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
+                .customer(customer)
+                .amount(amount)
+                .balanceAfter(newBalance)
+                .transactionType(AdvanceTransactionType.ADVANCE_CREDIT)
+                .referenceType(refType)
+                .referenceId(referenceId)
+                .description(description)
+                .build();
+
+        customer.setAdvanceBalance(newBalance);
+        advanceTransactionRepository.save(transaction);
+    }
+
+    private void publishDuesChange(Customer customer, BigDecimal previousOutstanding,
+                                   BigDecimal previousAdvance, DuesChangeType changeType) {
+        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                this, customer,
+                previousOutstanding, customer.getOutstandingBalance(),
+                previousAdvance, customer.getAdvanceBalance(),
+                changeType
+        ));
+    }
 
     private void updateCustomerOutstandingBalance(Customer customer, BigDecimal outstandingBalance, boolean isAdd) {
         if (customer == null) return;
@@ -212,18 +333,24 @@ public class OrderPaymentService {
         }
     }
 
-    /**
-     * Safety net: recalculates customer.outstandingBalance from the source of truth
-     * (sum of unpaid/partially-paid order outstanding balances). Called after every
-     * payment mutation to prevent incremental counter drift.
-     */
     void syncCustomerOutstanding(Customer customer) {
         if (customer == null) return;
         BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
-        if (customer.getOutstandingBalance().compareTo(actual) != 0) {
-            log.warn("Auto-correcting customer {} outstanding: recorded={} actual={}",
-                    customer.getId(), customer.getOutstandingBalance(), actual);
-            customer.setOutstandingBalance(actual);
-        }
+        customer.setOutstandingBalance(actual);
+    }
+
+    public List<PaymentResponse> getPaymentsByOrderId(UUID orderId) {
+        List<Payment> payments = paymentRepository.findByOrderIdOrderByCreatedAtAsc(orderId);
+        return payments.stream()
+                .map(p -> new PaymentResponse(
+                        p.getId(),
+                        p.getAmount(),
+                        p.getPaymentMethod(),
+                        p.getChequeNumber(),
+                        p.getProofFileUrl(),
+                        p.getRecordedByName(),
+                        p.getCreatedAt()
+                ))
+                .toList();
     }
 }

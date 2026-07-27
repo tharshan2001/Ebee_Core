@@ -9,10 +9,12 @@ import com.ebee.auth.service.UserDetailsServiceImpl;
 import com.ebee.common.config.CommonPropertiesConfig;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.order.dto.OrderResponse;
+import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
+import com.ebee.order.enums.RefundChoice;
 import com.ebee.order.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -185,9 +187,11 @@ class OrderControllerPaymentTest {
         response.setStatus(OrderStatus.RETURNED);
         response.setPaymentStatus(PaymentStatus.REFUNDED);
 
-        when(orderService.returnOrder(orderId)).thenReturn(response);
+        when(orderService.returnOrder(eq(orderId), any(OrderSettlementRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/orders/{id}/return", orderId))
+        mockMvc.perform(post("/api/orders/{id}/return", orderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refundChoice\":\"REFUND\",\"notes\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Order returned successfully"))

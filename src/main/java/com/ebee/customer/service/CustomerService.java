@@ -6,12 +6,20 @@ import com.ebee.common.service.CodeGenerationService;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
+import com.ebee.customer.dto.AdvanceTransactionResponse;
+import com.ebee.customer.dto.AdjustAdvanceRequest;
 import com.ebee.customer.dto.CreditLimitRequest;
 import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.entity.CustomerAdvanceTransaction;
+import com.ebee.customer.enums.AdvanceReferenceType;
+import com.ebee.customer.enums.AdvanceTransactionType;
+import com.ebee.customer.enums.DuesChangeType;
+import com.ebee.customer.event.CustomerDuesChangedEvent;
+import com.ebee.customer.repository.CustomerAdvanceTransactionRepository;
 import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.notification.NotificationPort;
 import com.ebee.order.dto.RecordPaymentRequest;
@@ -21,6 +29,7 @@ import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.service.OrderPaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -40,10 +49,12 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final CustomerAdvanceTransactionRepository advanceTransactionRepository;
     private final NotificationPort notificationPort;
     private final OrderPaymentService orderPaymentService;
     private final OrderRepository orderRepository;
     private final CodeGenerationService codeGenerationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -193,40 +204,128 @@ public class CustomerService {
                 .toList();
     }
 
-    @Transactional
-    public CustomerResponse recalculateCustomerOutstanding(UUID customerId) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
-        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customerId);
-        customer.setOutstandingBalance(actual);
-        customer = customerRepository.save(customer);
-        return toResponse(customer);
-    }
-
-    @Transactional
-    public int recalculateAllCustomerOutstanding() {
-        List<Customer> all = customerRepository.findAll();
-        int corrected = 0;
-        for (Customer customer : all) {
-            BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
-            if (customer.getOutstandingBalance().compareTo(actual) != 0) {
-                log.warn("Customer {} outstanding drift: recorded={} actual={}",
-                        customer.getId(), customer.getOutstandingBalance(), actual);
-                customer.setOutstandingBalance(actual);
-                customerRepository.save(customer);
-                corrected++;
-            }
-        }
-        return corrected;
-    }
-
     public void syncCustomerOutstanding(Customer customer) {
         BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
-        if (customer.getOutstandingBalance().compareTo(actual) != 0) {
-            log.warn("Auto-correcting customer {} outstanding: recorded={} actual={}",
-                    customer.getId(), customer.getOutstandingBalance(), actual);
-            customer.setOutstandingBalance(actual);
+        customer.setOutstandingBalance(actual);
+    }
+
+    public void syncAndPublishDuesChange(Customer customer, DuesChangeType changeType) {
+        BigDecimal previousOutstanding = customer.getOutstandingBalance();
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+        syncCustomerOutstanding(customer);
+        customerRepository.save(customer);
+        publishDuesChange(customer, previousOutstanding, previousAdvance, changeType);
+    }
+
+    public void publishDuesChange(Customer customer, BigDecimal previousOutstanding,
+                                  BigDecimal previousAdvance, DuesChangeType changeType) {
+        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                this, customer,
+                previousOutstanding, customer.getOutstandingBalance(),
+                previousAdvance, customer.getAdvanceBalance(),
+                changeType
+        ));
+    }
+
+    public BigDecimal getAdvanceBalance(UUID customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+        return customer.getAdvanceBalance();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdvanceTransactionResponse> getAdvanceHistory(UUID customerId, Pageable pageable) {
+        if (!customerRepository.existsById(customerId)) {
+            throw new ResourceNotFoundException("Customer", "id", customerId);
         }
+        return advanceTransactionRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, pageable)
+                .map(this::toAdvanceTransactionResponse);
+    }
+
+    @Transactional
+    public CustomerAdvanceTransaction creditToAdvance(Customer customer, BigDecimal amount,
+                                                       AdvanceReferenceType refType, UUID referenceId,
+                                                       String description) {
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+        BigDecimal newBalance = previousAdvance.add(amount);
+
+        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
+                .customer(customer)
+                .amount(amount)
+                .balanceAfter(newBalance)
+                .transactionType(AdvanceTransactionType.ADVANCE_CREDIT)
+                .referenceType(refType)
+                .referenceId(referenceId)
+                .description(description)
+                .build();
+
+        customer.setAdvanceBalance(newBalance);
+        customerRepository.save(customer);
+
+        publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
+                DuesChangeType.ADVANCE_CREDITED);
+
+        return advanceTransactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public CustomerAdvanceTransaction debitFromAdvance(Customer customer, BigDecimal amount,
+                                                        AdvanceReferenceType refType, UUID referenceId,
+                                                        String description) {
+        if (customer.getAdvanceBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient advance balance");
+        }
+
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+        BigDecimal newBalance = previousAdvance.subtract(amount);
+
+        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
+                .customer(customer)
+                .amount(amount.negate())
+                .balanceAfter(newBalance)
+                .transactionType(AdvanceTransactionType.ADVANCE_USED)
+                .referenceType(refType)
+                .referenceId(referenceId)
+                .description(description)
+                .build();
+
+        customer.setAdvanceBalance(newBalance);
+        customerRepository.save(customer);
+
+        publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
+                DuesChangeType.ADVANCE_USED);
+
+        return advanceTransactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public CustomerAdvanceTransaction manualAdjustAdvance(UUID customerId, AdjustAdvanceRequest request) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
+        BigDecimal newBalance = previousAdvance.add(request.amount());
+
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Advance balance cannot be negative");
+        }
+
+        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
+                .customer(customer)
+                .amount(request.amount())
+                .balanceAfter(newBalance)
+                .transactionType(AdvanceTransactionType.MANUAL_ADJUSTMENT)
+                .referenceType(AdvanceReferenceType.ADMIN_ADJUSTMENT)
+                .description(request.description())
+                .build();
+
+        customer.setAdvanceBalance(newBalance);
+        customerRepository.save(customer);
+
+        publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
+                DuesChangeType.MANUAL_ADJUSTMENT);
+
+        return advanceTransactionRepository.save(transaction);
     }
 
     @Transactional
@@ -352,6 +451,7 @@ public class CustomerService {
         response.setTotalOrders(customer.getTotalOrders());
         response.setCreditLimit(customer.getCreditLimit());
         response.setOutstandingBalance(customer.getOutstandingBalance());
+        response.setAdvanceBalance(customer.getAdvanceBalance());
         if (customer.getAddress() != null) {
             AddressResponse addrResponse = new AddressResponse();
             addrResponse.setId(customer.getAddress().getId());
@@ -368,5 +468,20 @@ public class CustomerService {
         response.setCreatedAt(customer.getCreatedAt());
         response.setUpdatedAt(customer.getUpdatedAt());
         return response;
+    }
+
+    private AdvanceTransactionResponse toAdvanceTransactionResponse(CustomerAdvanceTransaction tx) {
+        return new AdvanceTransactionResponse(
+                tx.getId(),
+                tx.getCustomer().getId(),
+                tx.getOrder() != null ? tx.getOrder().getId() : null,
+                tx.getAmount(),
+                tx.getBalanceAfter(),
+                tx.getTransactionType(),
+                tx.getReferenceType(),
+                tx.getReferenceId(),
+                tx.getDescription(),
+                tx.getCreatedAt()
+        );
     }
 }

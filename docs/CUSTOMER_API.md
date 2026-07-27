@@ -498,6 +498,139 @@ Records a payment against a customer's outstanding orders. The payment is distri
 
 ---
 
+## 10. Get Customer Balance
+
+**GET** `/api/customers/{id}/balance`
+
+Returns both outstanding balance and advance balance for a customer.
+
+**Access:** ADMIN only
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Customer balance retrieved successfully",
+  "data": {
+    "customerId": "uuid",
+    "customerName": "John Doe",
+    "outstandingBalance": 3200.00,
+    "advanceBalance": 6400.00
+  }
+}
+```
+
+---
+
+## 11. Get Advance History
+
+**GET** `/api/customers/{id}/advance-history`
+
+Returns paginated advance transaction history for a customer.
+
+**Access:** ADMIN only
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `20` | Page size (max 100) |
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Advance history retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "uuid",
+        "customerId": "uuid",
+        "orderId": "uuid or null",
+        "amount": 6400.00,
+        "balanceAfter": 6400.00,
+        "transactionType": "ADVANCE_CREDIT",
+        "referenceType": "ORDER_CANCELLED",
+        "referenceId": "uuid",
+        "description": "Credited from order cancellation - Order #JF-D-20260728-003",
+        "createdAt": "2026-07-28T01:16:19"
+      }
+    ],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "first": true,
+    "last": true
+  }
+}
+```
+
+**Transaction Types:**
+- `ADVANCE_CREDIT` — Amount added to advance (from cancellation/return)
+- `ADVANCE_USED` — Amount deducted from advance (used to pay order)
+- `MANUAL_ADJUSTMENT` — Manual admin adjustment
+
+**Reference Types:**
+- `ORDER_CANCELLED` — Credited from cancelled order
+- `ORDER_RETURNED` — Credited from returned order
+- `PAYMENT` — Advance used for order payment
+- `REFUND` — Cash refund (no advance change)
+- `ADMIN_ADJUSTMENT` — Manual adjustment
+
+---
+
+## 12. Adjust Advance Balance (Manual)
+
+**POST** `/api/customers/{id}/adjust-advance`
+
+Manually adjusts a customer's advance balance. Used for corrections or special circumstances.
+
+**Access:** SUPER_ADMIN only
+
+**Request Body:**
+```json
+{
+  "amount": 500.00,
+  "description": "Correction for return refund"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| amount | BigDecimal | Yes | Positive adds to advance, negative deducts |
+| description | String | Yes | Reason for adjustment |
+
+**Validation:**
+- Balance cannot go negative after adjustment
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Advance balance adjusted successfully",
+  "data": {
+    "id": "uuid",
+    "customerId": "uuid",
+    "orderId": null,
+    "amount": 500.00,
+    "balanceAfter": 6900.00,
+    "transactionType": "MANUAL_ADJUSTMENT",
+    "referenceType": "ADMIN_ADJUSTMENT",
+    "referenceId": null,
+    "description": "Correction for return refund",
+    "createdAt": "2026-07-28T02:00:00"
+  }
+}
+```
+
+**Error Responses:**
+- `400` — Adjustment would make balance negative
+- `404` — Customer not found
+
+---
+
 ## Data Models
 
 ### AddressRequest

@@ -12,6 +12,7 @@ import com.ebee.common.enums.District;
 import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Address;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.dto.OrderItemRequest;
@@ -63,6 +64,7 @@ class OrderDiscountIntegrationTest {
     @Mock private OrderNumberService orderNumberService;
     @Mock private CommissionCalculationService commissionCalculationService;
     @Mock private CommissionLifecycleService commissionLifecycleService;
+    @Mock private CustomerRepository customerRepository;
     @Mock private CustomerService customerService;
     @Mock private OrderNotificationService orderNotificationService;
     @Mock private AuditLogService auditLogService;

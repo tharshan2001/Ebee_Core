@@ -65,7 +65,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/combos/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/agent-applications").permitAll()
                 .requestMatchers("/api/whatsapp/webhook").permitAll()
-                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/ws/**", "/raw-ws/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )
@@ -132,6 +132,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         source.registerCorsConfiguration("/ws/**", configuration);
+        source.registerCorsConfiguration("/raw-ws/**", configuration);
         return source;
     }
 }

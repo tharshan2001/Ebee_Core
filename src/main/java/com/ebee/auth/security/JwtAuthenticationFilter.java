@@ -45,6 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/agent-applications")
                 || path.startsWith("/api/whatsapp/webhook")
                 || path.startsWith("/ws")
+                || path.startsWith("/raw-ws")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui");
     }

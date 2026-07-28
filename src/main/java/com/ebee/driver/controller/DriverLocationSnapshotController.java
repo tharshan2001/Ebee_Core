@@ -1,8 +1,8 @@
 package com.ebee.driver.controller;
 
 import com.ebee.common.exception.RateLimitException;
-import com.ebee.driver.dto.DriverLocationHistoryResponse;
 import com.ebee.driver.dto.DriverLocationRequest;
+import com.ebee.driver.dto.DriverLocationResponse;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.service.DriverLocationService;
 import jakarta.validation.Valid;
@@ -26,9 +26,9 @@ public class DriverLocationSnapshotController {
 
     @MessageMapping("/driver-locations/snapshot")
     @SendToUser("/queue/driver-locations-snapshot")
-    public List<DriverLocationHistoryResponse> requestSnapshot(Principal principal) {
+    public List<DriverLocationResponse> requestSnapshot(Principal principal) {
         String email = principal != null ? principal.getName() : "anonymous";
-        List<DriverLocationHistoryResponse> locations = driverLocationService.getActiveLocations();
+        List<DriverLocationResponse> locations = driverLocationService.getActiveLocations();
         log.info("Snapshot requested by {} — returning {} locations", email, locations.size());
         return locations;
     }

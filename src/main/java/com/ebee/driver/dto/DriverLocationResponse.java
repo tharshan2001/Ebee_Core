@@ -6,11 +6,12 @@ import java.util.UUID;
 public record DriverLocationResponse(
     UUID driverId,
     String driverName,
+    String photoUrl,
     double latitude,
     double longitude,
-    Float accuracy,
     Float bearing,
     Float speed,
+    Float accuracy,
     Instant recordedAt,
-    String photoUrl
+    long seq
 ) {}

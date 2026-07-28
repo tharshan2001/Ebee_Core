@@ -1,7 +1,6 @@
 package com.ebee.driver.controller;
 
 import com.ebee.common.response.ApiResponse;
-import com.ebee.driver.dto.DriverLocationHistoryResponse;
 import com.ebee.driver.dto.DriverLocationResponse;
 import com.ebee.driver.service.DriverLocationService;
 import com.ebee.notification.NotificationPort;
@@ -25,23 +24,23 @@ public class DriverLocationAdminController {
     private final NotificationPort notificationPort;
 
     @GetMapping("/active")
-    public ResponseEntity<ApiResponse<List<DriverLocationHistoryResponse>>> getActiveLocations() {
-        List<DriverLocationHistoryResponse> locations = driverLocationService.getActiveLocations();
+    public ResponseEntity<ApiResponse<List<DriverLocationResponse>>> getActiveLocations() {
+        List<DriverLocationResponse> locations = driverLocationService.getActiveLocations();
         return ResponseEntity.ok(ApiResponse.success("Active driver locations retrieved", locations));
     }
 
     @GetMapping("/{driverId}")
-    public ResponseEntity<ApiResponse<DriverLocationHistoryResponse>> getDriverLocation(
+    public ResponseEntity<ApiResponse<DriverLocationResponse>> getDriverLocation(
             @PathVariable UUID driverId) {
-        return driverLocationService.getLocationHistory(driverId)
+        return driverLocationService.getLocation(driverId)
                 .map(loc -> ResponseEntity.ok(ApiResponse.success("Location retrieved", loc)))
                 .orElse(ResponseEntity.ok(ApiResponse.success("No location data available")));
     }
 
     @GetMapping("/{driverId}/history")
-    public ResponseEntity<ApiResponse<DriverLocationHistoryResponse>> getDriverLocationHistory(
+    public ResponseEntity<ApiResponse<DriverLocationResponse>> getDriverLocationHistory(
             @PathVariable UUID driverId) {
-        return driverLocationService.getLocationHistory(driverId)
+        return driverLocationService.getLocation(driverId)
                 .map(loc -> ResponseEntity.ok(ApiResponse.success("Location history retrieved", loc)))
                 .orElse(ResponseEntity.ok(ApiResponse.success("No location history available")));
     }

@@ -154,18 +154,18 @@ public class DriverAppController {
     }
 
     @PostMapping("/location")
-    public ResponseEntity<ApiResponse<DriverLocationResponse>> updateLocation(
+    public ResponseEntity<ApiResponse<DriverLocationHistoryResponse>> updateLocation(
             @Valid @RequestBody DriverLocationRequest request) {
         Driver driver = driverAppService.getCurrentDriver();
         String driverName = driverAppService.getCurrentDriverName();
-        DriverLocationResponse response = driverLocationService.updateLocation(driver.getId(), driverName, request);
+        DriverLocationHistoryResponse response = driverLocationService.updateLocation(driver.getId(), driverName, request);
         return ResponseEntity.ok(ApiResponse.success("Location updated", response));
     }
 
     @GetMapping("/location")
-    public ResponseEntity<ApiResponse<DriverLocationResponse>> getMyLocation() {
+    public ResponseEntity<ApiResponse<DriverLocationHistoryResponse>> getMyLocation() {
         Driver driver = driverAppService.getCurrentDriver();
-        Optional<DriverLocationResponse> location = driverLocationService.getCurrentLocation(driver.getId());
+        Optional<DriverLocationHistoryResponse> location = driverLocationService.getLocationHistory(driver.getId());
         return location
                 .map(loc -> ResponseEntity.ok(ApiResponse.success("Location retrieved", loc)))
                 .orElse(ResponseEntity.ok(ApiResponse.success("No location data available")));

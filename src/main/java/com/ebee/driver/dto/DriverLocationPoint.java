@@ -8,5 +8,6 @@ public record DriverLocationPoint(
     Float bearing,
     Float speed,
     Float accuracy,
-    Instant timestamp
+    Instant timestamp,
+    long seq
 ) {}

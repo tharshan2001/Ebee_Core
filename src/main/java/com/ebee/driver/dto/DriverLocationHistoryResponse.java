@@ -7,5 +7,6 @@ public record DriverLocationHistoryResponse(
     UUID driverId,
     String driverName,
     String photoUrl,
-    List<DriverLocationPoint> points
+    List<DriverLocationPoint> points,
+    long baseSeq
 ) {}

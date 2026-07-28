@@ -4,7 +4,6 @@ import com.ebee.common.exception.RateLimitException;
 import com.ebee.driver.dto.DriverLocationHistoryResponse;
 import com.ebee.driver.dto.DriverLocationPoint;
 import com.ebee.driver.dto.DriverLocationRequest;
-import com.ebee.driver.dto.DriverLocationResponse;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.user.service.UserLookupService;
@@ -22,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,10 +33,16 @@ import java.util.concurrent.TimeUnit;
 public class DriverLocationService {
 
     private static final String LOCATION_KEY_PREFIX = "driver:location:history:";
+    private static final String SEQ_KEY_PREFIX = "driver:location:seq:";
     private static final String RATE_LIMIT_KEY_PREFIX = "driver:ratelimit:";
+    private static final String LAST_BROADCAST_KEY_PREFIX = "driver:location:lastbroadcast:";
     private static final int MAX_HISTORY_POINTS = 20;
     private static final long LOCATION_TTL_MINUTES = 5;
-    private static final long RATE_LIMIT_MS = 300;
+    private static final long RATE_LIMIT_MS = 500;
+    private static final double MIN_MOVEMENT_METERS = 5.0;
+    private static final long MIN_BROADCAST_INTERVAL_MS = 200;
+
+    private static final double EARTH_RADIUS_METERS = 6371000;
 
     private final StringRedisTemplate stringRedisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
@@ -63,13 +67,18 @@ public class DriverLocationService {
             .orElse(null);
 
         String locationKey = LOCATION_KEY_PREFIX + driverId;
+        String seqKey = SEQ_KEY_PREFIX + driverId;
+
+        long newSeq = stringRedisTemplate.opsForValue().increment(seqKey);
+
         DriverLocationPoint newPoint = new DriverLocationPoint(
             request.latitude(),
             request.longitude(),
             request.bearing(),
             request.speed(),
             request.accuracy(),
-            Instant.now()
+            Instant.now(),
+            newSeq
         );
 
         try {
@@ -84,22 +93,60 @@ public class DriverLocationService {
             throw new RuntimeException("Failed to serialize location history", e);
         }
 
+        List<DriverLocationPoint> currentPoints = getPointsList(locationKey);
+
+        if (currentPoints.size() > 1) {
+            DriverLocationPoint latest = currentPoints.get(0);
+            DriverLocationPoint previous = currentPoints.get(1);
+            double distance = haversineDistance(
+                previous.latitude(), previous.longitude(),
+                latest.latitude(), latest.longitude()
+            );
+
+            if (distance < MIN_MOVEMENT_METERS) {
+                log.debug("Driver {} moved only {:.2f}m, skipping broadcast", driverId, distance);
+                return new DriverLocationHistoryResponse(driverId, driverName, photoUrl, currentPoints, newSeq);
+            }
+        }
+
+        String lastBroadcastKey = LAST_BROADCAST_KEY_PREFIX + driverId;
+        String lastBroadcastStr = stringRedisTemplate.opsForValue().get(lastBroadcastKey);
+        long lastBroadcastTime = lastBroadcastStr != null ? Long.parseLong(lastBroadcastStr) : 0;
+        long now = System.currentTimeMillis();
+
+        if (now - lastBroadcastTime < MIN_BROADCAST_INTERVAL_MS) {
+            log.debug("Driver {} broadcast too soon ({})ms, skipping", driverId, now - lastBroadcastTime);
+            return new DriverLocationHistoryResponse(driverId, driverName, photoUrl, currentPoints, newSeq);
+        }
+
         var historyResponse = new DriverLocationHistoryResponse(
             driverId,
             driverName,
             photoUrl,
-            getPointsList(locationKey)
+            currentPoints,
+            newSeq
         );
 
         try {
             messagingTemplate.convertAndSend("/topic/driver-locations", historyResponse);
-            log.info("Broadcast location history for driver {} ({} points) at ({}, {})",
-                driverId, historyResponse.points().size(), request.latitude(), request.longitude());
+            log.info("Broadcast location history for driver {} ({} points, seq={}) at ({}, {})",
+                driverId, historyResponse.points().size(), newSeq, request.latitude(), request.longitude());
+            stringRedisTemplate.opsForValue().set(lastBroadcastKey, String.valueOf(now), 1, TimeUnit.MINUTES);
         } catch (Exception e) {
             log.warn("Failed to broadcast location for driver {}: {}", driverId, e.getMessage());
         }
 
         return historyResponse;
+    }
+
+    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+            + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+            * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_METERS * c;
     }
 
     private List<DriverLocationPoint> getPointsList(String locationKey) {
@@ -117,6 +164,7 @@ public class DriverLocationService {
 
     public Optional<DriverLocationHistoryResponse> getLocationHistory(UUID driverId) {
         String locationKey = LOCATION_KEY_PREFIX + driverId;
+        String seqKey = SEQ_KEY_PREFIX + driverId;
         String json = stringRedisTemplate.opsForValue().get(locationKey);
         if (json == null) return Optional.empty();
 
@@ -133,7 +181,10 @@ public class DriverLocationService {
                 .map(d -> d.getUser().getFirstName() + " " + d.getUser().getLastName())
                 .orElse("Unknown");
 
-            return Optional.of(new DriverLocationHistoryResponse(driverId, driverName, photoUrl, points));
+            String seqStr = stringRedisTemplate.opsForValue().get(seqKey);
+            long seq = seqStr != null ? Long.parseLong(seqStr) : latest.seq();
+
+            return Optional.of(new DriverLocationHistoryResponse(driverId, driverName, photoUrl, points, seq));
         } catch (JsonProcessingException e) {
             log.warn("Failed to deserialize location history for driver {}: {}", driverId, e.getMessage());
             return Optional.empty();
@@ -165,6 +216,7 @@ public class DriverLocationService {
 
     public void removeLocation(UUID driverId) {
         stringRedisTemplate.delete(LOCATION_KEY_PREFIX + driverId);
+        stringRedisTemplate.delete(SEQ_KEY_PREFIX + driverId);
     }
 
     public Optional<Driver> resolveDriverByEmail(String email) {

@@ -29,6 +29,12 @@ import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.repository.OrderRepository;
+import com.ebee.trip.dto.AddOrdersToTripRequest;
+import com.ebee.trip.dto.TripResponse;
+import com.ebee.trip.entity.Trip;
+import com.ebee.trip.enums.TripStatus;
+import com.ebee.trip.mapper.TripMapper;
+import com.ebee.trip.repository.TripRepository;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -71,6 +77,8 @@ public class DriverAppService {
     private final StoragePort storagePort;
     private final NotificationPort notificationPort;
     private final ApplicationEventPublisher eventPublisher;
+    private final TripRepository tripRepository;
+    private final TripMapper tripMapper;
 
     public Driver getCurrentDriver() {
         UUID userId = securityService.getCurrentUserId();
@@ -137,11 +145,20 @@ public class DriverAppService {
     @Transactional(readOnly = true)
     public Page<DriverDeliveryResponse> getMyDeliveries(DeliveryStatus status, Pageable pageable) {
         UUID userId = securityService.getCurrentUserId();
-        List<Order> orders;
+        UUID driverId = driverRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", userId))
+                .getId();
+
+        Optional<Trip> activeTrip = tripRepository.findByDriverIdAndStatus(driverId, TripStatus.IN_PROGRESS);
+        if (activeTrip.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        List<Order> orders = orderRepository.findByTripId(activeTrip.get().getId());
         if (status != null) {
-            orders = deliveryRepository.findByDeliveryStatusAndDeliveryAssignedToId(status, userId);
-        } else {
-            orders = deliveryRepository.findByDeliveryAssignedToId(userId);
+            orders = orders.stream()
+                    .filter(o -> o.getDeliveryStatus() == status)
+                    .toList();
         }
         orders.sort(Comparator.comparing(Order::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
 
@@ -405,6 +422,200 @@ public class DriverAppService {
             expenses = expenseRepository.findByDriverIdOrderByCreatedAtDesc(driver.getId());
         }
         return expenseMapper.toResponseList(expenses);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TripResponse> getAvailableTrips() {
+        Driver driver = getCurrentDriver();
+        List<Trip> trips = tripRepository.findByDriverIdAndStatusIn(
+                driver.getId(),
+                List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS));
+        return trips.stream().map(tripMapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TripResponse getMyInProgressTrip() {
+        Driver driver = getCurrentDriver();
+        return tripRepository.findByDriverIdAndStatus(driver.getId(), TripStatus.IN_PROGRESS)
+                .map(tripMapper::toResponse)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public TripResponse getTripById(UUID tripId) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+
+        return tripMapper.toResponse(trip);
+    }
+
+    @Transactional
+    public TripResponse startTrip(UUID tripId) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+        if (trip.getStatus() != TripStatus.PLANNED) {
+            throw new IllegalStateException("Only PLANNING trips can be started");
+        }
+
+        tripRepository.findByDriverIdAndStatus(driver.getId(), TripStatus.IN_PROGRESS)
+                .ifPresent(existing -> {
+                    throw new IllegalStateException("You already have an active trip: " + existing.getName());
+                });
+
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        trip = tripRepository.save(trip);
+
+        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
+                "Driver started trip '" + trip.getName() + "'");
+
+        return tripMapper.toResponse(trip);
+    }
+
+    @Transactional
+    public TripResponse addOrdersToTrip(UUID tripId, AddOrdersToTripRequest request) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+        if (trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot modify orders on a " + trip.getStatus() + " trip");
+        }
+
+        if (request.getOrderIdsToAdd() != null && !request.getOrderIdsToAdd().isEmpty()) {
+            for (UUID orderId : request.getOrderIdsToAdd()) {
+                Order order = orderRepository.findById(orderId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+                if (order.getTrip() != null && order.getTrip().getId().equals(tripId)) {
+                    continue;
+                }
+                if (order.getDeliveryAssignedTo() != null
+                        && !order.getDeliveryAssignedTo().getId().equals(driver.getUser().getId())) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is assigned to a different driver");
+                }
+                if (order.getTrip() != null) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is already on trip '" + order.getTrip().getName() + "'");
+                }
+
+                order.setTrip(trip);
+                order.setDeliveryAssignedTo(driver.getUser());
+                orderRepository.save(order);
+            }
+        }
+
+        if (request.getOrderIdsToRemove() != null && !request.getOrderIdsToRemove().isEmpty()) {
+            for (UUID orderId : request.getOrderIdsToRemove()) {
+                Order order = orderRepository.findById(orderId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+                if (order.getTrip() == null || !order.getTrip().getId().equals(tripId)) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is not on this trip");
+                }
+
+                order.setTrip(null);
+                orderRepository.save(order);
+            }
+        }
+
+        trip = tripRepository.save(trip);
+
+        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
+                "Orders updated on trip '" + trip.getName() + "'");
+
+        return tripMapper.toResponse(trip);
+    }
+
+    @Transactional
+    public TripResponse updateMileage(UUID tripId, BigDecimal mileageKm) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+
+        trip.setMileageKm(mileageKm);
+        trip = tripRepository.save(trip);
+
+        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
+                "Mileage updated to " + mileageKm + " km on trip '" + trip.getName() + "'");
+
+        return tripMapper.toResponse(trip);
+    }
+
+    @Transactional
+    public TripResponse completeTrip(UUID tripId) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+        if (trip.getStatus() != TripStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
+        }
+
+        trip.setStatus(TripStatus.COMPLETED);
+        trip = tripRepository.save(trip);
+
+        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
+                "Trip '" + trip.getName() + "' completed by driver");
+
+        return tripMapper.toResponse(trip);
+    }
+
+    @Transactional
+    public ExpenseResponse createTripExpense(UUID tripId, ExpenseRequest request, MultipartFile receipt) {
+        Driver driver = getCurrentDriver();
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
+        if (trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot add expenses to a " + trip.getStatus() + " trip");
+        }
+
+        User currentUser = getCurrentUser();
+
+        Expense.ExpenseBuilder builder = Expense.builder()
+                .category(request.getCategory())
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .dateIncurred(request.getDateIncurred())
+                .createdBy(currentUser)
+                .driver(driver)
+                .trip(trip)
+                .status(ExpenseStatus.PENDING);
+
+        Expense expense = builder.build();
+
+        if (receipt != null && !receipt.isEmpty()) {
+            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses", currentUser.getEmail() + "_Expense"));
+        }
+
+        expense = expenseRepository.save(expense);
+
+        auditLogService.record(AuditAction.CREATE, "Expense", expense.getId(),
+                "Driver expense " + expense.getCategory() + " LKR " + expense.getAmount() + " created on trip '" + trip.getName() + "'");
+
+        return expenseMapper.toResponse(expense);
     }
 
     @Transactional

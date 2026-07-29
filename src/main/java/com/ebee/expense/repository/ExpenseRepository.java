@@ -35,4 +35,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     @Query("SELECT e.category, COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred <= :end GROUP BY e.category")
     List<Object[]> sumApprovedGroupByCategory(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    List<Expense> findByTripId(UUID tripId);
 }

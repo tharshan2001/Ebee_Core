@@ -41,6 +41,10 @@ public class ExpenseResponse {
     private LocalDateTime paidAt;
     private String paymentReference;
 
+    private UUID tripId;
+    private String tripName;
+    private BigDecimal distanceKm;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

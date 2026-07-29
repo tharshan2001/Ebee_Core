@@ -121,4 +121,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end")
     Long countTotalOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    List<Order> findByTripId(UUID tripId);
 }

@@ -28,4 +28,8 @@ public class ExpenseRequest {
     private LocalDate dateIncurred;
 
     private UUID driverId;
+
+    private UUID tripId;
+
+    private BigDecimal distanceKm;
 }

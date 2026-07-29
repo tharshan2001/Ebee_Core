@@ -1,8 +1,9 @@
 package com.ebee.expense.enums;
 
 public enum ExpenseCategory {
+    PETROL,
+    MILEAGE,
     TRAVEL,
-    FUEL,
     OFFICE_SUPPLIES,
     UTILITIES,
     MAINTENANCE,

@@ -1,7 +1,6 @@
 package com.ebee.delivery.controller;
 
 import com.ebee.common.response.ApiResponse;
-import com.ebee.delivery.dto.AssignDriverRequest;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
@@ -21,15 +20,6 @@ import java.util.UUID;
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
-
-    @PatchMapping("/{orderId}/assign")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<DeliveryResponse>> assignDelivery(
-            @PathVariable UUID orderId,
-            @Valid @RequestBody AssignDriverRequest request) {
-        DeliveryResponse response = deliveryService.assignDelivery(orderId, request.getDriverId());
-        return ResponseEntity.ok(ApiResponse.success("Delivery assigned successfully", response));
-    }
 
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")

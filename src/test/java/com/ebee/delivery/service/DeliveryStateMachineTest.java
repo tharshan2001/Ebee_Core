@@ -30,20 +30,35 @@ class DeliveryStateMachineTest {
     // ---------- PENDING ----------
 
     @Test
-    void pending_throwsOnAnyTransition() {
+    void pending_canGoToAssigned() {
         Order order = orderWithStatus(DeliveryStatus.PENDING);
 
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, true))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Use assignDelivery() instead");
+        var result = stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, true);
+
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.ASSIGNED);
+        assertThat(result.wasDelivered()).isFalse();
+        assertThat(result.wasFailedPermanent()).isFalse();
     }
 
     @Test
-    void pending_throwsEvenForFailed() {
+    void pending_canGoToFailed() {
         Order order = orderWithStatus(DeliveryStatus.PENDING);
 
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.FAILED, "x", true))
-                .isInstanceOf(IllegalStateException.class);
+        var result = stateMachine.transition(order, DeliveryStatus.FAILED, "Customer unavailable", true);
+
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.FAILED);
+        assertThat(order.getDeliveryFailureReason()).isEqualTo("Customer unavailable");
+        assertThat(result.wasDelivered()).isFalse();
+        assertThat(result.wasFailedPermanent()).isFalse();
+    }
+
+    @Test
+    void pending_throwsForInvalidTransition() {
+        Order order = orderWithStatus(DeliveryStatus.PENDING);
+
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid delivery status transition");
     }
 
     // ---------- Happy path ----------

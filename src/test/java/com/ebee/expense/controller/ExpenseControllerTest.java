@@ -170,7 +170,7 @@ class ExpenseControllerTest {
 
     private ExpenseRequest createExpenseRequest() {
         ExpenseRequest request = new ExpenseRequest();
-        request.setCategory(ExpenseCategory.FUEL);
+        request.setCategory(ExpenseCategory.PETROL);
         request.setAmount(new BigDecimal("5000.00"));
         request.setDescription("Fuel for delivery van");
         request.setDateIncurred(LocalDate.now());

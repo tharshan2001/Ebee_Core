@@ -10,9 +10,12 @@ import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
 import com.ebee.expense.entity.Expense;
+import com.ebee.expense.enums.ExpenseCategory;
 import com.ebee.expense.enums.ExpenseStatus;
 import com.ebee.expense.mapper.ExpenseMapper;
 import com.ebee.expense.repository.ExpenseRepository;
+import com.ebee.trip.entity.Trip;
+import com.ebee.trip.repository.TripRepository;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +44,7 @@ public class ExpenseService {
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
     private final StoragePort storagePort;
+    private final TripRepository tripRepository;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request, MultipartFile receipt) {
@@ -48,15 +53,40 @@ public class ExpenseService {
 
         Expense.ExpenseBuilder builder = Expense.builder()
                 .category(request.getCategory())
-                .amount(request.getAmount())
                 .description(request.getDescription())
                 .dateIncurred(request.getDateIncurred())
                 .createdBy(currentUser);
+
+        if (request.getCategory() == ExpenseCategory.MILEAGE) {
+            builder.amount(BigDecimal.ZERO);
+            if (request.getDistanceKm() == null || request.getDistanceKm().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException("Distance km is required for MILEAGE category and must be positive");
+            }
+            builder.distanceKm(request.getDistanceKm());
+        } else {
+            if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException("Amount must be positive for " + request.getCategory() + " category");
+            }
+            builder.amount(request.getAmount());
+            if (request.getDistanceKm() != null) {
+                throw new IllegalStateException("Distance km should only be set for MILEAGE category");
+            }
+        }
 
         if (request.getDriverId() != null) {
             Driver driver = driverRepository.findById(request.getDriverId())
                     .orElseThrow(() -> new ResourceNotFoundException("Driver", "id", request.getDriverId()));
             builder.driver(driver);
+        }
+
+        if (request.getTripId() != null) {
+            Trip trip = tripRepository.findById(request.getTripId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", request.getTripId()));
+            if (trip.getDriver() != null && builder.build().getDriver() != null
+                    && !trip.getDriver().getId().equals(builder.build().getDriver().getId())) {
+                throw new IllegalStateException("Expense driver must match trip driver");
+            }
+            builder.trip(trip);
         }
 
         if (currentUser.getRole() == RoleType.ADMIN) {

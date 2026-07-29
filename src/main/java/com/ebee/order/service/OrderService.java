@@ -32,6 +32,10 @@ public interface OrderService {
 
     List<OrderResponse> getAllOrders();
 
+    List<OrderResponse> getUnassignedOrders();
+
+    List<OrderResponse> getUnassignedOrdersByStatus(OrderStatus status);
+
     Page<OrderResponse> getAllOrdersPaginated(Pageable pageable);
 
     Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable);

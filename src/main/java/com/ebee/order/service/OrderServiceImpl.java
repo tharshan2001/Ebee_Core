@@ -466,6 +466,20 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional(readOnly = true)
     @Override
+    public List<OrderResponse> getUnassignedOrders() {
+        List<Order> orders = orderRepository.findByTripIsNull();
+        return orderMapper.toResponseList(orders);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<OrderResponse> getUnassignedOrdersByStatus(OrderStatus status) {
+        List<Order> orders = orderRepository.findByTripIsNullAndStatus(status);
+        return orderMapper.toResponseList(orders);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
         Page<Order> orders = orderRepository.findAllWithDetails(pageable);
         return orders.map(orderMapper::toResponse);

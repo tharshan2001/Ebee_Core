@@ -84,6 +84,16 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }
 
+    @GetMapping("/unassigned")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getUnassignedOrders(
+            @RequestParam(required = false) OrderStatus status) {
+        List<OrderResponse> response = status != null
+                ? orderService.getUnassignedOrdersByStatus(status)
+                : orderService.getUnassignedOrders();
+        return ResponseEntity.ok(ApiResponse.success("Unassigned orders retrieved successfully", response));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getAllOrders(

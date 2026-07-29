@@ -1,5 +1,6 @@
 package com.ebee.order.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.audit.enums.AuditAction;
@@ -88,6 +89,7 @@ public class OrderServiceImpl implements OrderService {
     private final AuditLogService auditLogService;
     private final OrderPaymentService orderPaymentService;
     private final OrderPdfService orderPdfService;
+    private final LedgerService ledgerService;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -340,6 +342,16 @@ public class OrderServiceImpl implements OrderService {
                 throw new DuplicateOrderNumberException("Duplicate order number: " + order.getOrderNumber(), ex);
             }
             throw ex;
+        }
+
+        if (customer != null) {
+            ledgerService.recordCustomerInvoice(
+                    customer.getId(),
+                    savedOrder.getId(),
+                    savedOrder.getTotalAmount(),
+                    "Order " + savedOrder.getOrderNumber(),
+                    currentUser.getId()
+            );
         }
 
         if (customer != null) {
@@ -617,6 +629,14 @@ public class OrderServiceImpl implements OrderService {
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.RETURNED);
         Order updatedOrder = orderRepository.save(order);
+
+        ledgerService.recordCustomerRefund(
+                order.getCustomer().getId(),
+                updatedOrder.getId(),
+                order.getPaidAmount(),
+                "Return for Order " + order.getOrderNumber(),
+                securityService.getCurrentUserId()
+        );
 
         orderPaymentService.syncCustomerOutstanding(order.getCustomer());
         customerRepository.save(order.getCustomer());

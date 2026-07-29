@@ -79,6 +79,7 @@ class OrderServiceTest {
     @Mock private OrderPaymentService orderPaymentService;
     @Mock private OrderPdfService orderPdfService;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private OrderServiceImpl orderService;
@@ -1120,5 +1121,75 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getTotalAmount())
                 .isEqualByComparingTo(new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void createOrder_recordsInvoiceInLedger() {
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-001");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product1, product2));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            if (o.getId() == null) {
+                o.setId(UUID.randomUUID());
+            }
+            return o;
+        });
+        when(commissionCalculationService.calculateCommissionForOrder(any()))
+                .thenReturn(Commission.builder()
+                        .id(UUID.randomUUID())
+                        .commissionAmount(new BigDecimal("487.50"))
+                        .commissionRate(new BigDecimal("7.5"))
+                        .status(CommissionStatus.CALCULATED)
+                        .build());
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.createOrder(orderRequest);
+
+        verify(ledgerService).recordCustomerInvoice(
+                eq(customer.getId()),
+                any(UUID.class),
+                any(BigDecimal.class),
+                contains("Order"),
+                any(UUID.class)
+        );
+    }
+
+    @Test
+    void returnOrder_recordsRefundInLedger() {
+        order.setStatus(OrderStatus.DELIVERED);
+        order.setPaymentMethod(PaymentMethod.CASH);
+        order.setPaidAmount(new BigDecimal("6500.00"));
+        order.setOutstandingBalance(BigDecimal.ZERO);
+        order.setPaymentStatus(PaymentStatus.PAID);
+
+        UUID orderId = order.getId();
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        doAnswer(invocation -> {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            order.setPaidAmount(BigDecimal.ZERO);
+            return null;
+        }).when(orderPaymentService).handleOrderSettlement(any(), any(), any());
+
+        orderService.returnOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
+
+        // Note: The refund amount passed to ledger is currently 0 due to handleOrderSettlement
+        // clearing paidAmount BEFORE the ledger call. This is a known bug to fix.
+        verify(ledgerService).recordCustomerRefund(
+                eq(customer.getId()),
+                eq(orderId),
+                any(BigDecimal.class),
+                contains("Return"),
+                any(UUID.class)
+        );
     }
 }

@@ -51,6 +51,7 @@ Creates a new customer. Phone number must be unique.
   "lastName": "Kumar",
   "phoneNumber": "+94111111111",
   "email": "arun@example.com",
+  "bookNo": "BOOK-001",
   "address": {
     "street": "123 Main St",
     "city": "Jaffna",
@@ -67,7 +68,8 @@ Creates a new customer. Phone number must be unique.
 | firstName | String | Yes | |
 | lastName | String | Yes | |
 | phoneNumber | String | Yes | Must be unique, 10 digits starting with 0 |
-| email | String | Yes | Must be a valid email format |
+| email | String | No | Must be a valid email format |
+| bookNo | String | No | Must be unique if provided |
 | address | Object | Yes | Nested address object |
 | address.street | String | Yes | Max 255 chars |
 | address.city | String | Yes | Max 100 chars |
@@ -85,6 +87,7 @@ Creates a new customer. Phone number must be unique.
     "lastName": "Kumar",
     "phoneNumber": "+94111111111",
     "email": "arun@example.com",
+    "bookNo": "BOOK-001",
     "totalOrders": 0,
     "creditLimit": 50000.00,
     "outstandingBalance": 0.00,
@@ -230,7 +233,26 @@ If the customer already has an address, it is **updated in place**. If they don'
 
 ---
 
-### 5. Search Customers (Non-Paginated)
+### 5. Get Customer by Book No
+
+**GET** `/api/customers/book-no/{bookNo}`
+
+**Access:** ADMIN, AGENT
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| bookNo | String | Customer's book number |
+
+**Success Response (200 OK):** Same shape as Get by ID.
+
+**Error Responses:**
+- `404` — Customer not found with bookNo
+
+---
+
+### 6. Search Customers (Non-Paginated)
 
 **GET** `/api/customers/search?q=...`
 
@@ -242,7 +264,7 @@ Returns **all** matching customers as a flat array. No pagination — useful for
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `q` | String | yes | Search query (matches phoneNumber, firstName, lastName, or email) |
+| `q` | String | yes | Search query (matches phoneNumber, firstName, lastName, email, customerCode, or bookNo) |
 
 ```bash
 curl "http://localhost:8085/api/customers/search?q=Praveen" \

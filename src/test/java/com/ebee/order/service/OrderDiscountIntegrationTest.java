@@ -71,6 +71,7 @@ class OrderDiscountIntegrationTest {
     @Mock private OrderPaymentService orderPaymentService;
     @Mock private OrderPdfService orderPdfService;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private OrderServiceImpl orderService;

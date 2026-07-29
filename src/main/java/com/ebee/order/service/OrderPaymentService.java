@@ -1,5 +1,6 @@
 package com.ebee.order.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -45,6 +46,7 @@ public class OrderPaymentService {
     private final AuditLogService auditLogService;
     private final SecurityService securityService;
     private final ApplicationEventPublisher eventPublisher;
+    private final LedgerService ledgerService;
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
         if (paymentMethod == PaymentMethod.CHEQUE
@@ -164,6 +166,14 @@ public class OrderPaymentService {
                 .recordedByName(currentUserName)
                 .build();
         paymentRepository.save(payment);
+
+        ledgerService.recordCustomerPayment(
+                order.getCustomer().getId(),
+                payment.getId(),
+                request.amount(),
+                "Payment for Order " + order.getOrderNumber() + " via " + request.paymentMethod(),
+                currentUserId
+        );
 
         if (isCreditOrder || isCodOrder) {
             updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);

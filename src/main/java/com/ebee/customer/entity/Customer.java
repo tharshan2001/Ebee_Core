@@ -44,6 +44,9 @@ public class Customer {
     @Column(length = 255)
     private String email;
 
+    @Column(name = "book_no", unique = true, length = 50)
+    private String bookNo;
+
     @Column(name = "total_orders", nullable = false)
     @Builder.Default
     private Integer totalOrders = 0;

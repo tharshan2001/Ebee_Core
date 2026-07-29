@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN book_no VARCHAR(50) UNIQUE;

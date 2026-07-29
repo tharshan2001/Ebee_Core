@@ -19,9 +19,10 @@ public class CustomerRequest {
     @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String phoneNumber;
 
-    @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
+
+    private String bookNo;
 
     @Valid
     @jakarta.validation.constraints.NotNull(message = "Address is required")

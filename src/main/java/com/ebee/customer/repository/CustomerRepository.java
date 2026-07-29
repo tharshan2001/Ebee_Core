@@ -53,4 +53,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     List<Customer> findBySearchTerm(@Param("search") String search);
 
     List<Customer> findByOutstandingBalanceGreaterThan(BigDecimal balance, Sort sort);
+
+    @Query("SELECT COUNT(c) FROM Customer c WHERE c.active = true")
+    Long countActive();
+
+    @Query("SELECT c FROM Customer c WHERE c.outstandingBalance > 0 ORDER BY c.outstandingBalance DESC")
+    List<Customer> findAllWithOutstandingBalance();
 }

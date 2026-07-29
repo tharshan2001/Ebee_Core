@@ -57,6 +57,7 @@ The `/ws/**` path is included in the CORS configuration alongside REST endpoints
 |-------|-------|-------------|
 | `/topic/orders` | `ADMIN`, `SUPER_ADMIN` | Order creation and status changes |
 | `/topic/deliveries` | `ADMIN`, `SUPER_ADMIN`, `AGENT`, `DRIVER` | Delivery assignment and status changes |
+| `/topic/trips` | `ADMIN`, `SUPER_ADMIN`, `DRIVER` | Trip status changes (start, complete, cancel) |
 | `/topic/driver-locations` | _open_ (any authenticated) | Live driver GPS pings from the mobile app |
 
 Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/topic/driver-locations`, `/user/queue/...`) are open to all authenticated users.
@@ -147,6 +148,50 @@ Subscribing with a role that is not in the allowed set results in an immediate D
 ### Status values
 
 `PENDING`, `ASSIGNED`, `PICKED_UP`, `IN_TRANSIT`, `DELIVERED`, `FAILED`, `FAILED_PERMANENT`
+
+---
+
+## Trip Feed — `/topic/trips`
+
+Broadcast when a trip changes status (started, completed, or cancelled).
+
+### Payload
+
+```json
+{
+  "tripId": "uuid",
+  "tripName": "Morning Route Colombo",
+  "previousStatus": "PLANNING",
+  "newStatus": "IN_PROGRESS",
+  "driverId": "uuid",
+  "driverName": "Driver One",
+  "orderCount": 5,
+  "occurredAt": "2026-07-30T08:00:00"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tripId` | UUID | Trip ID |
+| `tripName` | String | Trip name |
+| `previousStatus` | Enum | Status before the change |
+| `newStatus` | Enum | Status after the change |
+| `driverId` | UUID/null | Assigned driver's ID |
+| `driverName` | String/null | Assigned driver's full name |
+| `orderCount` | int | Number of orders on the trip |
+| `occurredAt` | LocalDateTime | Timestamp of the status change |
+
+### Status values
+
+`PLANNING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
+
+### Events broadcast
+
+| Trigger | `previousStatus` | `newStatus` |
+|---------|------------------|-------------|
+| Driver starts trip | `PLANNING` | `IN_PROGRESS` |
+| Driver completes trip | `IN_PROGRESS` | `COMPLETED` |
+| Admin cancels trip | `PLANNING` or `IN_PROGRESS` | `CANCELLED` |
 
 ---
 

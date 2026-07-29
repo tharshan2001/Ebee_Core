@@ -19,11 +19,13 @@ import com.ebee.trip.dto.TripResponse;
 import com.ebee.trip.dto.UpdateTripRequest;
 import com.ebee.trip.entity.Trip;
 import com.ebee.trip.enums.TripStatus;
+import com.ebee.trip.event.TripStatusChangedEvent;
 import com.ebee.trip.mapper.TripMapper;
 import com.ebee.trip.repository.TripRepository;
 import com.ebee.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,7 @@ public class TripService {
     private final TripMapper tripMapper;
     private final ExpenseMapper expenseMapper;
     private final AuditLogService auditLogService;
+    private final ApplicationEventPublisher eventPublisher;
     private final SecurityService securityService;
 
     @Transactional
@@ -181,6 +184,7 @@ public class TripService {
             throw new IllegalStateException("Trip is already cancelled");
         }
 
+        TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.CANCELLED);
         trip = tripRepository.save(trip);
 
@@ -192,6 +196,8 @@ public class TripService {
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' cancelled");
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
 
         return toTripResponse(trip);
     }
@@ -232,11 +238,14 @@ public class TripService {
             throw new IllegalStateException("Driver already has an active trip: " + existingInProgress.get().getName());
         }
 
+        TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.IN_PROGRESS);
         trip = tripRepository.save(trip);
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' started");
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
 
         return toTripResponse(trip);
     }
@@ -322,11 +331,14 @@ public class TripService {
             throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
         }
 
+        TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.COMPLETED);
         trip = tripRepository.save(trip);
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' completed");
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
 
         return toTripResponse(trip);
     }

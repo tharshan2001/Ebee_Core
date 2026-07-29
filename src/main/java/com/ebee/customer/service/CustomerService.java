@@ -1,5 +1,8 @@
 package com.ebee.customer.service;
 
+import com.ebee.accounting.entity.CustomerLedger;
+import com.ebee.accounting.repository.CustomerLedgerRepository;
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.CodeGenerationService;
@@ -37,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +59,8 @@ public class CustomerService {
     private final OrderRepository orderRepository;
     private final CodeGenerationService codeGenerationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final LedgerService ledgerService;
+    private final CustomerLedgerRepository customerLedgerRepository;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -68,6 +74,7 @@ public class CustomerService {
                 .lastName(request.getLastName())
                 .phoneNumber(request.getPhoneNumber())
                 .email(request.getEmail())
+                .bookNo(request.getBookNo())
                 .customerCode(generateCustomerCode(request))
                 .build();
 
@@ -104,6 +111,9 @@ public class CustomerService {
         }
         if (request.getEmail() != null) {
             customer.setEmail(request.getEmail());
+        }
+        if (request.getBookNo() != null) {
+            customer.setBookNo(request.getBookNo());
         }
 
         if (request.getAddress() != null) {
@@ -161,6 +171,13 @@ public class CustomerService {
         String normalized = PhoneUtils.normalize(phoneNumber);
         Customer customer = customerRepository.findByPhoneNumber(normalized)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "phoneNumber", phoneNumber));
+        return toResponse(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerResponse getCustomerByBookNo(String bookNo) {
+        Customer customer = customerRepository.findByBookNo(bookNo)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "bookNo", bookNo));
         return toResponse(customer);
     }
 
@@ -242,6 +259,36 @@ public class CustomerService {
                 .map(this::toAdvanceTransactionResponse);
     }
 
+    @Transactional(readOnly = true)
+    public Page<CustomerLedger> getCustomerLedger(UUID customerId, Pageable pageable) {
+        if (!customerRepository.existsById(customerId)) {
+            throw new ResourceNotFoundException("Customer", "id", customerId);
+        }
+        return customerLedgerRepository.findByCustomerId(customerId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerLedger> getCustomerLedgerFiltered(UUID customerId, String entryType,
+                                                          LocalDateTime startDate, LocalDateTime endDate) {
+        if (!customerRepository.existsById(customerId)) {
+            throw new ResourceNotFoundException("Customer", "id", customerId);
+        }
+        List<CustomerLedger> allEntries = customerLedgerRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
+        return allEntries.stream()
+                .filter(e -> entryType == null || e.getTransactionType().equals(entryType))
+                .filter(e -> startDate == null || !e.getCreatedAt().isBefore(startDate))
+                .filter(e -> endDate == null || !e.getCreatedAt().isAfter(endDate))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getCustomerLedgerBalance(UUID customerId) {
+        if (!customerRepository.existsById(customerId)) {
+            throw new ResourceNotFoundException("Customer", "id", customerId);
+        }
+        return customerLedgerRepository.calculateBalance(customerId);
+    }
+
     @Transactional
     public CustomerAdvanceTransaction creditToAdvance(Customer customer, BigDecimal amount,
                                                        AdvanceReferenceType refType, UUID referenceId,
@@ -261,6 +308,13 @@ public class CustomerService {
 
         customer.setAdvanceBalance(newBalance);
         customerRepository.save(customer);
+
+        ledgerService.recordCustomerAdvance(
+                customer.getId(),
+                referenceId,
+                amount,
+                description
+        );
 
         publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
                 DuesChangeType.ADVANCE_CREDITED);
@@ -448,6 +502,7 @@ public class CustomerService {
         response.setLastName(customer.getLastName());
         response.setPhoneNumber(customer.getPhoneNumber());
         response.setEmail(customer.getEmail());
+        response.setBookNo(customer.getBookNo());
         response.setTotalOrders(customer.getTotalOrders());
         response.setCreditLimit(customer.getCreditLimit());
         response.setOutstandingBalance(customer.getOutstandingBalance());

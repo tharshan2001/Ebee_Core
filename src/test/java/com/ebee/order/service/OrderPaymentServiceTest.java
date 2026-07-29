@@ -39,6 +39,7 @@ class OrderPaymentServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private AuditLogService auditLogService;
     @Mock private SecurityService securityService;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
 
     @InjectMocks private OrderPaymentService orderPaymentService;
 

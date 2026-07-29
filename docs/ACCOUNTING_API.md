@@ -523,6 +523,113 @@ All period status changes are recorded in `accounting_period_audit`:
 
 ---
 
+## Customer Ledger API
+
+### Base Path: `/api/customers/{customerId}/ledger`
+
+These endpoints provide detailed access to customer ledger entries with full filtering and pagination support.
+
+---
+
+### 1. Get Customer Ledger Entries
+**GET** `/api/customers/{customerId}/ledger`
+
+Retrieves paginated customer ledger entries with optional filters.
+
+**Access:** ADMIN
+
+**Path Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `customerId` | UUID | Customer identifier |
+
+**Query Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `page` | int | No | Page number (default: 0) |
+| `size` | int | No | Page size (default: 20) |
+| `entryType` | String | No | Filter by transaction type (e.g., INVOICE, PAYMENT, REFUND) |
+| `startDate` | ISO DateTime | No | Filter entries after this date |
+| `endDate` | ISO DateTime | No | Filter entries before this date |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Customer ledger retrieved successfully",
+  "data": {
+    "content": [
+      {
+        "id": "uuid",
+        "entityId": "customer-uuid",
+        "transactionType": "INVOICE",
+        "debit": 10000.00,
+        "credit": 0.00,
+        "description": "Order JF-A-20260101-001",
+        "orderId": "order-uuid",
+        "paymentId": null,
+        "returnId": null,
+        "createdAt": "2026-07-29T10:30:00"
+      },
+      {
+        "id": "uuid",
+        "entityId": "customer-uuid",
+        "transactionType": "PAYMENT",
+        "debit": 0.00,
+        "credit": 5000.00,
+        "description": "Payment for Order JF-A-20260101-001 via CASH",
+        "orderId": "order-uuid",
+        "paymentId": "payment-uuid",
+        "returnId": null,
+        "createdAt": "2026-07-29T11:00:00"
+      }
+    ],
+    "totalElements": 2,
+    "totalPages": 1,
+    "number": 0,
+    "size": 20
+  }
+}
+```
+
+---
+
+### 2. Get Customer Ledger Balance
+**GET** `/api/customers/{customerId}/ledger/outstanding`
+
+Retrieves the current ledger balance (sum of debits - credits) for a customer.
+
+**Access:** ADMIN
+
+**Path Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `customerId` | UUID | Customer identifier |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Customer ledger balance retrieved",
+  "data": 5000.00
+}
+```
+
+---
+
+## Auto-Sync Points
+
+The customer ledger is automatically updated when the following events occur:
+
+| Event | Ledger Entry | Entry Type |
+|-------|--------------|------------|
+| Order created | Debit = order total amount | INVOICE |
+| Payment recorded | Credit = payment amount | PAYMENT |
+| Order returned | Credit = paid amount | REFUND |
+| Advance credited | Credit = advance amount | ADVANCE |
+
+---
+
 ## Migration Notes
 
 ### Required Migrations
@@ -531,6 +638,7 @@ All period status changes are recorded in `accounting_period_audit`:
 | V101 | Creates fiscal_years, accounting_periods, accounting_period_audit tables |
 | V102 | Creates customer_ledger, supplier_ledger, agent_ledger tables |
 | V106 | Adds CHECK constraint on order_items (product_id XOR combo_id) |
+| V107 | Adds book_no column to customers table |
 
 ### Ledger Initialization
 On migration V102:

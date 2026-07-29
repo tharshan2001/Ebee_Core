@@ -143,8 +143,10 @@ public class LedgerController {
             entry.getTransactionType(),
             entry.getDebit(),
             entry.getCredit(),
-            balance,
             entry.getDescription(),
+            entry.getOrderId(),
+            entry.getPaymentId(),
+            entry.getReturnId(),
             entry.getCreatedAt()
         );
     }
@@ -156,8 +158,10 @@ public class LedgerController {
             entry.getTransactionType(),
             entry.getDebit(),
             entry.getCredit(),
-            balance,
             entry.getDescription(),
+            null,
+            null,
+            null,
             entry.getCreatedAt()
         );
     }
@@ -169,8 +173,10 @@ public class LedgerController {
             entry.getTransactionType(),
             entry.getDebit(),
             entry.getCredit(),
-            balance,
             entry.getDescription(),
+            null,
+            null,
+            null,
             entry.getCreatedAt()
         );
     }

@@ -15,6 +15,7 @@ public class CustomerResponse {
     private String lastName;
     private String phoneNumber;
     private String email;
+    private String bookNo;
     private Integer totalOrders;
     private BigDecimal creditLimit;
     private BigDecimal outstandingBalance;

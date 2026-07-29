@@ -1,5 +1,7 @@
 package com.ebee.customer.controller;
 
+import com.ebee.accounting.dto.LedgerEntryResponse;
+import com.ebee.accounting.entity.CustomerLedger;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ebee.common.util.SortUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,6 +59,13 @@ public class CustomerController {
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByPhone(@PathVariable String phoneNumber) {
         CustomerResponse response = customerService.getCustomerByPhone(phoneNumber);
+        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
+    }
+
+    @GetMapping("/book-no/{bookNo}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByBookNo(@PathVariable String bookNo) {
+        CustomerResponse response = customerService.getCustomerByBookNo(bookNo);
         return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
     }
 
@@ -156,6 +166,42 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("Advance balance adjusted successfully", toAdvanceResponse(transaction)));
     }
 
+    @GetMapping("/{id}/ledger")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<LedgerEntryResponse>>> getCustomerLedger(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String entryType,
+            @RequestParam(required = false) LocalDateTime startDate,
+            @RequestParam(required = false) LocalDateTime endDate) {
+        Pageable pageable = PageRequest.of(page, size);
+
+        List<CustomerLedger> filteredEntries;
+        if (entryType != null || startDate != null || endDate != null) {
+            filteredEntries = customerService.getCustomerLedgerFiltered(id, entryType, startDate, endDate);
+        } else {
+            filteredEntries = customerService.getCustomerLedger(id, pageable).getContent();
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + size, filteredEntries.size());
+        List<CustomerLedger> pageContent = start < filteredEntries.size()
+                ? filteredEntries.subList(start, end)
+                : List.of();
+        Page<CustomerLedger> filtered = new org.springframework.data.domain.PageImpl<>(pageContent, pageable, filteredEntries.size());
+
+        PageResponse<LedgerEntryResponse> response = PageResponse.from(filtered.map(this::toLedgerEntryResponse));
+        return ResponseEntity.ok(ApiResponse.success("Customer ledger retrieved successfully", response));
+    }
+
+    @GetMapping("/{id}/ledger/outstanding")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<BigDecimal>> getCustomerLedgerOutstanding(@PathVariable UUID id) {
+        BigDecimal balance = customerService.getCustomerLedgerBalance(id);
+        return ResponseEntity.ok(ApiResponse.success("Customer ledger balance retrieved", balance));
+    }
+
     private AdvanceTransactionResponse toAdvanceResponse(CustomerAdvanceTransaction tx) {
         return new AdvanceTransactionResponse(
                 tx.getId(),
@@ -168,6 +214,21 @@ public class CustomerController {
                 tx.getReferenceId(),
                 tx.getDescription(),
                 tx.getCreatedAt()
+        );
+    }
+
+    private LedgerEntryResponse toLedgerEntryResponse(CustomerLedger entry) {
+        return new LedgerEntryResponse(
+                entry.getId(),
+                entry.getCustomerId(),
+                entry.getTransactionType(),
+                entry.getDebit(),
+                entry.getCredit(),
+                entry.getDescription(),
+                entry.getOrderId(),
+                entry.getPaymentId(),
+                entry.getReturnId(),
+                entry.getCreatedAt()
         );
     }
 }

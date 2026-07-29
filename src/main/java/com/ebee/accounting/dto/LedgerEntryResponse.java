@@ -10,7 +10,9 @@ public record LedgerEntryResponse(
     String transactionType,
     BigDecimal debit,
     BigDecimal credit,
-    BigDecimal balance,
     String description,
+    UUID orderId,
+    UUID paymentId,
+    UUID returnId,
     LocalDateTime createdAt
 ) {}

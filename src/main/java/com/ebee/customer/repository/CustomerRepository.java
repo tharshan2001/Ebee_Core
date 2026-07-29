@@ -22,7 +22,11 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     Optional<Customer> findByCustomerCode(String customerCode);
 
+    Optional<Customer> findByBookNo(String bookNo);
+
     boolean existsByPhoneNumber(String phoneNumber);
+
+    boolean existsByBookNo(String bookNo);
 
     @Modifying
     @Query("UPDATE Customer c SET c.totalOrders = c.totalOrders + 1 WHERE c.id = :id")
@@ -42,10 +46,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
            countQuery = "SELECT COUNT(c) FROM Customer c")
     Page<Customer> findAll(Pageable pageable);
 
-    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search%")
+    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search% OR c.bookNo LIKE %:search%")
     Page<Customer> findBySearchTerm(@Param("search") String search, Pageable pageable);
 
-    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search%")
+    @Query("SELECT c FROM Customer c LEFT JOIN FETCH c.address WHERE c.phoneNumber LIKE %:search% OR c.firstName LIKE %:search% OR c.lastName LIKE %:search% OR c.email LIKE %:search% OR c.customerCode LIKE %:search% OR c.bookNo LIKE %:search%")
     List<Customer> findBySearchTerm(@Param("search") String search);
 
     List<Customer> findByOutstandingBalanceGreaterThan(BigDecimal balance, Sort sort);

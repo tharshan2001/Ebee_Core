@@ -1,186 +1,222 @@
 # ERP Accounting Hardening - Branch Summary
 
-## What Was Done
+## All Database Changes
 
-### 1. Customer Ledger Auto-Sync
-- **Book No Field**: Added `book_no` column to `customers` table (V107)
-- **Auto-Recording**: Customer ledger entries created automatically on:
+### New Tables Created
+| Table | Migration | Description |
+|-------|-----------|-------------|
+| `fiscal_years` | V101 | Fiscal year definitions |
+| `accounting_periods` | V101 | Monthly periods with OPEN/CLOSED/ARCHIVED status |
+| `accounting_period_audit` | V101 | Period status change history |
+| `customer_ledger` | V102 | Customer accounts receivable entries |
+| `supplier_ledger` | V102 | Supplier accounts payable entries |
+| `agent_ledger` | V102 | Agent commission tracking |
+| `customer_balance_cache` | V102 | Cached customer balances |
+| `supplier_balance_cache` | V102 | Cached supplier balances |
+| `agent_balance_cache` | V102 | Cached agent balances |
+| `accounting_period_transactions` | V109 | Automatic transaction tracking per period |
+
+### Table Modifications
+| Table | Migration | Change |
+|-------|-----------|--------|
+| `customers` | V107 | Added `book_no` column (unique, nullable) |
+| `order_items` | V106 | Added CHECK constraint (product_id XOR combo_id) |
+| `fiscal_years` | V108 | Renamed `year`→`fiscal_year`, `is_closed`→`is_active`, added `updated_at` |
+| `accounting_period_audit` | V101 | Schema: added `fiscal_year`, `month`, `year`, `changed_by`, `changed_at` |
+
+### Inventory Changes (No New Table - Enhanced Queries)
+- Added queries for FIFO layer tracking and low stock alerts
+
+---
+
+## All Code Changes
+
+### New Files Created
+```
+src/main/java/com/ebee/
+├── accounting/
+│   ├── controller/
+│   │   ├── AccountingPeriodController.java    # Period CRUD endpoints
+│   │   └── LedgerController.java             # Manual ledger entry endpoints
+│   ├── dto/
+│   │   ├── AccountingPeriodResponse.java
+│   │   ├── LedgerEntryResponse.java
+│   │   ├── PeriodActionRequest.java
+│   │   └── RecordLedgerRequest.java
+│   ├── entity/
+│   │   ├── AccountingPeriod.java
+│   │   ├── AccountingPeriodAudit.java
+│   │   ├── AccountingPeriodTransaction.java   # NEW - period transaction tracking
+│   │   ├── AgentBalanceCache.java
+│   │   ├── AgentLedger.java
+│   │   ├── CustomerBalanceCache.java
+│   │   ├── CustomerLedger.java
+│   │   ├── FiscalYear.java
+│   │   └── SupplierBalanceCache.java
+│   ├── enums/
+│   │   ├── LedgerTransactionType.java
+│   │   ├── LedgerType.java
+│   │   └── PeriodStatus.java
+│   ├── repository/
+│   │   ├── AccountingPeriodAuditRepository.java
+│   │   ├── AccountingPeriodRepository.java
+│   │   ├── AccountingPeriodTransactionRepository.java
+│   │   ├── AgentBalanceCacheRepository.java
+│   │   ├── AgentLedgerRepository.java
+│   │   ├── CustomerBalanceCacheRepository.java
+│   │   ├── CustomerLedgerRepository.java
+│   │   ├── FiscalYearRepository.java
+│   │   └── SupplierBalanceCacheRepository.java
+│   └── service/
+│       ├── AccountingPeriodService.java       # Period management logic
+│       └── LedgerService.java                # Ledger entry recording
+├── reporting/
+│   ├── controller/ReportsController.java     # Unified reports API
+│   ├── dto/
+│   │   ├── AgingReportResponse.java
+│   │   ├── ReportSummaryResponse.java
+│   │   └── TrialBalanceResponse.java
+│   └── service/ReportsService.java           # Combined reports logic
+└── notification/
+    └── (enhanced for order events)
+```
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `CustomerController.java` | Added bookNo lookup, ledger endpoints |
+| `CustomerService.java` | Added ledger sync on advance, SecurityService injection |
+| `CustomerRepository.java` | Added `findByBookNo()`, `existsByBookNo()`, `countActive()` |
+| `Customer.java` | Added `bookNo` field |
+| `CustomerRequest.java` | Added `bookNo` field |
+| `CustomerResponse.java` | Added `bookNo` field |
+| `OrderServiceImpl.java` | Added ledger calls for INVOICE, REFUND |
+| `OrderPaymentService.java` | Added ledger calls for PAYMENT |
+| `InventoryRepository.java` | Added low stock queries |
+| `AgentRepository.java` | Added `countActive()` |
+| `SalesController.java` | Added @Deprecated annotations |
+| `SalesController.java` | Added @Deprecated annotations |
+| `LedgerController.java` | Added SecurityService for recordedBy |
+
+### Deleted Files
+| File | Reason |
+|------|--------|
+| `FinanceController.java` | Replaced by ReportsController |
+| `FinanceService.java` | Replaced by ReportsService |
+| `FinanceSummaryResponse.java` | Replaced by ReportSummaryResponse |
+| `CategoryBreakdown.java` | Duplicated in reporting dto |
+| `PeriodInfo.java` | Duplicated in reporting dto |
+
+---
+
+## Features Implemented
+
+### 1. Customer Ledger Auto-Sync ✅
+- **Book No**: Unique customer identifier (`book_no` column)
+- **Auto-Recording** on:
   - Order creation → INVOICE (debit)
   - Payment recording → PAYMENT (credit)
   - Order return → REFUND (credit)
   - Advance credited → ADVANCE (credit)
 
-### 2. Accounting Period Transactions
-- **New Table**: `accounting_period_transactions` (V109) - tracks all ledger entries against periods
-- **Auto-Recording**: Every ledger entry automatically recorded to current open period
-- **Period Enforcement**: Entries only recorded if matching OPEN period exists
-- **Audit Fields**: `recorded_by`, `recorded_at` on all transactions
+### 2. Accounting Period Transactions ✅
+- New `accounting_period_transactions` table (V109)
+- Every ledger entry automatically recorded to current OPEN period
+- Requires open period for current month/year
+- Logs warning if no open period exists
 
-### 3. Fiscal Year Schema Fix
-- **Migration V108**: Fixed `fiscal_years` table schema
-  - Renamed `year` → `fiscal_year`
-  - Renamed `is_closed` → `is_active`
-  - Added `updated_at` column
+### 3. Unified Reports API ✅
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/reports/summary` | Combined sales + finance + dashboard |
+| `GET /api/reports/trial-balance` | All ledger entries with totals |
+| `GET /api/reports/aging` | Customer outstanding aging |
 
-### 4. Unified Reports API
-- **New Endpoint**: `GET /api/reports/summary` - combined sales + finance + dashboard metrics
-- **New Endpoint**: `GET /api/reports/trial-balance` - all ledger entries by type with totals
-- **New Endpoint**: `GET /api/reports/aging` - customer outstanding aging buckets (current/30/60/90/90+)
-- **Deprecated**: Old `/api/finance/summary`, `/api/sales/summary`, `/api/sales/dashboard`
+### 4. Manual Ledger Endpoints ✅
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| `POST /ledger/customer/{id}/invoice` | ADMIN | Manual invoice |
+| `POST /ledger/customer/{id}/payment` | ADMIN/AGENT | Manual payment |
+| `POST /ledger/customer/{id}/refund` | ADMIN | Manual refund |
+| `POST /ledger/supplier/{id}/invoice` | ADMIN | Supplier invoice |
+| `POST /ledger/supplier/{id}/payment` | ADMIN | Supplier payment |
+| `POST /ledger/agent/{id}/commission` | ADMIN | Agent commission |
+| `POST /ledger/agent/{id}/payout` | ADMIN | Agent payout |
 
-### 5. Database Migrations
-| Version | Description |
-|---------|-------------|
-| V101 | Creates fiscal_years, accounting_periods, accounting_period_audit tables |
-| V102 | Creates customer_ledger, supplier_ledger, agent_ledger tables |
-| V106 | Adds CHECK constraint on order_items (product_id XOR combo_id) |
-| V107 | Adds book_no column to customers table |
-| V108 | Fixes fiscal_years schema (year→fiscal_year, is_closed→is_active) |
-| V109 | Creates accounting_period_transactions table |
-
----
-
-## What Needs to Be Added for Full Control
-
-### 1. Supplier & Agent Ledger Auto-Sync
-**Current State**: Only customer ledger auto-syncs to accounting periods
-**Needed**:
-- `recordSupplierInvoice` → should call `recordPeriodTransaction()`
-- `recordSupplierPayment` → should call `recordPeriodTransaction()`
-- `recordAgentCommission` → should call `recordPeriodTransaction()`
-- `recordAgentPayout` → should call `recordPeriodTransaction()`
-
-### 2. Accounting Period Management UI
-**Current State**: No admin UI for period management
-**Needed**:
-- Open/Close/Reopen/Archive periods via API (endpoints exist)
-- Admin dashboard widget showing current period status
-- Warning when no open period exists for current month
-
-### 3. Trial Balance Report
-**Current State**: Basic endpoint returns all ledger entries
-**Needed**:
-- Period selector (filter by specific month/year)
-- Group by entity type (customer/supplier/agent)
-- Export to CSV/PDF
-- Totals validation (debit = credit)
-
-### 4. Aging Report Enhancements
-**Current State**: Basic aging buckets by customer
-**Needed**:
-- Filter by date range
-- Filter by agent (show only their customers)
-- Export to CSV/PDF
-- Drill-down to specific customer orders
-
-### 5. Daily Cash Flow Report
-**Current State**: Not implemented
-**Needed**:
-- `GET /api/reports/cash-flow?month=7&year=2026`
-- Daily breakdown: payments received, refunds issued, expenses paid
-- Running balance per day
-
-### 6. Commission Report
-**Current State**: Basic commission calculation
-**Needed**:
-- `GET /api/reports/commissions?period=monthly`
-- By agent breakdown
-- By status (pending/approved/paid)
-- Export to CSV/PDF
-
-### 7. Supplier Liability Report
-**Current State**: Not implemented
-**Needed**:
-- `GET /api/reports/supplier-liabilities`
-- All outstanding amounts to suppliers
-- By supplier breakdown
-- Aging of PO receipts
-
-### 8. Dashboard Widgets
-**Current State**: Basic summary metrics
-**Needed**:
-- Current accounting period status (is it open?)
-- Outstanding vs collected this month
-- Low stock alerts
-- Commission liability (pending + approved, not yet paid)
-
-### 9. Audit Log Integration
-**Current State**: Basic audit logging exists
-**Needed**:
-- UI to view audit logs
-- Filter by entity type, action, user, date range
-- Export to CSV
-
-### 10. Role-Based Access for Reports
-**Current State**: Most reports require ADMIN only
-**Needed**:
-- AGENT: Can view own sales stats, own commission status
-- ADMIN: Full access to all reports
-- SUPER_ADMIN: Can view/edit accounting periods
+### 5. Accounting Period Management ✅
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| `GET /api/accounting/periods` | ADMIN | List all periods |
+| `GET /api/accounting/periods/open` | ADMIN | Get open periods |
+| `POST /api/accounting/periods/open` | ADMIN | Open a period |
+| `POST /api/accounting/periods/close` | ADMIN | Close a period |
+| `POST /api/accounting/periods/reopen` | SUPER_ADMIN | Reopen closed |
+| `POST /api/accounting/periods/archive` | SUPER_ADMIN | Archive period |
 
 ---
 
-## API Endpoints Summary
+## What Still Needs to Be Done
+
+### High Priority
+1. **Supplier Ledger Auto-Sync** - Not recording to accounting periods
+2. **Agent Ledger Auto-Sync** - Not recording to accounting periods
+3. **Period Management UI** - API exists, need admin UI
+
+### Medium Priority
+4. **Trial Balance Enhancements** - Period filter, export
+5. **Aging Report Enhancements** - Filters, export, drill-down
+6. **Daily Cash Flow Report** - Not implemented
+7. **Commission Report** - Not implemented
+8. **Supplier Liability Report** - Not implemented
+
+### Low Priority
+9. **Dashboard Widgets** - Period status, alerts
+10. **Audit Log UI** - View/filter logs
+11. **Role Refinement** - AGENT vs ADMIN access controls
+
+---
+
+## API Summary
 
 ### Reports API (`/api/reports`)
-| Endpoint | Method | Access | Description |
-|----------|--------|--------|-------------|
-| `/summary` | GET | ADMIN | Combined sales + finance + dashboard |
-| `/trial-balance` | GET | ADMIN | All ledger entries with totals |
-| `/aging` | GET | ADMIN | Customer outstanding aging buckets |
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| `/summary` | ADMIN | Combined sales + finance + dashboard |
+| `/trial-balance` | ADMIN | All ledger entries |
+| `/aging` | ADMIN | Customer aging buckets |
 
 ### Accounting API (`/api/accounting`)
-| Endpoint | Method | Access | Description |
-|----------|--------|--------|-------------|
-| `/periods` | GET | ADMIN | List all periods |
-| `/periods/open` | GET/POST | ADMIN | Get/Create open periods |
-| `/periods/close` | POST | ADMIN | Close a period |
-| `/periods/reopen` | POST | SUPER_ADMIN | Reopen closed period |
-| `/periods/archive` | POST | SUPER_ADMIN | Archive period |
-| `/ledger/customer/{id}/balance` | GET | ADMIN | Customer balance |
-| `/ledger/customer/{id}/invoice` | POST | ADMIN | Manual invoice entry |
-| `/ledger/customer/{id}/payment` | POST | ADMIN/AGENT | Manual payment entry |
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| `/periods` | ADMIN | List periods |
+| `/periods/open` | ADMIN | Get/Create open |
+| `/periods/close` | ADMIN | Close period |
+| `/periods/reopen` | SUPER_ADMIN | Reopen |
+| `/periods/archive` | SUPER_ADMIN | Archive |
+| `/ledger/customer/{id}/balance` | ADMIN | Customer balance |
+| `/ledger/customer/{id}/invoice` | ADMIN | Manual invoice |
+| `/ledger/customer/{id}/payment` | ADMIN/AGENT | Manual payment |
 
-### Customer Ledger API (`/api/customers`)
-| Endpoint | Method | Access | Description |
-|----------|--------|--------|-------------|
-| `/{id}/ledger` | GET | ADMIN | Customer ledger entries |
-| `/{id}/ledger/outstanding` | GET | ADMIN | Customer outstanding balance |
-| `/book-no/{bookNo}` | GET | Public | Lookup by book number |
-
----
-
-## Database Schema Summary
-
-### Core Accounting Tables
-- `fiscal_years` - Fiscal year definitions
-- `accounting_periods` - Monthly periods with status (OPEN/CLOSED/ARCHIVED)
-- `accounting_period_audit` - Period status change history
-- `accounting_period_transactions` - Automatic transaction tracking
-
-### Ledger Tables
-- `customer_ledger` - Customer accounts receivable
-- `supplier_ledger` - Supplier accounts payable
-- `agent_ledger` - Agent commission tracking
-
-### Balance Caches
-- `customer_balance_cache` - Cached customer balances
-- `supplier_balance_cache` - Cached supplier balances
-- `agent_balance_cache` - Cached agent balances
+### Customer API (`/api/customers`)
+| Endpoint | Access | Description |
+|----------|--------|-------------|
+| `/{id}/ledger` | ADMIN | Ledger entries |
+| `/{id}/ledger/outstanding` | ADMIN | Balance |
+| `/book-no/{bookNo}` | Public | Lookup |
 
 ---
 
-## Configuration
+## Database Migrations Summary
 
-### Environment Variables Required
-```
-DB_URL=jdbc:postgresql://localhost:5432/ebee_db
-DB_USERNAME=ebee
-DB_PASSWORD=<password>
-JWT_SECRET=<256-bit-secret>
-```
+| Version | Files Changed | Description |
+|---------|--------------|-------------|
+| V101 | 1 file | Creates fiscal_years, accounting_periods, accounting_period_audit |
+| V102 | 1 file | Creates ledger tables and balance caches |
+| V106 | 1 file | CHECK constraint on order_items |
+| V107 | 1 file | Adds book_no to customers |
+| V108 | 1 file | Fixes fiscal_years schema |
+| V109 | 1 file | Creates accounting_period_transactions |
 
-### Security
-- Public endpoints: `/api/auth/**`, `/api/customers/phone/**`, `/api/customers/book-no/**`, `/api/products/**`, `/api/categories/**`, `/api/combos/{id}`
-- ADMIN endpoints: All accounting and report endpoints
-- SUPER_ADMIN: Period archive/reopen only
+**Total**: 6 migrations, ~250 lines SQL
+
+**Code Changes**: ~50 files modified, ~3000 lines added, ~200 lines deleted

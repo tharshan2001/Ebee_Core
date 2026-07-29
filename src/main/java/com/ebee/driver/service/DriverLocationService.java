@@ -38,16 +38,16 @@ public class DriverLocationService {
     private static final String RATE_LIMIT_KEY_PREFIX = "driver:ratelimit:";
     private static final String LAST_UPDATE_KEY_PREFIX = "driver:location:lastupdate:";
     private static final long LOCATION_TTL_MINUTES = 5;
-    private static final long RATE_LIMIT_MS = 300;
-    private static final double MIN_MOVEMENT_METERS = 3.0;
-    private static final float MIN_SPEED_KMH = 1.0f;
-    private static final float MIN_HEADING_CHANGE_DEGREES = 5.0f;
+    private static final long RATE_LIMIT_MS = 100;
+    private static final double MIN_MOVEMENT_METERS = 0.5;
+    private static final float MIN_SPEED_KMH = 0.5f;
+    private static final float MIN_HEADING_CHANGE_DEGREES = 3.0f;
 
-    private static final long BROADCAST_INTERVAL_MS = 1000;
-    private static final long SPEED_TIER_STOPPED_MS = 5000;
-    private static final long SPEED_TIER_SLOW_MS = 2000;
-    private static final long SPEED_TIER_NORMAL_MS = 1000;
-    private static final long SPEED_TIER_FAST_MS = 500;
+    private static final long BROADCAST_INTERVAL_MS = 500;
+    private static final long SPEED_TIER_STOPPED_MS = 1000;
+    private static final long SPEED_TIER_SLOW_MS = 500;
+    private static final long SPEED_TIER_NORMAL_MS = 300;
+    private static final long SPEED_TIER_FAST_MS = 200;
 
     private static final double EARTH_RADIUS_METERS = 6371000;
 
@@ -116,15 +116,6 @@ public class DriverLocationService {
                 if (bearingDiff < MIN_HEADING_CHANGE_DEGREES) {
                     filteredBearing = lastGoodBearing;
                 }
-            }
-        }
-
-        if (existing != null) {
-            double distance = haversineDistance(existing.latitude, existing.longitude, newLat, newLng);
-            if (distance < MIN_MOVEMENT_METERS && existing.speed != null && existing.speed < MIN_SPEED_KMH && newSpeed != null && newSpeed < MIN_SPEED_KMH) {
-                log.debug("Driver {} stationary, skipping position update", driverId);
-                return buildResponse(driverId, driverName, photoUrl, existing.latitude, existing.longitude,
-                    filteredBearing, newSpeed, request.accuracy(), Instant.now(), newSeq);
             }
         }
 

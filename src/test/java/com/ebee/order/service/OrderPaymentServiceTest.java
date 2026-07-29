@@ -214,4 +214,34 @@ class OrderPaymentServiceTest {
                 .hasMessageContaining("Order not found");
     }
 
+    @Test
+    void recordPayment_recordsPaymentInLedger() {
+        Order order = unpaidOrder(new BigDecimal("2000.00"), PaymentMethod.COD);
+        order.setOrderNumber("ORD-TEST-001");
+
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(orderRepository.sumOutstandingByCustomerId(customer.getId())).thenReturn(BigDecimal.ZERO);
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
+        when(paymentRepository.save(any())).thenAnswer(invocation -> {
+            Payment p = invocation.getArgument(0);
+            if (p.getId() == null) {
+                p.setId(UUID.randomUUID());
+            }
+            return p;
+        });
+
+        RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("1000.00"), PaymentMethod.CASH, null, null);
+        orderPaymentService.recordPayment(order.getId(), request);
+
+        verify(ledgerService).recordCustomerPayment(
+                eq(customer.getId()),
+                any(UUID.class),
+                eq(new BigDecimal("1000.00")),
+                contains("Payment for Order")
+        );
+    }
+
 }

@@ -54,7 +54,7 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     List<Customer> findByOutstandingBalanceGreaterThan(BigDecimal balance, Sort sort);
 
-    @Query("SELECT COUNT(c) FROM Customer c WHERE c.active = true")
+    @Query("SELECT COUNT(c) FROM Customer c WHERE c.totalOrders > 0")
     Long countActive();
 
     @Query("SELECT c FROM Customer c WHERE c.outstandingBalance > 0 ORDER BY c.outstandingBalance DESC")

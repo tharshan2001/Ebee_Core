@@ -1,13 +1,13 @@
 -- V102: Create ledger tables for customer, supplier, and agent
 -- Implemented as immutable append-only ledgers
 
--- Create customer_ledger table
+-- Create customer_ledger table (return_id removed - returns table not in final schema)
 CREATE TABLE customer_ledger (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id uuid NOT NULL REFERENCES customers(id),
     order_id uuid REFERENCES orders(id),
     payment_id uuid REFERENCES payments(id),
-    return_id uuid REFERENCES returns(id),
+    return_id uuid,
     transaction_type varchar(50) NOT NULL,
     debit decimal(12,2) DEFAULT 0 CHECK (debit >= 0),
     credit decimal(12,2) DEFAULT 0 CHECK (credit >= 0),
@@ -32,7 +32,8 @@ CREATE TABLE supplier_ledger (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     supplier_id uuid NOT NULL REFERENCES suppliers(id),
     purchase_order_id uuid REFERENCES purchase_orders(id),
-    expense_id uuid REFERENCES expenses(id),
+    expense_id uuid,
+    supplier_payment_id uuid,
     transaction_type varchar(50) NOT NULL,
     debit decimal(12,2) DEFAULT 0 CHECK (debit >= 0),
     credit decimal(12,2) DEFAULT 0 CHECK (credit >= 0),
@@ -91,6 +92,7 @@ CREATE INDEX idx_supplier_ledger_supplier ON supplier_ledger(supplier_id);
 CREATE INDEX idx_supplier_ledger_supplier_date ON supplier_ledger(supplier_id, created_at);
 CREATE INDEX idx_supplier_ledger_po ON supplier_ledger(purchase_order_id);
 CREATE INDEX idx_supplier_ledger_expense ON supplier_ledger(expense_id);
+CREATE INDEX idx_supplier_ledger_supplier_payment ON supplier_ledger(supplier_payment_id);
 CREATE INDEX idx_supplier_ledger_type ON supplier_ledger(transaction_type);
 CREATE INDEX idx_supplier_balance_cache_supplier ON supplier_balance_cache(supplier_id);
 

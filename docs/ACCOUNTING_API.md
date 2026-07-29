@@ -518,8 +518,64 @@ All period status changes are recorded in `accounting_period_audit`:
 | `old_status` | Previous status |
 | `new_status` | New status |
 | `reason` | Reason for change |
-| `performed_by` | User who made change |
-| `performed_at` | Timestamp |
+| `changed_by` | User who made change |
+| `changed_at` | Timestamp |
+
+---
+
+## Accounting Period Transactions
+
+### Overview
+Every ledger entry is automatically recorded in `accounting_period_transactions` when posted through the ledger service. This provides:
+- **Granular transaction tracking** per accounting period
+- **Audit trail** linking ledger entries to specific periods
+- **Automatic period assignment** based on current date
+
+### How It Works
+When a ledger entry is created (INVOICE, PAYMENT, REFUND, ADVANCE):
+1. The entry is saved to the appropriate ledger table (customer/supplier/agent)
+2. The system checks for an **OPEN** period matching the current month/year
+3. If an open period exists, a corresponding entry is created in `accounting_period_transactions`
+
+### Transaction Table Schema
+```sql
+accounting_period_transactions (
+    id              UUID PRIMARY KEY,
+    period_id       UUID REFERENCES accounting_periods(id),
+    fiscal_year     INTEGER NOT NULL,
+    month           INTEGER NOT NULL,
+    year            INTEGER NOT NULL,
+    transaction_type VARCHAR(50) NOT NULL,  -- INVOICE, PAYMENT, REFUND, ADVANCE
+    debit           DECIMAL(15,2) DEFAULT 0,
+    credit          DECIMAL(15,2) DEFAULT 0,
+    reference_id    UUID,                   -- order/payment/return ID
+    reference_type  VARCHAR(50),             -- ORDER, PAYMENT, RETURN, ADVANCE
+    description     VARCHAR(500),
+    recorded_by     UUID NOT NULL,          -- user who recorded
+    recorded_at     TIMESTAMP NOT NULL
+)
+```
+
+### Auto-Sync Triggers
+| Event | Ledger Entry | Period Transaction |
+|-------|--------------|-------------------|
+| Order created | Debit = order total | INVOICE (debit) |
+| Payment recorded | Credit = payment amount | PAYMENT (credit) |
+| Order returned | Credit = paid amount | REFUND (debit) |
+| Advance credited | Credit = advance amount | ADVANCE (credit) |
+
+### Behavior When No Open Period
+If no open period exists for the current month/year:
+- The ledger entry is still created (ledger is always authoritative)
+- A warning is logged: `"No open period found for {}/{}, transaction not recorded"`
+- No period transaction entry is created
+- Admin must open a period before entries can be tracked
+
+### Benefits
+1. **Period-based reporting** - Aggregate transactions by period
+2. **Audit compliance** - Every entry linked to who recorded it and when
+3. **Reconciliation** - Can reconcile ledger totals against period transaction totals
+4. **Automatic** - No manual intervention required for customer ledger entries
 
 ---
 
@@ -630,6 +686,21 @@ The customer ledger is automatically updated when the following events occur:
 
 ---
 
+## Internal Service Methods
+
+The `LedgerService` contains additional internal methods not exposed as REST endpoints:
+
+| Method | Purpose | Called By |
+|--------|---------|-----------|
+| `recordSupplierExpense()` | Records supplier expense (debit) | Internal only |
+| `getCustomerBalance()` | Calculates customer balance | Internal + REST |
+| `getSupplierBalance()` | Calculates supplier balance | Internal + REST |
+| `getAgentBalance()` | Calculates agent balance | Internal + REST |
+
+These internal methods are available for programmatic use but do not have corresponding REST API endpoints.
+
+---
+
 ## Migration Notes
 
 ### Required Migrations
@@ -639,6 +710,8 @@ The customer ledger is automatically updated when the following events occur:
 | V102 | Creates customer_ledger, supplier_ledger, agent_ledger tables |
 | V106 | Adds CHECK constraint on order_items (product_id XOR combo_id) |
 | V107 | Adds book_no column to customers table |
+| V108 | Fixes fiscal_years schema: renames `year`→`fiscal_year`, `is_closed`→`is_active`, drops `name`, adds `updated_at` |
+| V109 | Creates accounting_period_transactions table for automatic period transaction tracking |
 
 ### Ledger Initialization
 On migration V102:
@@ -658,6 +731,13 @@ On migration V102:
 }
 ```
 
+Common 400 errors:
+- `"No open period found for {}/{}, transaction not recorded"` - No OPEN period exists for current month/year
+- `"Period is not open (status={})"` - Attempted to post to a non-OPEN period
+- `"Period not found"` - Requested period doesn't exist
+- `"Can only close OPEN periods"` - Period must be OPEN to close
+- `"Can only reopen CLOSED periods"` - Period must be CLOSED to reopen
+
 ### 403 Forbidden
 ```json
 {
@@ -672,4 +752,45 @@ On migration V102:
   "success": false,
   "message": "Period not found"
 }
+```
+
+### 500 Internal Server Error
+```json
+{
+  "success": false,
+  "message": "An unexpected error occurred"
+}
+```
+
+---
+
+## Period Transaction Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     LEDGER ENTRY CREATED                            │
+│            (Order, Payment, Return, Advance)                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     CHECK CURRENT MONTH/YEAR                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                    ┌─────────────┴─────────────┐
+                    ▼                           ▼
+         ┌─────────────────┐         ┌─────────────────┐
+         │  OPEN PERIOD    │         │ NO OPEN PERIOD  │
+         │    EXISTS       │         │    FOR MONTH    │
+         └─────────────────┘         └─────────────────┘
+                    │                           │
+                    ▼                           ▼
+┌─────────────────────────────┐    ┌─────────────────────────────┐
+│  1. Save Ledger Entry       │    │  1. Save Ledger Entry       │
+│  2. Find Period by          │    │  2. LOG WARNING             │
+│     Month + Year            │    │     "No open period..."     │
+│  3. Create Period           │    │  3. NO Period Transaction   │
+│     Transaction             │    │     Created                 │
+│  4. Return Ledger Entry     │    │  4. Return Ledger Entry     │
+└─────────────────────────────┘    └─────────────────────────────┘
 ```

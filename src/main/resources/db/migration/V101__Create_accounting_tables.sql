@@ -63,4 +63,4 @@ CREATE INDEX idx_accounting_periods_fiscal_year ON accounting_periods(fiscal_yea
 CREATE INDEX idx_accounting_periods_year_month ON accounting_periods(year, month);
 CREATE INDEX idx_accounting_periods_status ON accounting_periods(status);
 CREATE INDEX idx_accounting_period_audit_period ON accounting_period_audit(period_id);
-CREATE INDEX idx_accounting_period_audit_performer ON accounting_period_audit(performed_by);
+CREATE INDEX idx_accounting_period_audit_performer ON accounting_period_audit(changed_by);

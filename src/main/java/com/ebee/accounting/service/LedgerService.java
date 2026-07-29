@@ -115,7 +115,19 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording customer advance: customer={}, payment={}, amount={}", customerId, paymentId, amount);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.ADVANCE.name(),
+                BigDecimal.ZERO,
+                amount,
+                paymentId,
+                "ADVANCE",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional(readOnly = true)

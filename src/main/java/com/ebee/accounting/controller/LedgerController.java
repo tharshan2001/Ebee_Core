@@ -8,6 +8,7 @@ import com.ebee.accounting.enums.LedgerTransactionType;
 import com.ebee.accounting.enums.LedgerType;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.security.SecurityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class LedgerController {
 
     private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     @GetMapping("/customer/{customerId}/balance")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
@@ -52,7 +54,7 @@ public class LedgerController {
             @RequestParam UUID orderId,
             @RequestParam BigDecimal amount,
             @RequestParam(required = false) String description) {
-        CustomerLedger entry = ledgerService.recordCustomerInvoice(customerId, orderId, amount, description);
+        CustomerLedger entry = ledgerService.recordCustomerInvoice(customerId, orderId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
         LedgerEntryResponse response = toResponse(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Customer invoice recorded", response));
@@ -65,7 +67,7 @@ public class LedgerController {
             @RequestParam UUID paymentId,
             @RequestParam BigDecimal amount,
             @RequestParam(required = false) String description) {
-        CustomerLedger entry = ledgerService.recordCustomerPayment(customerId, paymentId, amount, description);
+        CustomerLedger entry = ledgerService.recordCustomerPayment(customerId, paymentId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
         LedgerEntryResponse response = toResponse(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Customer payment recorded", response));
@@ -78,7 +80,7 @@ public class LedgerController {
             @RequestParam UUID returnId,
             @RequestParam BigDecimal amount,
             @RequestParam(required = false) String description) {
-        CustomerLedger entry = ledgerService.recordCustomerRefund(customerId, returnId, amount, description);
+        CustomerLedger entry = ledgerService.recordCustomerRefund(customerId, returnId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
         LedgerEntryResponse response = toResponse(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Customer refund recorded", response));

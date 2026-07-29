@@ -171,7 +171,8 @@ public class OrderPaymentService {
                 order.getCustomer().getId(),
                 payment.getId(),
                 request.amount(),
-                "Payment for Order " + order.getOrderNumber() + " via " + request.paymentMethod()
+                "Payment for Order " + order.getOrderNumber() + " via " + request.paymentMethod(),
+                currentUserId
         );
 
         if (isCreditOrder || isCodOrder) {

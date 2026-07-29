@@ -2,16 +2,20 @@ package com.ebee.accounting.service;
 
 import com.ebee.accounting.entity.AccountingPeriod;
 import com.ebee.accounting.entity.AccountingPeriodAudit;
+import com.ebee.accounting.entity.AccountingPeriodTransaction;
 import com.ebee.accounting.entity.FiscalYear;
 import com.ebee.accounting.enums.PeriodStatus;
 import com.ebee.accounting.repository.AccountingPeriodAuditRepository;
 import com.ebee.accounting.repository.AccountingPeriodRepository;
+import com.ebee.accounting.repository.AccountingPeriodTransactionRepository;
 import com.ebee.accounting.repository.FiscalYearRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +28,7 @@ public class AccountingPeriodService {
 
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final AccountingPeriodAuditRepository accountingPeriodAuditRepository;
+    private final AccountingPeriodTransactionRepository accountingPeriodTransactionRepository;
     private final FiscalYearRepository fiscalYearRepository;
 
     @Transactional(readOnly = true)
@@ -162,5 +167,63 @@ public class AccountingPeriodService {
     @Transactional(readOnly = true)
     public List<AccountingPeriodAudit> getPeriodHistory(UUID periodId) {
         return accountingPeriodAuditRepository.findByPeriodIdOrderByChangedAtDesc(periodId);
+    }
+
+    @Transactional
+    public AccountingPeriodTransaction recordPeriodTransaction(
+            String transactionType,
+            BigDecimal debit,
+            BigDecimal credit,
+            UUID referenceId,
+            String referenceType,
+            String description,
+            UUID recordedBy) {
+
+        LocalDate today = LocalDate.now();
+        int month = today.getMonthValue();
+        int year = today.getYear();
+
+        Optional<AccountingPeriod> periodOpt = accountingPeriodRepository.findByMonthAndYear(month, year);
+
+        if (periodOpt.isEmpty()) {
+            log.warn("No open period found for {}/{}, transaction not recorded", month, year);
+            return null;
+        }
+
+        AccountingPeriod period = periodOpt.get();
+        if (period.getStatus() != PeriodStatus.OPEN) {
+            log.warn("Period {}/{} is not open (status={}), transaction not recorded", month, year, period.getStatus());
+            return null;
+        }
+
+        AccountingPeriodTransaction transaction = AccountingPeriodTransaction.builder()
+                .periodId(period.getId())
+                .fiscalYear(year)
+                .month(month)
+                .year(year)
+                .transactionType(transactionType)
+                .debit(debit)
+                .credit(credit)
+                .referenceId(referenceId)
+                .referenceType(referenceType)
+                .description(description)
+                .recordedBy(recordedBy)
+                .recordedAt(LocalDateTime.now())
+                .build();
+
+        log.info("Recorded period transaction: type={}, amount={}, period={}/{}",
+                transactionType, debit.add(credit), month, year);
+
+        return accountingPeriodTransactionRepository.save(transaction);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountingPeriodTransaction> getPeriodTransactions(UUID periodId) {
+        return accountingPeriodTransactionRepository.findByPeriodIdOrderByRecordedAtDesc(periodId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountingPeriodTransaction> getTransactionsByPeriod(int fiscalYear, int month) {
+        return accountingPeriodTransactionRepository.findByFiscalYearAndMonthOrderByRecordedAtDesc(fiscalYear, month);
     }
 }

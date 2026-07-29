@@ -240,7 +240,8 @@ class OrderPaymentServiceTest {
                 eq(customer.getId()),
                 any(UUID.class),
                 eq(new BigDecimal("1000.00")),
-                contains("Payment for Order")
+                contains("Payment for Order"),
+                any(UUID.class)
         );
     }
 

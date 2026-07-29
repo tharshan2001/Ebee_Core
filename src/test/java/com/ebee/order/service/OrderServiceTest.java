@@ -1156,7 +1156,8 @@ class OrderServiceTest {
                 eq(customer.getId()),
                 any(UUID.class),
                 any(BigDecimal.class),
-                contains("Order")
+                contains("Order"),
+                any(UUID.class)
         );
     }
 
@@ -1172,6 +1173,7 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         doAnswer(invocation -> {
             order.setPaymentStatus(PaymentStatus.REFUNDED);
             order.setPaidAmount(BigDecimal.ZERO);
@@ -1186,7 +1188,8 @@ class OrderServiceTest {
                 eq(customer.getId()),
                 eq(orderId),
                 any(BigDecimal.class),
-                contains("Return")
+                contains("Return"),
+                any(UUID.class)
         );
     }
 }

@@ -34,6 +34,9 @@ class LedgerServiceTest {
     @Mock
     private AgentLedgerRepository agentLedgerRepository;
 
+    @Mock
+    private AccountingPeriodService accountingPeriodService;
+
     @InjectMocks
     private LedgerService ledgerService;
 
@@ -50,10 +53,11 @@ class LedgerServiceTest {
     void recordCustomerInvoice_createsInvoiceEntry() {
         UUID customerId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
+        UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("5000.00");
         String description = "Order ORD-001";
 
-        CustomerLedger result = ledgerService.recordCustomerInvoice(customerId, orderId, amount, description);
+        CustomerLedger result = ledgerService.recordCustomerInvoice(customerId, orderId, amount, description, recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();
@@ -70,10 +74,11 @@ class LedgerServiceTest {
     void recordCustomerPayment_createsPaymentEntry() {
         UUID customerId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
+        UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("2000.00");
         String description = "Payment via CASH";
 
-        CustomerLedger result = ledgerService.recordCustomerPayment(customerId, paymentId, amount, description);
+        CustomerLedger result = ledgerService.recordCustomerPayment(customerId, paymentId, amount, description, recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();
@@ -90,10 +95,11 @@ class LedgerServiceTest {
     void recordCustomerRefund_createsRefundEntry() {
         UUID customerId = UUID.randomUUID();
         UUID returnId = UUID.randomUUID();
+        UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("1500.00");
         String description = "Return for Order ORD-001";
 
-        CustomerLedger result = ledgerService.recordCustomerRefund(customerId, returnId, amount, description);
+        CustomerLedger result = ledgerService.recordCustomerRefund(customerId, returnId, amount, description, recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();
@@ -110,10 +116,11 @@ class LedgerServiceTest {
     void recordCustomerAdvance_createsAdvanceEntry() {
         UUID customerId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
+        UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("1000.00");
         String description = "Advance payment";
 
-        CustomerLedger result = ledgerService.recordCustomerAdvance(customerId, paymentId, amount, description);
+        CustomerLedger result = ledgerService.recordCustomerAdvance(customerId, paymentId, amount, description, recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();

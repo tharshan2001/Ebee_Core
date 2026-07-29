@@ -5,6 +5,7 @@ import com.ebee.accounting.repository.CustomerLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.service.CodeGenerationService;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.customer.dto.AddressRequest;
@@ -61,6 +62,7 @@ public class CustomerService {
     private final ApplicationEventPublisher eventPublisher;
     private final LedgerService ledgerService;
     private final CustomerLedgerRepository customerLedgerRepository;
+    private final SecurityService securityService;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -313,7 +315,8 @@ public class CustomerService {
                 customer.getId(),
                 referenceId,
                 amount,
-                description
+                description,
+                securityService.getCurrentUserId()
         );
 
         publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,

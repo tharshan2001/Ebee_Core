@@ -349,7 +349,8 @@ public class OrderServiceImpl implements OrderService {
                     customer.getId(),
                     savedOrder.getId(),
                     savedOrder.getTotalAmount(),
-                    "Order " + savedOrder.getOrderNumber()
+                    "Order " + savedOrder.getOrderNumber(),
+                    currentUser.getId()
             );
         }
 
@@ -633,7 +634,8 @@ public class OrderServiceImpl implements OrderService {
                 order.getCustomer().getId(),
                 updatedOrder.getId(),
                 order.getPaidAmount(),
-                "Return for Order " + order.getOrderNumber()
+                "Return for Order " + order.getOrderNumber(),
+                securityService.getCurrentUserId()
         );
 
         orderPaymentService.syncCustomerOutstanding(order.getCustomer());

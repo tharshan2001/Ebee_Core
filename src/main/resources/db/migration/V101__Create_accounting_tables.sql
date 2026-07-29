@@ -36,9 +36,12 @@ CREATE TABLE accounting_period_audit (
     action varchar(50) NOT NULL,
     old_status period_status,
     new_status period_status NOT NULL,
-    reason varchar(255) NOT NULL,
-    performed_by uuid REFERENCES users(id),
-    performed_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+    reason varchar(255),
+    changed_by uuid REFERENCES users(id),
+    changed_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fiscal_year integer NOT NULL,
+    month integer NOT NULL,
+    year integer NOT NULL
 );
 
 -- Create placeholder fiscal year for existing/pre-system entries

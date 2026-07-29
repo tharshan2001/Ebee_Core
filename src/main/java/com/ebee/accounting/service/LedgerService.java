@@ -24,9 +24,10 @@ public class LedgerService {
     private final CustomerLedgerRepository customerLedgerRepository;
     private final SupplierLedgerRepository supplierLedgerRepository;
     private final AgentLedgerRepository agentLedgerRepository;
+    private final AccountingPeriodService accountingPeriodService;
 
     @Transactional
-    public CustomerLedger recordCustomerInvoice(UUID customerId, UUID orderId, BigDecimal amount, String description) {
+    public CustomerLedger recordCustomerInvoice(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
                 .orderId(orderId)
@@ -36,11 +37,23 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording customer invoice: customer={}, order={}, amount={}", customerId, orderId, amount);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.INVOICE.name(),
+                amount,
+                BigDecimal.ZERO,
+                orderId,
+                "ORDER",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public CustomerLedger recordCustomerPayment(UUID customerId, UUID paymentId, BigDecimal amount, String description) {
+    public CustomerLedger recordCustomerPayment(UUID customerId, UUID paymentId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
                 .paymentId(paymentId)
@@ -50,11 +63,23 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording customer payment: customer={}, payment={}, amount={}", customerId, paymentId, amount);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.PAYMENT.name(),
+                BigDecimal.ZERO,
+                amount,
+                paymentId,
+                "PAYMENT",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public CustomerLedger recordCustomerRefund(UUID customerId, UUID returnId, BigDecimal amount, String description) {
+    public CustomerLedger recordCustomerRefund(UUID customerId, UUID returnId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
                 .returnId(returnId)
@@ -64,11 +89,23 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording customer refund: customer={}, return={}, amount={}", customerId, returnId, amount);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.REFUND.name(),
+                amount,
+                BigDecimal.ZERO,
+                returnId,
+                "RETURN",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public CustomerLedger recordCustomerAdvance(UUID customerId, UUID paymentId, BigDecimal amount, String description) {
+    public CustomerLedger recordCustomerAdvance(UUID customerId, UUID paymentId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
                 .paymentId(paymentId)

@@ -32,6 +32,7 @@ public class SalesController {
     private final SecurityService securityService;
     private final AgentService agentService;
 
+    @Deprecated
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<SalesSummaryResponse>> getSalesSummary(
@@ -41,6 +42,7 @@ public class SalesController {
         return ResponseEntity.ok(ApiResponse.success("Sales summary retrieved successfully", response));
     }
 
+    @Deprecated
     @GetMapping("/dashboard")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard(

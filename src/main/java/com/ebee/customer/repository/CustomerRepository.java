@@ -56,4 +56,7 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     @Query("SELECT COUNT(c) FROM Customer c WHERE c.active = true")
     Long countActive();
+
+    @Query("SELECT c FROM Customer c WHERE c.outstandingBalance > 0 ORDER BY c.outstandingBalance DESC")
+    List<Customer> findAllWithOutstandingBalance();
 }

@@ -21,6 +21,7 @@ public class FinanceController {
 
     private final FinanceService financeService;
 
+    @Deprecated
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<FinanceSummaryResponse>> getSummary(

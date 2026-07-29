@@ -1,7 +1,9 @@
 package com.ebee.reporting.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.reporting.dto.AgingReportResponse;
 import com.ebee.reporting.dto.ReportSummaryResponse;
+import com.ebee.reporting.dto.TrialBalanceResponse;
 import com.ebee.reporting.service.ReportsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,5 +30,19 @@ public class ReportsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         ReportSummaryResponse response = reportsService.getSummary(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Report summary retrieved successfully", response));
+    }
+
+    @GetMapping("/trial-balance")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TrialBalanceResponse>> getTrialBalance() {
+        TrialBalanceResponse response = reportsService.getTrialBalance();
+        return ResponseEntity.ok(ApiResponse.success("Trial balance retrieved successfully", response));
+    }
+
+    @GetMapping("/aging")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AgingReportResponse>> getAgingReport() {
+        AgingReportResponse response = reportsService.getAgingReport();
+        return ResponseEntity.ok(ApiResponse.success("Aging report retrieved successfully", response));
     }
 }

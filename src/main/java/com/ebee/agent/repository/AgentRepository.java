@@ -51,4 +51,7 @@ public interface AgentRepository extends JpaRepository<Agent, UUID> {
 
     @Query("SELECT a FROM Agent a LEFT JOIN FETCH a.user WHERE a.agentCode LIKE %:search% OR a.user.firstName LIKE %:search% OR a.user.lastName LIKE %:search% OR a.user.phoneNumber LIKE %:search% OR a.nicNumber LIKE %:search% OR a.district LIKE %:search% OR a.user.email LIKE %:search%")
     List<Agent> findBySearchTerm(@Param("search") String search);
+
+    @Query("SELECT COUNT(a) FROM Agent a WHERE a.isActive = true")
+    Long countActive();
 }

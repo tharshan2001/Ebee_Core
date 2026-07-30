@@ -71,7 +71,8 @@ public class DriverLocationService {
         Instant timestamp,
         long seq,
         Float lastBroadcastBearing,
-        long lastUpdateTime
+        long lastUpdateTime,
+        long lastBroadcastSeq
     ) {}
 
     @PostConstruct
@@ -133,7 +134,8 @@ public class DriverLocationService {
             timestamp,
             newSeq,
             existing != null ? existing.lastBroadcastBearing : filteredBearing,
-            now
+            now,
+            existing != null ? existing.lastBroadcastSeq : 0
         );
         pendingBroadcasts.put(driverId, pending);
 
@@ -152,7 +154,7 @@ public class DriverLocationService {
                 pendingBroadcasts.put(driverId, new PendingBroadcast(
                     driverId, driverName, photoUrl, newLat, newLng,
                     filteredBearing, newSpeed, request.accuracy(), timestamp, newSeq,
-                    filteredBearing, now
+                    filteredBearing, now, existing.lastBroadcastSeq
                 ));
             }
         }
@@ -167,6 +169,10 @@ public class DriverLocationService {
         List<DriverLocationResponse> toBroadcast = new ArrayList<>();
 
         for (PendingBroadcast pending : pendingBroadcasts.values()) {
+            if (pending.seq() == pending.lastBroadcastSeq()) {
+                continue;
+            }
+
             long timeSinceUpdate = now - pending.lastUpdateTime();
             long broadcastInterval = getBroadcastInterval(pending.speed());
 
@@ -197,7 +203,8 @@ public class DriverLocationService {
                     pending.timestamp(),
                     pending.seq(),
                     pending.bearing(),
-                    pending.lastUpdateTime()
+                    pending.lastUpdateTime(),
+                    pending.seq()
                 ));
             }
         }

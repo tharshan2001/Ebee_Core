@@ -2,18 +2,93 @@
 /**
  * Driver Location Simulator
  *
- * Simulates a driver moving along a route, sending GPS updates via STOMP WebSocket.
- * This simulates exactly how the mobile app sends location data.
+ * Simulates a driver moving along a route on Galle Road (A2 Highway), Colombo to Galle,
+ * sending GPS updates via STOMP WebSocket. This simulates exactly how the mobile app
+ * sends location data to the backend.
  *
- * Usage:
+ * =============================================================================
+ * SETUP
+ * =============================================================================
+ *
+ * Prerequisites:
+ *   1. Backend must be running on http://localhost:8085 (or specify --api-url)
+ *   2. Dependencies must be installed:
+ *      npm install sockjs-client stompjs
+ *
+ * Quick Start:
+ *   node scripts/driver-location-simulator.js
+ *
+ * =============================================================================
+ * USAGE
+ * =============================================================================
+ *
  *   node scripts/driver-location-simulator.js [options]
  *
  * Options:
- *   --driver-email    Driver email (default: driver-sim@ebee.lk)
- *   --driver-password Driver password (default: Driver@123)
- *   --speed           Movement speed in km/h (default: 40)
- *   --interval        GPS update interval in ms (default: 3000)
- *   --api-url         Backend API URL (default: http://localhost:8085)
+ *   --driver-email     Driver email (default: driver-sim@ebee.lk)
+ *   --driver-password  Driver password (default: Driver@123)
+ *   --speed            Movement speed in km/h (default: 40)
+ *   --interval         GPS update interval in ms (default: 1000ms)
+ *   --api-url          Backend API URL (default: http://localhost:8085)
+ *
+ * Examples:
+ *   # Run at 60km/h
+ *   node scripts/driver-location-simulator.js --speed 60
+ *
+ *   # Run at 500ms intervals (2 updates per second)
+ *   node scripts/driver-location-simulator.js --interval 500
+ *
+ *   # Point to production backend
+ *   node scripts/driver-location-simulator.js --api-url https://api.ebee.lk
+ *
+ * =============================================================================
+ * ROUTE
+ * =============================================================================
+ *
+ * The simulator traces Galle Road (A2 Highway) from Fort Colombo to Galle and back:
+ *   - Fort, Colombo (6.9271, 79.8412) → Galle (6.0255, 80.2225)
+ *   - Distance: ~120km one way
+ *   - At 40km/h: ~3 hours for full round trip
+ *
+ * The route follows actual waypoints along A2 highway passing through:
+ *   Mount Lavinia, Kalutara, Beruwala, Aluthgama, Bentota, Hikkaduwa,
+ *   Ambalangoda, Galle, and returning northbound.
+ *
+ * =============================================================================
+ * HOW IT WORKS
+ * =============================================================================
+ *
+ * 1. Creates/retrieves a test driver account via admin API
+ * 2. Authenticates as the driver
+ * 3. Connects to STOMP WebSocket endpoint at /ws
+ * 4. Continuously:
+ *    - Calculates current position along route based on elapsed time
+ *    - Sends location update every --interval ms
+ *    - Interpolates between waypoints for smooth movement
+ *
+ * Data sent per update:
+ *   {
+ *     latitude: number,
+ *     longitude: number,
+ *     accuracy: number (5.0m),
+ *     bearing: number (degrees),
+ *     speed: number (km/h)
+ *   }
+ *
+ * =============================================================================
+ * BACKEND INTEGRATION
+ * =============================================================================
+ *
+ * The simulator exercises the same endpoints as the mobile app:
+ *   - POST /api/drivers (create driver - admin required)
+ *   - POST /api/auth/login (authenticate)
+ *   - PATCH /api/drivers/{id}/availability (set available)
+ *   - STOMP /app/driver-locations/update (send GPS)
+ *
+ * Backend receives location and broadcasts to /topic/driver-locations
+ * Frontend subscribes to same topic for live updates.
+ *
+ * =============================================================================
  */
 
 const SockJS = require('sockjs-client');
@@ -32,32 +107,91 @@ const DRIVER_PASSWORD = getArg('driver-password', 'Driver@123');
 const ADMIN_EMAIL = getArg('admin-email', 'super@ebee.lk');
 const ADMIN_PASSWORD = getArg('admin-password', 'Super@dmin123!');
 const SPEED_KMH = parseFloat(getArg('speed', '40'));
-const INTERVAL_MS = parseInt(getArg('interval', '3000'));
+const INTERVAL_MS = parseInt(getArg('interval', '1000'));
 const API_URL = getArg('api-url', 'http://localhost:8085');
 
-// Sri Lanka route - Galle Road, Colombo to Mount Lavinia and back
+// Sri Lanka route - Galle Road (A2 Highway), Colombo to Galle and back
 const ROUTE = [
-  { lat: 6.9271, lng: 79.8412 },  // Fort
-  { lat: 6.9219, lng: 79.8425 },
+  // Colombo to Galle (southbound)
+  { lat: 6.9271, lng: 79.8412 },  // Fort, Colombo
+  { lat: 6.9219, lng: 79.8425 },  // Kollupitiya
   { lat: 6.9173, lng: 79.8438 },  // Bambalapitiya
-  { lat: 6.9127, lng: 79.8451 },
-  { lat: 6.9081, lng: 79.8464 },  // Wellawatte
-  { lat: 6.9035, lng: 79.8477 },
-  { lat: 6.8989, lng: 79.8490 },  // Dehiwala
-  { lat: 6.8943, lng: 79.8503 },
+  { lat: 6.9127, lng: 79.8451 },  // Wellawatte
+  { lat: 6.9081, lng: 79.8464 },  // Wellawatte North
+  { lat: 6.9035, lng: 79.8477 },  // Dehiwala
+  { lat: 6.8989, lng: 79.8490 },  // Oluwil
+  { lat: 6.8943, lng: 79.8503 },  // Mount Lavinia
+  { lat: 6.8897, lng: 79.8516 },  // Ratmalana
+  { lat: 6.8851, lng: 79.8529 },  // Kalubawabede
+  { lat: 6.8805, lng: 79.8542 },  // Panadura
+  { lat: 6.8759, lng: 79.8555 },  // Walana
+  { lat: 6.8713, lng: 79.8568 },  // Neboda
+  { lat: 6.8667, lng: 79.8581 },  // Kalutara
+  { lat: 6.8621, lng: 79.8594 },  // Payable
+  { lat: 6.8575, lng: 79.8607 },  // Beruwala
+  { lat: 6.8529, lng: 79.8620 },  // Aluthgama
+  { lat: 6.8483, lng: 79.8633 },  // Bentota
+  { lat: 6.8437, lng: 79.8646 },  // Induruwa
+  { lat: 6.8391, lng: 79.8659 },  // Kosgoda
+  { lat: 6.8345, lng: 79.8672 },  // Ahungalla
+  { lat: 6.8299, lng: 79.8685 },  // Balapitiya
+  { lat: 6.8253, lng: 79.8698 },  // Ambalangoda
+  { lat: 6.8207, lng: 79.8711 },  // Hikkaduwa
+  { lat: 6.8161, lng: 79.8724 },  // Telwatta
+  { lat: 6.8115, lng: 79.8737 },  // Boossa
+  { lat: 6.8069, lng: 79.8750 },  // Koggalla
+  { lat: 6.8023, lng: 79.8763 },  // Ahangama
+  { lat: 6.7977, lng: 79.8776 },  // Weligama
+  { lat: 6.7931, lng: 79.8789 },  // Polhena
+  { lat: 6.7885, lng: 79.8802 },  // Matara
+  { lat: 6.7839, lng: 79.8815 },  // Mirissa
+  { lat: 6.7793, lng: 79.8828 },  // Dondra
+  { lat: 6.7747, lng: 79.8841 },  // Mulkern
+  { lat: 6.7701, lng: 79.8854 },  // Tangalle
+  { lat: 6.7655, lng: 79.8867 },  // Seenimodara
+  { lat: 6.7609, lng: 79.8880 },  // Hambantota
+  { lat: 6.7563, lng: 79.8893 },  // Tissamaharama
+  { lat: 6.7517, lng: 79.8906 },  // Yala
+  { lat: 6.7471, lng: 79.8919 },  // Kataragama
+  { lat: 6.7499, lng: 79.8624 },  // Galle (city center)
+  // Galle to Colombo (northbound - reverse)
+  { lat: 6.7563, lng: 79.8893 },  // Tissamaharama
+  { lat: 6.7609, lng: 79.8880 },  // Hambantota
+  { lat: 6.7655, lng: 79.8867 },  // Seenimodara
+  { lat: 6.7701, lng: 79.8854 },  // Tangalle
+  { lat: 6.7747, lng: 79.8841 },  // Mulkern
+  { lat: 6.7793, lng: 79.8828 },  // Dondra
+  { lat: 6.7839, lng: 79.8815 },  // Mirissa
+  { lat: 6.7885, lng: 79.8802 },  // Matara
+  { lat: 6.7931, lng: 79.8789 },  // Polhena
+  { lat: 6.7977, lng: 79.8776 },  // Weligama
+  { lat: 6.8023, lng: 79.8763 },  // Ahangama
+  { lat: 6.8069, lng: 79.8750 },  // Koggalla
+  { lat: 6.8115, lng: 79.8737 },  // Boossa
+  { lat: 6.8161, lng: 79.8724 },  // Telwatta
+  { lat: 6.8207, lng: 79.8711 },  // Hikkaduwa
+  { lat: 6.8253, lng: 79.8698 },  // Ambalangoda
+  { lat: 6.8299, lng: 79.8685 },  // Balapitiya
+  { lat: 6.8345, lng: 79.8672 },  // Kosgoda
+  { lat: 6.8391, lng: 79.8659 },  // Induruwa
+  { lat: 6.8437, lng: 79.8646 },  // Bentota
+  { lat: 6.8483, lng: 79.8633 },  // Aluthgama
+  { lat: 6.8529, lng: 79.8620 },  // Beruwala
+  { lat: 6.8575, lng: 79.8607 },  // Payable
+  { lat: 6.8621, lng: 79.8594 },  // Kalutara
+  { lat: 6.8667, lng: 79.8581 },  // Neboda
+  { lat: 6.8713, lng: 79.8568 },  // Walana
+  { lat: 6.8759, lng: 79.8555 },  // Panadura
+  { lat: 6.8805, lng: 79.8542 },  // Kalubawabede
+  { lat: 6.8851, lng: 79.8529 },  // Ratmalana
   { lat: 6.8897, lng: 79.8516 },  // Mount Lavinia
-  { lat: 6.8851, lng: 79.8529 },
-  { lat: 6.8805, lng: 79.8542 },
-  { lat: 6.8851, lng: 79.8529 },  // Return - Mount Lavinia
-  { lat: 6.8897, lng: 79.8516 },
-  { lat: 6.8943, lng: 79.8503 },  // Return - Dehiwala
-  { lat: 6.8989, lng: 79.8490 },
-  { lat: 6.9035, lng: 79.8477 },  // Return - Wellawatte
-  { lat: 6.9081, lng: 79.8464 },
-  { lat: 6.9127, lng: 79.8451 },  // Return - Bambalapitiya
-  { lat: 6.9173, lng: 79.8438 },
-  { lat: 6.9219, lng: 79.8425 },
-  { lat: 6.9271, lng: 79.8412 },  // Return - Fort
+  { lat: 6.8943, lng: 79.8503 },  // Oluwil
+  { lat: 6.8989, lng: 79.8490 },  // Dehiwala
+  { lat: 6.9035, lng: 79.8477 },  // Wellawatte South
+  { lat: 6.9081, lng: 79.8464 },  // Wellawatte North
+  { lat: 6.9127, lng: 79.8451 },  // Bambalapitiya
+  { lat: 6.9173, lng: 79.8438 },  // Kollupitiya
+  { lat: 6.9219, lng: 79.8425 },  // Fort
 ];
 
 let currentWaypointIndex = 0;

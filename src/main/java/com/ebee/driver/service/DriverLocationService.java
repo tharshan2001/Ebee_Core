@@ -8,14 +8,12 @@ import com.ebee.driver.repository.DriverRepository;
 import com.ebee.user.service.UserLookupService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class DriverLocationService {
 
     private static final String LOCATION_KEY_PREFIX = "driver:location:";
@@ -39,15 +35,6 @@ public class DriverLocationService {
     private static final String LAST_UPDATE_KEY_PREFIX = "driver:location:lastupdate:";
     private static final long LOCATION_TTL_MINUTES = 5;
     private static final long RATE_LIMIT_MS = 100;
-    private static final double MIN_MOVEMENT_METERS = 0.5;
-    private static final float MIN_SPEED_KMH = 0.5f;
-    private static final float MIN_HEADING_CHANGE_DEGREES = 3.0f;
-
-    private static final long BROADCAST_INTERVAL_MS = 500;
-    private static final long SPEED_TIER_STOPPED_MS = 1000;
-    private static final long SPEED_TIER_SLOW_MS = 500;
-    private static final long SPEED_TIER_NORMAL_MS = 300;
-    private static final long SPEED_TIER_FAST_MS = 200;
 
     private static final double EARTH_RADIUS_METERS = 6371000;
 
@@ -57,9 +44,7 @@ public class DriverLocationService {
     private final DriverRepository driverRepository;
     private final UserLookupService userLookupService;
 
-    private final ConcurrentHashMap<UUID, PendingBroadcast> pendingBroadcasts = new ConcurrentHashMap<>();
-
-    record PendingBroadcast(
+    private record RedisLocationData(
         UUID driverId,
         String driverName,
         String photoUrl,
@@ -69,16 +54,8 @@ public class DriverLocationService {
         Float speed,
         Float accuracy,
         Instant timestamp,
-        long seq,
-        Float lastBroadcastBearing,
-        long lastUpdateTime,
-        long lastBroadcastSeq
+        long seq
     ) {}
-
-    @PostConstruct
-    public void init() {
-        log.info("DriverLocationService initialized with broadcast interval {}ms", BROADCAST_INTERVAL_MS);
-    }
 
     @Transactional
     public DriverLocationResponse updateLocation(UUID driverId, String driverName, DriverLocationRequest request) {
@@ -99,7 +76,6 @@ public class DriverLocationService {
         long newSeq = stringRedisTemplate.opsForValue().increment(seqKey);
         long now = System.currentTimeMillis();
 
-        PendingBroadcast existing = pendingBroadcasts.get(driverId);
         String photoUrl = driverRepository.findById(driverId)
             .map(driver -> driver.getUser().getProfilePictureUrl())
             .orElse(null);
@@ -108,39 +84,14 @@ public class DriverLocationService {
         double newLng = request.longitude();
         Float newBearing = request.bearing();
         Float newSpeed = request.speed();
-
-        Float filteredBearing = newBearing;
-        if (existing != null && newSpeed != null && newSpeed < MIN_SPEED_KMH) {
-            Float lastGoodBearing = existing.lastBroadcastBearing;
-            if (lastGoodBearing != null && newBearing != null) {
-                float bearingDiff = Math.abs(normalizeAngle(newBearing - lastGoodBearing));
-                if (bearingDiff < MIN_HEADING_CHANGE_DEGREES) {
-                    filteredBearing = lastGoodBearing;
-                }
-            }
-        }
-
         Instant timestamp = Instant.now();
 
-        PendingBroadcast pending = new PendingBroadcast(
-            driverId,
-            driverName,
-            photoUrl,
-            newLat,
-            newLng,
-            filteredBearing,
-            newSpeed,
-            request.accuracy(),
-            timestamp,
-            newSeq,
-            existing != null ? existing.lastBroadcastBearing : filteredBearing,
-            now,
-            existing != null ? existing.lastBroadcastSeq : 0
-        );
-        pendingBroadcasts.put(driverId, pending);
-
         try {
-            String json = objectMapper.writeValueAsString(pending);
+            var redisData = new RedisLocationData(
+                driverId, driverName, photoUrl, newLat, newLng,
+                newBearing, newSpeed, request.accuracy(), timestamp, newSeq
+            );
+            String json = objectMapper.writeValueAsString(redisData);
             stringRedisTemplate.opsForValue().set(locationKey, json, LOCATION_TTL_MINUTES, TimeUnit.MINUTES);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize location", e);
@@ -148,90 +99,14 @@ public class DriverLocationService {
 
         stringRedisTemplate.opsForValue().set(LAST_UPDATE_KEY_PREFIX + driverId, String.valueOf(now), LOCATION_TTL_MINUTES, TimeUnit.MINUTES);
 
-        if (existing != null && existing.lastBroadcastBearing != null && filteredBearing != null) {
-            float bearingDiff = Math.abs(normalizeAngle(filteredBearing - existing.lastBroadcastBearing));
-            if (bearingDiff >= MIN_HEADING_CHANGE_DEGREES) {
-                pendingBroadcasts.put(driverId, new PendingBroadcast(
-                    driverId, driverName, photoUrl, newLat, newLng,
-                    filteredBearing, newSpeed, request.accuracy(), timestamp, newSeq,
-                    filteredBearing, now, existing.lastBroadcastSeq
-                ));
-            }
-        }
+        DriverLocationResponse response = buildResponse(driverId, driverName, photoUrl, newLat, newLng,
+            newBearing, newSpeed, request.accuracy(), timestamp, newSeq);
 
-        return buildResponse(driverId, driverName, photoUrl, newLat, newLng,
-            filteredBearing, newSpeed, request.accuracy(), timestamp, newSeq);
-    }
+        messagingTemplate.convertAndSend("/topic/driver-locations", response);
+        log.info("Broadcast driver {} at ({}, {}) speed={}km/h seq={}",
+            driverId, newLat, newLng, newSpeed, newSeq);
 
-    @Scheduled(fixedRate = BROADCAST_INTERVAL_MS)
-    public void broadcastLocations() {
-        long now = System.currentTimeMillis();
-        List<DriverLocationResponse> toBroadcast = new ArrayList<>();
-
-        for (PendingBroadcast pending : pendingBroadcasts.values()) {
-            if (pending.seq() == pending.lastBroadcastSeq()) {
-                continue;
-            }
-
-            long timeSinceUpdate = now - pending.lastUpdateTime();
-            long broadcastInterval = getBroadcastInterval(pending.speed());
-
-            if (timeSinceUpdate >= broadcastInterval) {
-                DriverLocationResponse response = buildResponse(
-                    pending.driverId(),
-                    pending.driverName(),
-                    pending.photoUrl(),
-                    pending.latitude(),
-                    pending.longitude(),
-                    pending.bearing(),
-                    pending.speed(),
-                    pending.accuracy(),
-                    pending.timestamp(),
-                    pending.seq()
-                );
-                toBroadcast.add(response);
-
-                pendingBroadcasts.put(pending.driverId(), new PendingBroadcast(
-                    pending.driverId(),
-                    pending.driverName(),
-                    pending.photoUrl(),
-                    pending.latitude(),
-                    pending.longitude(),
-                    pending.bearing(),
-                    pending.speed(),
-                    pending.accuracy(),
-                    pending.timestamp(),
-                    pending.seq(),
-                    pending.bearing(),
-                    pending.lastUpdateTime(),
-                    pending.seq()
-                ));
-            }
-        }
-
-        if (!toBroadcast.isEmpty()) {
-            try {
-                for (DriverLocationResponse response : toBroadcast) {
-                    messagingTemplate.convertAndSend("/topic/driver-locations", response);
-                    log.debug("Broadcast driver {} at ({}, {}) speed={}km/h",
-                        response.driverId(), response.latitude(), response.longitude(), response.speed());
-                }
-            } catch (Exception e) {
-                log.warn("Failed to broadcast locations: {}", e.getMessage());
-            }
-        }
-    }
-
-    private long getBroadcastInterval(Float speed) {
-        if (speed == null || speed < MIN_SPEED_KMH) {
-            return SPEED_TIER_STOPPED_MS;
-        } else if (speed < 20.0f) {
-            return SPEED_TIER_SLOW_MS;
-        } else if (speed < 60.0f) {
-            return SPEED_TIER_NORMAL_MS;
-        } else {
-            return SPEED_TIER_FAST_MS;
-        }
+        return response;
     }
 
     private float normalizeAngle(float angle) {
@@ -268,24 +143,25 @@ public class DriverLocationService {
         );
     }
 
+    @Transactional(readOnly = true)
     public Optional<DriverLocationResponse> getLocation(UUID driverId) {
         String locationKey = LOCATION_KEY_PREFIX + driverId;
         String json = stringRedisTemplate.opsForValue().get(locationKey);
         if (json == null) return Optional.empty();
 
         try {
-            PendingBroadcast pending = objectMapper.readValue(json, PendingBroadcast.class);
+            RedisLocationData data = objectMapper.readValue(json, RedisLocationData.class);
             return Optional.of(buildResponse(
-                pending.driverId(),
-                pending.driverName(),
-                pending.photoUrl(),
-                pending.latitude(),
-                pending.longitude(),
-                pending.bearing(),
-                pending.speed(),
-                pending.accuracy(),
-                pending.timestamp(),
-                pending.seq()
+                data.driverId(),
+                data.driverName(),
+                data.photoUrl(),
+                data.latitude(),
+                data.longitude(),
+                data.bearing(),
+                data.speed(),
+                data.accuracy(),
+                data.timestamp(),
+                data.seq()
             ));
         } catch (JsonProcessingException e) {
             log.warn("Failed to deserialize location for driver {}: {}", driverId, e.getMessage());
@@ -293,6 +169,7 @@ public class DriverLocationService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<DriverLocationResponse> getActiveLocations() {
         List<DriverLocationResponse> locations = new ArrayList<>();
 
@@ -317,11 +194,11 @@ public class DriverLocationService {
         return locations;
     }
 
+    @Transactional
     public void removeLocation(UUID driverId) {
         stringRedisTemplate.delete(LOCATION_KEY_PREFIX + driverId);
         stringRedisTemplate.delete(SEQ_KEY_PREFIX + driverId);
         stringRedisTemplate.delete(LAST_UPDATE_KEY_PREFIX + driverId);
-        pendingBroadcasts.remove(driverId);
     }
 
     public Optional<Driver> resolveDriverByEmail(String email) {

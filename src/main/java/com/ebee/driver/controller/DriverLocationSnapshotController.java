@@ -13,6 +13,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
 import java.util.List;
@@ -34,6 +35,7 @@ public class DriverLocationSnapshotController {
     }
 
     @MessageMapping("/driver-locations/update")
+    @Transactional
     public void updateLocation(@Valid @Payload DriverLocationRequest request, Principal principal) {
         if (principal == null) {
             log.warn("STOMP location update rejected: no principal");

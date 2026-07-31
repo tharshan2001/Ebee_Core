@@ -17,7 +17,7 @@
  */
 
 const SockJS = require('sockjs-client');
-const Stomp = require('stompjs').Stomp;
+const Stomp = require('stompjs');
 const http = require('http');
 
 // Parse command line args
@@ -30,7 +30,7 @@ const getArg = (name, defaultVal) => {
 const DRIVER_EMAIL = getArg('driver-email', 'driver-sim@ebee.lk');
 const DRIVER_PASSWORD = getArg('driver-password', 'Driver@123');
 const ADMIN_EMAIL = getArg('admin-email', 'super@ebee.lk');
-const ADMIN_PASSWORD = getArg('admin-password', 'Anton0809');
+const ADMIN_PASSWORD = getArg('admin-password', 'Super@dmin123!');
 const SPEED_KMH = parseFloat(getArg('speed', '40'));
 const INTERVAL_MS = parseInt(getArg('interval', '3000'));
 const API_URL = getArg('api-url', 'http://localhost:8085');
@@ -219,7 +219,7 @@ async function createDriver() {
     const data = unwrapResponse(createResponse);
     driverUUID = data.id;
     return data;
-  } else if (adminLogin.data && adminLogin.data.message && adminLogin.data.message.includes('already exists')) {
+  } else if (createResponse.data && createResponse.data.message && createResponse.data.message.includes('already exists')) {
     console.log(`[ADMIN] Driver already exists, using existing driver`);
     // Find the existing driver UUID
     const driversResp = await httpRequest('GET', '/api/drivers?page=0&size=100', null, adminToken);
@@ -251,10 +251,10 @@ async function setAvailability(token, availability) {
 // Connect to STOMP WebSocket and send location updates
 function connectAndSendLocations() {
   return new Promise((resolve, reject) => {
-    const wsUrl = API_URL.replace('http', 'ws') + '/ws';
-    console.log(`[WS] Connecting to ${wsUrl}...`);
+    const socketUrl = API_URL + '/ws';
+    console.log(`[WS] Connecting to ${socketUrl}...`);
 
-    const socket = new SockJS(wsUrl);
+    const socket = new SockJS(socketUrl);
     const client = Stomp.over(socket);
 
     // Disable heartbeat for simplicity

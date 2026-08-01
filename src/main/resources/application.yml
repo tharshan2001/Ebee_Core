@@ -127,6 +127,9 @@ app:
     last-name: Admin
   ip-whitelist:
     super-admin-ips: ${SUPER_ADMIN_IPS:}
+  driver:
+    gps-interval-ms: ${DRIVER_GPS_INTERVAL_MS:1000}
+    min-accuracy: ${DRIVER_GPS_MIN_ACCURACY:10}
   delivery:
     timeout:
       pickup: ${DELIVERY_TIMEOUT_PICKUP:2h}

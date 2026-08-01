@@ -28,7 +28,7 @@
  *   --driver-email     Driver email (default: driver-sim@ebee.lk)
  *   --driver-password  Driver password (default: Driver@123)
  *   --speed            Movement speed in km/h (default: 40)
- *   --interval        GPS update interval in ms (default: 3000ms)
+ *   --interval        GPS update interval in ms (default: 3000ms) - set 1000 for faster testing
  *   --api-url          Backend API URL (default: http://localhost:8085)
  *
  * Examples:

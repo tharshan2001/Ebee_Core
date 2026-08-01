@@ -9,12 +9,14 @@ public class AppProperties {
     private final Backup backup;
     private final Cors cors;
     private final IpWhitelist ipWhitelist;
+    private final Driver driver;
 
     @ConstructorBinding
-    public AppProperties(Backup backup, Cors cors, IpWhitelist ipWhitelist) {
+    public AppProperties(Backup backup, Cors cors, IpWhitelist ipWhitelist, Driver driver) {
         this.backup = backup != null ? backup : new Backup();
         this.cors = cors != null ? cors : new Cors();
         this.ipWhitelist = ipWhitelist != null ? ipWhitelist : new IpWhitelist();
+        this.driver = driver != null ? driver : new Driver();
     }
 
     public Backup getBackup() {
@@ -27,6 +29,10 @@ public class AppProperties {
 
     public IpWhitelist getIpWhitelist() {
         return ipWhitelist;
+    }
+
+    public Driver getDriver() {
+        return driver;
     }
 
     public static class Backup {
@@ -77,6 +83,30 @@ public class AppProperties {
 
         public String getSuperAdminIps() {
             return superAdminIps;
+        }
+    }
+
+    public static class Driver {
+        private final Long gpsIntervalMs;
+        private final Integer minAccuracy;
+
+        @ConstructorBinding
+        public Driver(Long gpsIntervalMs, Integer minAccuracy) {
+            this.gpsIntervalMs = gpsIntervalMs != null ? gpsIntervalMs : 1000L;
+            this.minAccuracy = minAccuracy != null ? minAccuracy : 10;
+        }
+
+        public Driver() {
+            this.gpsIntervalMs = 1000L;
+            this.minAccuracy = 10;
+        }
+
+        public Long getGpsIntervalMs() {
+            return gpsIntervalMs;
+        }
+
+        public Integer getMinAccuracy() {
+            return minAccuracy;
         }
     }
 }

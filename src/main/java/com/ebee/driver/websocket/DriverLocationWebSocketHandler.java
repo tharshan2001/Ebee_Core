@@ -1,6 +1,7 @@
 package com.ebee.driver.websocket;
 
 import com.ebee.auth.service.JwtService;
+import com.ebee.common.config.AppProperties;
 import com.ebee.driver.dto.DriverLocationRequest;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
@@ -34,6 +35,7 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
     private final DriverLocationService driverLocationService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
+    private final AppProperties appProperties;
 
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
 
@@ -97,6 +99,7 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
             UUID driverId = driverOpt.get().getId();
             sessions.put(session.getId(), new SessionInfo(email, driverId));
             send(session, "AUTH_OK");
+            sendGpsConfig(session);
             log.info("Raw WS auth OK: session={} driverId={}", session.getId(), driverId);
             return true;
         } catch (Exception e) {
@@ -124,5 +127,17 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
         } catch (Exception e) {
             log.warn("WS send failed: {}", e.getMessage());
         }
+    }
+
+    private void sendGpsConfig(WebSocketSession session) {
+        var driver = appProperties.getDriver();
+        String config = String.format(
+            "{\"type\":\"GPS_CONFIG\",\"gpsIntervalMs\":%d,\"minAccuracy\":%d}",
+            driver.getGpsIntervalMs(),
+            driver.getMinAccuracy()
+        );
+        send(session, config);
+        log.info("Sent GPS config to session {}: gpsIntervalMs={}, minAccuracy={}",
+            session.getId(), driver.getGpsIntervalMs(), driver.getMinAccuracy());
     }
 }

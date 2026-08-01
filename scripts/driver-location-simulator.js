@@ -28,7 +28,7 @@
  *   --driver-email     Driver email (default: driver-sim@ebee.lk)
  *   --driver-password  Driver password (default: Driver@123)
  *   --speed            Movement speed in km/h (default: 40)
- *   --interval        GPS update interval in ms (default: 3000ms) - set 1000 for faster testing
+ *   --interval        GPS update interval in ms (default: 1000ms, matches mobile app)
  *   --api-url          Backend API URL (default: http://localhost:8085)
  *
  * Examples:
@@ -107,7 +107,7 @@ const DRIVER_PASSWORD = getArg('driver-password', 'Driver@123');
 const ADMIN_EMAIL = getArg('admin-email', 'super@ebee.lk');
 const ADMIN_PASSWORD = getArg('admin-password', 'Super@dmin123!');
 const SPEED_KMH = parseFloat(getArg('speed', '40'));
-const INTERVAL_MS = parseInt(getArg('interval', '3000'));
+const INTERVAL_MS = parseInt(getArg('interval', '1000'));
 const API_URL = getArg('api-url', 'http://localhost:8085');
 
 // Sri Lanka route - Galle Road (A2 Highway), Colombo to Galle and back

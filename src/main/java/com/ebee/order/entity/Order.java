@@ -145,6 +145,10 @@ public class Order {
     @Builder.Default
     private OrderSource orderSource = OrderSource.AGENT;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trip_id")
+    private com.ebee.trip.entity.Trip trip;
+
     @PrePersist
     @PreUpdate
     public void validate() {

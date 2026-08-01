@@ -7,7 +7,6 @@ import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
 import com.ebee.common.config.CommonPropertiesConfig;
-import com.ebee.delivery.dto.AssignDriverRequest;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
@@ -46,43 +45,11 @@ class DeliveryControllerTest {
     @MockBean private IpWhitelistService ipWhitelistService;
 
     private final UUID orderId = UUID.randomUUID();
-    private final UUID driverId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         when(rateLimitingService.isIpAllowed(anyString())).thenReturn(true);
         when(ipWhitelistService.isAllowed(any(), anyString())).thenReturn(true);
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void assignDelivery_asAdmin_returns200() throws Exception {
-        when(deliveryService.assignDelivery(any(UUID.class), any(UUID.class)))
-                .thenReturn(new DeliveryResponse());
-
-        AssignDriverRequest request = new AssignDriverRequest();
-        request.setDriverId(driverId);
-
-        mockMvc.perform(patch("/api/deliveries/{orderId}/assign", orderId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Delivery assigned successfully"));
-
-        verify(deliveryService).assignDelivery(orderId, driverId);
-    }
-
-    @Test
-    @WithMockUser(roles = "DRIVER")
-    void assignDelivery_asDriver_returns403() throws Exception {
-        AssignDriverRequest request = new AssignDriverRequest();
-        request.setDriverId(driverId);
-
-        mockMvc.perform(patch("/api/deliveries/{orderId}/assign", orderId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
     }
 
     @Test

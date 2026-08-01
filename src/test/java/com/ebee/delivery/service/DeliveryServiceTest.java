@@ -131,68 +131,6 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void assignDelivery_success() {
-        order.setDeliveryStatus(DeliveryStatus.PENDING);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
-        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
-
-        var result = deliveryService.assignDelivery(orderId, driverUserId);
-
-        assertThat(result).isNotNull();
-        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.ASSIGNED);
-        assertThat(order.getDeliveryAssignedTo()).isEqualTo(driverUser);
-        assertThat(driverProfile.getAvailability()).isEqualTo(DriverAvailability.ON_TRIP);
-        verify(driverRepository).save(driverProfile);
-        verify(notificationPort).notifyUser(eq(driverUser), anyString(), eq("delivery-assigned-driver"), anyMap(), anySet());
-        verify(notificationPort).createInternalAlert(eq(driverUser), anyString(), anyString(), any(), eq(orderId), eq("order"));
-        verify(notificationPort).notifyCustomer(eq(customer), anyString(), eq("delivery-assigned-customer"), anyMap(), anySet());
-        verify(auditLogService).record(eq(AuditAction.DELIVERY_ASSIGN), eq("Order"), eq(orderId), anyString());
-    }
-
-    @Test
-    void assignDelivery_notPending_throws() {
-        order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-
-        assertThatThrownBy(() -> deliveryService.assignDelivery(orderId, driverUserId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Delivery can only be assigned when status is PENDING");
-    }
-
-    @Test
-    void assignDelivery_userNotDriver_throws() {
-        UUID adminId = UUID.randomUUID();
-        User adminUser = User.builder().id(adminId).role(RoleType.ADMIN).build();
-        order.setDeliveryStatus(DeliveryStatus.PENDING);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
-
-        assertThatThrownBy(() -> deliveryService.assignDelivery(orderId, adminId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("User is not a driver");
-    }
-
-    @Test
-    void assignDelivery_driverSuspended_throws() {
-        driverProfile.setAvailability(DriverAvailability.SUSPENDED);
-        order.setDeliveryStatus(DeliveryStatus.PENDING);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
-        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
-
-        assertThatThrownBy(() -> deliveryService.assignDelivery(orderId, driverUserId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("driver is suspended");
-    }
-
-    @Test
     void updateDeliveryStatus_driverCanUpdateOwnDelivery() {
         order.setDeliveryAssignedTo(driverUser);
         order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
@@ -305,43 +243,5 @@ class DeliveryServiceTest {
         assertThatThrownBy(() -> deliveryService.getDeliveryDetail(orderId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Delivery");
-    }
-
-    @Test
-    void assignDelivery_withFcmToken_sendsPush() {
-        driverProfile.setFcmToken("ExponentPushToken[test-token-12345]");
-        order.setDeliveryStatus(DeliveryStatus.PENDING);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
-        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
-
-        var result = deliveryService.assignDelivery(orderId, driverUserId);
-
-        assertThat(result).isNotNull();
-        verify(notificationPort).sendPush(argThat(push ->
-                push.token().equals("ExponentPushToken[test-token-12345]")
-                        && push.title().contains("New Delivery")
-                        && "delivery_assigned".equals(push.data().get("type"))
-                        && orderId.toString().equals(push.data().get("orderId"))
-        ));
-    }
-
-    @Test
-    void assignDelivery_withoutFcmToken_doesNotSendPush() {
-        driverProfile.setFcmToken(null);
-        order.setDeliveryStatus(DeliveryStatus.PENDING);
-
-        when(orderRepository.findByIdForUpdateWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(userRepository.findById(driverUserId)).thenReturn(Optional.of(driverUser));
-        when(driverRepository.findByUserId(driverUserId)).thenReturn(Optional.of(driverProfile));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(eq(driverUserId), anyList())).thenReturn(1L);
-
-        deliveryService.assignDelivery(orderId, driverUserId);
-
-        verify(notificationPort, never()).sendPush(any());
     }
 }

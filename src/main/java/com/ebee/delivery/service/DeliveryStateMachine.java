@@ -22,14 +22,14 @@ class DeliveryStateMachine implements DeliveryStateTransition {
      * <p>
      * Notes:
      * <ul>
-     *   <li>PENDING can only be left via {@code assignDelivery()} — it is not a valid
-     *       target of {@code updateDeliveryStatus()}.</li>
+     *   <li>PENDING transitions to ASSIGNED when order is added to a trip with a driver.</li>
      *   <li>DELIVERED and FAILED_PERMANENT are terminal — no outgoing transitions.</li>
      *   <li>FAILED_PERMANENT requires admin role.</li>
      *   <li>Same-status transitions are a no-op (idempotent).</li>
      * </ul>
      */
     private static final Map<DeliveryStatus, Set<DeliveryStatus>> VALID_TRANSITIONS = Map.of(
+            DeliveryStatus.PENDING, Set.of(DeliveryStatus.ASSIGNED, DeliveryStatus.FAILED),
             DeliveryStatus.ASSIGNED, Set.of(DeliveryStatus.PICKED_UP, DeliveryStatus.FAILED),
             DeliveryStatus.PICKED_UP, Set.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED),
             DeliveryStatus.IN_TRANSIT, Set.of(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED),
@@ -44,11 +44,6 @@ class DeliveryStateMachine implements DeliveryStateTransition {
 
         if (currentStatus == null) {
             throw new IllegalArgumentException("Delivery has not been initialized for this order");
-        }
-
-        if (currentStatus == DeliveryStatus.PENDING) {
-            throw new IllegalStateException(
-                    "Cannot transition from PENDING via updateDeliveryStatus. Use assignDelivery() instead.");
         }
 
         if (currentStatus == newStatus) {

@@ -26,6 +26,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.ebee.trip.dto.AddOrdersToTripRequest;
+import com.ebee.trip.dto.TripResponse;
+
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -133,6 +137,62 @@ public class DriverAppController {
             @RequestParam(required = false) ExpenseStatus status) {
         List<ExpenseResponse> responses = driverAppService.getMyExpenses(status);
         return ResponseEntity.ok(ApiResponse.success("Expenses retrieved successfully", responses));
+    }
+
+    @GetMapping("/trips/available")
+    public ResponseEntity<ApiResponse<List<TripResponse>>> getAvailableTrips() {
+        List<TripResponse> trips = driverAppService.getAvailableTrips();
+        return ResponseEntity.ok(ApiResponse.success("Available trips retrieved successfully", trips));
+    }
+
+    @GetMapping("/trips/my")
+    public ResponseEntity<ApiResponse<TripResponse>> getMyInProgressTrip() {
+        TripResponse trip = driverAppService.getMyInProgressTrip();
+        return ResponseEntity.ok(ApiResponse.success("Current trip retrieved successfully", trip));
+    }
+
+    @GetMapping("/trips/{id}")
+    public ResponseEntity<ApiResponse<TripResponse>> getTripById(@PathVariable UUID id) {
+        TripResponse response = driverAppService.getTripById(id);
+        return ResponseEntity.ok(ApiResponse.success("Trip retrieved successfully", response));
+    }
+
+    @PatchMapping("/trips/{id}/start")
+    public ResponseEntity<ApiResponse<TripResponse>> startTrip(@PathVariable UUID id) {
+        TripResponse response = driverAppService.startTrip(id);
+        return ResponseEntity.ok(ApiResponse.success("Trip started successfully", response));
+    }
+
+    @PatchMapping("/trips/{id}/orders")
+    public ResponseEntity<ApiResponse<TripResponse>> addOrdersToTrip(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddOrdersToTripRequest request) {
+        TripResponse response = driverAppService.addOrdersToTrip(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Orders updated successfully", response));
+    }
+
+    @PatchMapping("/trips/{id}/mileage")
+    public ResponseEntity<ApiResponse<TripResponse>> updateMileage(
+            @PathVariable UUID id,
+            @RequestParam BigDecimal mileageKm) {
+        TripResponse response = driverAppService.updateMileage(id, mileageKm);
+        return ResponseEntity.ok(ApiResponse.success("Mileage updated successfully", response));
+    }
+
+    @PatchMapping("/trips/{id}/complete")
+    public ResponseEntity<ApiResponse<TripResponse>> completeTrip(@PathVariable UUID id) {
+        TripResponse response = driverAppService.completeTrip(id);
+        return ResponseEntity.ok(ApiResponse.success("Trip completed successfully", response));
+    }
+
+    @PostMapping(value = "/trips/{id}/expenses", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ExpenseResponse>> createTripExpense(
+            @PathVariable UUID id,
+            @RequestPart("expense") @Valid ExpenseRequest request,
+            @RequestParam(value = "receipt", required = false) MultipartFile receipt) {
+        ExpenseResponse response = driverAppService.createTripExpense(id, request, receipt);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Expense created successfully", response));
     }
 
     @PostMapping(value = "/profile/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

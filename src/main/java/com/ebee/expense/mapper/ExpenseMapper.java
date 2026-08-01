@@ -17,6 +17,9 @@ public interface ExpenseMapper {
     @Mapping(target = "driverName", expression = "java(expense.getDriver() != null ? expense.getDriver().getUser().getFirstName() + \" \" + expense.getDriver().getUser().getLastName() : null)")
     @Mapping(target = "approvedById", source = "approvedBy.id")
     @Mapping(target = "approvedByName", expression = "java(expense.getApprovedBy() != null ? expense.getApprovedBy().getFirstName() + \" \" + expense.getApprovedBy().getLastName() : null)")
+    @Mapping(target = "tripId", source = "trip.id")
+    @Mapping(target = "tripName", expression = "java(expense.getTrip() != null ? expense.getTrip().getName() : null)")
+    @Mapping(target = "distanceKm", source = "distanceKm")
     ExpenseResponse toResponse(Expense expense);
 
     List<ExpenseResponse> toResponseList(List<Expense> expenses);

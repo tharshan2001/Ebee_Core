@@ -64,7 +64,7 @@ class ExpenseServiceTest {
         agent = User.builder().id(UUID.randomUUID()).email("agent@ebee.com").role(RoleType.AGENT).build();
 
         request = new ExpenseRequest();
-        request.setCategory(ExpenseCategory.FUEL);
+        request.setCategory(ExpenseCategory.PETROL);
         request.setAmount(new BigDecimal("5000.00"));
         request.setDescription("Fuel for delivery van");
         request.setDateIncurred(LocalDate.now());
@@ -151,7 +151,7 @@ class ExpenseServiceTest {
         Expense expense = Expense.builder()
                 .id(expenseId)
                 .status(ExpenseStatus.PENDING)
-                .category(ExpenseCategory.FUEL)
+                .category(ExpenseCategory.PETROL)
                 .amount(new BigDecimal("5000"))
                 .build();
 
@@ -188,7 +188,7 @@ class ExpenseServiceTest {
         Expense expense = Expense.builder()
                 .id(expenseId)
                 .status(ExpenseStatus.PENDING)
-                .category(ExpenseCategory.FUEL)
+                .category(ExpenseCategory.PETROL)
                 .amount(new BigDecimal("5000"))
                 .build();
 

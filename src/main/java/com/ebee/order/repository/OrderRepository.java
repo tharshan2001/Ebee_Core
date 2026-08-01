@@ -121,4 +121,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end")
     Long countTotalOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    List<Order> findByTripId(UUID tripId);
+
+    @Query("SELECT o FROM Order o WHERE o.trip IS NULL AND o.status = :status")
+    List<Order> findByTripIsNullAndStatus(@Param("status") com.ebee.order.enums.OrderStatus status);
+
+    @Query("SELECT o FROM Order o WHERE o.trip IS NULL")
+    List<Order> findByTripIsNull();
 }

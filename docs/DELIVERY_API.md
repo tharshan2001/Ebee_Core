@@ -69,11 +69,43 @@ Drivers can have multiple active deliveries. Admin manages availability via `PAT
 - **Delivery**: automatically initialized to `PENDING` when the order status changes to `SHIPPED`.
 - **Delivered (from delivery)**: when delivery status is updated to `DELIVERED`, order status also updates to `DELIVERED`.
 - **Delivered (from order)**: when order status is updated to `DELIVERED`, delivery status also sets to `DELIVERED`.
-- **Driver ON_TRIP**: automatically set when a delivery is assigned to the driver.
-- **Driver availability**: managed manually by admin via `PATCH /api/drivers/{id}/availability`. A driver can have multiple active deliveries.
+- **Driver ON_TRIP**: automatically set when a trip is started (driver has active deliveries).
+- **Driver availability**: managed by trip system — driver is AVAILABLE when no active trips, ON_TRIP when trip is IN_PROGRESS.
 - **deliveryFailureReason**: set when delivery status is updated to `FAILED`; cleared on retry (`FAILED` → `PENDING`).
 - **Commission auto-approve**: when delivery status is updated to `DELIVERED`, the associated commission (if any) is auto-approved. Direct orders have no commission and are unaffected.
 - **Stock rollback on FAILED_PERMANENT**: when delivery status is updated to `FAILED_PERMANENT`, stock is returned for each order item and the order is reset to `PENDING` status with `deliveryAssignedTo` and delivery dates cleared. The associated commission (if any) is cancelled to `CANCELLED` status. `deliveryFailureReason` is preserved for audit.
+
+---
+
+## Trip-Based Assignment (Primary)
+
+Driver assignment is done **via trips**, not directly on orders:
+
+1. Admin creates a trip (`POST /api/trips`) with a driver
+2. Admin adds orders to the trip (`PATCH /api/trips/{id}/orders`)
+3. When orders are added, `order.deliveryAssignedTo` is set from `trip.driver`
+4. Driver starts trip (`PATCH /api/driver/trips/{id}/start`) — trip becomes IN_PROGRESS
+5. Driver now sees these orders in their delivery list
+6. Driver completes trip — orders no longer visible to driver
+
+See [Trip Management API](TRIP_API.md) for full trip documentation.
+
+---
+
+## Direct Assignment (Deprecated)
+
+The direct assignment endpoint exists for backward compatibility but is not the primary flow:
+
+```
+PATCH /api/deliveries/{orderId}/assign
+Auth: ADMIN
+Body:
+{
+    "driverId": "uuid"
+}
+```
+
+Fails if delivery status is not `PENDING`.
 
 ---
 
@@ -125,19 +157,6 @@ Auth: ADMIN, DRIVER
 
 Fails if the order has no delivery.
 
-### Assign Driver
-
-```
-PATCH /api/deliveries/{orderId}/assign
-Auth: ADMIN
-Body:
-{
-    "driverId": "uuid"
-}
-```
-
-Fails if delivery status is not `PENDING`.
-
 ### Update Delivery Status
 
 ```
@@ -168,12 +187,21 @@ The reason is stored in `deliveryFailureReason` on the order, included in custom
 
 ---
 
-## Typical Workflow
+## Typical Workflow (Trip-Based)
 
 ```
 1. Order created     → district auto-set from customer address
-2. Order → SHIPPED   → deliveryStatus = PENDING
-3. Admin views       → "10 pending deliveries in Batticaloa"
-4. Admin assigns     → driver to each delivery
-5. Driver delivers   → each order marked PICKED_UP → IN_TRANSIT → DELIVERED
+2. Order → SHIPPED  → deliveryStatus = PENDING
+3. Admin creates    → trip with driver assigned
+4. Admin adds      → orders to trip
+5. Driver starts   → trip (IN_PROGRESS) → sees orders in delivery list
+6. Driver delivers → each order: PICKED_UP → IN_TRANSIT → DELIVERED
+7. Driver completes → trip (COMPLETED) → orders no longer visible
 ```
+
+---
+
+## Related Documentation
+
+- [Trip Management API](TRIP_API.md) — Trip CRUD and trip-based order assignment
+- [Driver App API](DRIVER_APP_API.md) — Driver trip operations (start, complete, mileage)

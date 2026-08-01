@@ -89,6 +89,13 @@ public class Expense {
     @Column(name = "payment_reference")
     private String paymentReference;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trip_id")
+    private com.ebee.trip.entity.Trip trip;
+
+    @Column(name = "distance_km", precision = 10, scale = 2)
+    private BigDecimal distanceKm;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -1,8 +1,21 @@
 # Driver App API
 
-The Driver App API provides mobile-friendly endpoints for drivers to manage deliveries, profile, expenses, and receive real-time updates.
+The Driver App API provides mobile-friendly endpoints for drivers to manage deliveries, profile, expenses, trips, and receive real-time updates.
 
 All endpoints are under `/api/driver/*` and require authentication with `ROLE_DRIVER`.
+
+---
+
+## Trip-Based Delivery Assignment
+
+Deliveries are assigned to drivers **via trips**, not directly:
+
+1. Admin creates a trip and assigns a driver
+2. Admin adds orders to the trip
+3. Driver starts the trip → only then sees those orders in their delivery list
+4. Driver completes the trip → orders no longer appear in their delivery list
+
+**Key rule:** A driver can only have ONE active (IN_PROGRESS) trip at a time.
 
 ---
 
@@ -16,7 +29,7 @@ ASSIGNED ──▶ PICKED_UP ──▶ IN_TRANSIT ──▶ DELIVERED
 ```
 
 **Driver cannot:**
-- Assign or reassign deliveries (admin-only via `PATCH /api/deliveries/{orderId}/assign`)
+- Assign or reassign deliveries (admin-only via trip management)
 - Mark as `FAILED_PERMANENT` (admin-only)
 - Change availability to `SUSPENDED`
 
@@ -86,6 +99,8 @@ GET /api/driver/deliveries?status=ASSIGNED&page=0&size=20&sort=updatedAt,desc
 Auth: DRIVER
 ```
 
+**Important:** This endpoint returns ONLY orders from the driver's **active (IN_PROGRESS) trip**. If the driver has no active trip, returns an empty list.
+
 Optional filter: `status` (`ASSIGNED`, `PICKED_UP`, `IN_TRANSIT`, `DELIVERED`, `FAILED`).
 
 Sortable fields: `createdAt`, `updatedAt`, `orderNumber`, `deliveryStatus`, `scheduledDate`, `deliveredAt`.
@@ -95,7 +110,7 @@ curl -s "http://localhost:8085/api/driver/deliveries?status=ASSIGNED&page=0&size
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-**Response:** `PageResponse<DriverDeliveryResponse>`.
+**Response:** `PageResponse<DriverDeliveryResponse>`
 
 ---
 
@@ -296,6 +311,158 @@ Auth: DRIVER
 
 ---
 
+## Trip Management
+
+### List My Trips
+
+```
+GET /api/driver/trips
+Auth: DRIVER
+```
+
+Returns all trips assigned to the current driver.
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": "uuid",
+            "name": "Morning Route Colombo",
+            "startDate": "2026-07-30",
+            "endDate": "2026-07-30",
+            "status": "IN_PROGRESS",
+            "notes": "Morning deliveries",
+            "mileageKm": 45.5,
+            "orderCount": 5,
+            "paidOrderCount": 3,
+            "partialOrderCount": 1,
+            "unpaidOrderCount": 1,
+            "expectedAmount": 15000.00,
+            "collectedAmount": 10000.00,
+            "outstandingAmount": 5000.00,
+            "netAmount": 8500.00,
+            "totalExpenses": 1500.00,
+            "petrolCost": 1000.00,
+            "parkingCost": 200.00,
+            "tollCost": 0,
+            "travelCost": 0,
+            "maintenanceCost": 0,
+            "otherCost": 300.00
+        }
+    ]
+}
+```
+
+---
+
+### Get Trip by ID
+
+```
+GET /api/driver/trips/{tripId}
+Auth: DRIVER
+```
+
+Returns trip details. Driver can only view their own trips.
+
+---
+
+### Start Trip
+
+```
+PATCH /api/driver/trips/{tripId}/start
+Auth: DRIVER
+```
+
+Transitions trip from PLANNING to IN_PROGRESS.
+
+**Rules:**
+- Trip must be in PLANNING status
+- Driver must be assigned to the trip
+- Driver cannot have another active (IN_PROGRESS) trip
+
+**Response:** `TripResponse`
+
+---
+
+### Add Orders to Trip
+
+```
+PATCH /api/driver/trips/{tripId}/orders
+Auth: DRIVER
+Content-Type: application/json
+```
+
+```json
+{
+    "orderIdsToAdd": ["uuid1", "uuid2"],
+    "orderIdsToRemove": ["uuid3"]
+}
+```
+
+**Note:** Typically admin adds orders, but driver can also add/remove orders while in PLANNING status.
+
+---
+
+### Update Mileage
+
+```
+PATCH /api/driver/trips/{tripId}/mileage?mileageKm=45.5
+Auth: DRIVER
+```
+
+Records the total distance driven for the trip.
+
+---
+
+### Complete Trip
+
+```
+PATCH /api/driver/trips/{tripId}/complete
+Auth: DRIVER
+```
+
+Transitions trip from IN_PROGRESS to COMPLETED.
+
+**Rules:**
+- Trip must be in IN_PROGRESS status
+
+**Response:** `TripResponse`
+
+---
+
+### Create Trip Expense
+
+```
+POST /api/driver/trips/{tripId}/expenses
+Auth: DRIVER
+Content-Type: multipart/form-data
+```
+
+| Part | Type | Required | Description |
+|------|------|----------|-------------|
+| `expense` | JSON string | Yes | Expense details |
+| `receipt` | File | No | Receipt image |
+
+`expense` JSON structure:
+```json
+{
+    "category": "PETROL",
+    "amount": 5000.00,
+    "description": "Fuel for route",
+    "dateIncurred": "2026-07-30"
+}
+```
+
+Valid categories: `PETROL`, `MILEAGE`, `PARKING`, `TOLL`, `TRAVEL`, `MAINTENANCE`, `OTHER`.
+
+- For PETROL: `amount > 0`, `distanceKm` should be null
+- For MILEAGE: `amount = 0`, `distanceKm > 0` (distance in km)
+
+Expense is linked to both the trip and the driver.
+
+---
+
 ## Expenses
 
 ### Create Expense
@@ -313,14 +480,14 @@ Content-Type: multipart/form-data
 `expense` JSON structure:
 ```json
 {
-    "category": "FUEL",
+    "category": "PETROL",
     "amount": 5000.00,
     "description": "Fuel for deliveries in Batticaloa",
     "dateIncurred": "2026-06-29"
 }
 ```
 
-Valid categories: `FUEL`, `MAINTENANCE`, `PARKING`, `TOLL`, `OTHER`.
+Valid categories: `PETROL`, `MILEAGE`, `MAINTENANCE`, `PARKING`, `TOLL`, `TRAVEL`, `OTHER`.
 
 The driver is automatically set as the `driverId` on the expense.
 
@@ -393,6 +560,7 @@ Error responses:
 
 - [Driver Module API](DRIVER_API.md) — Admin endpoints for driver CRUD and availability
 - [Delivery Module API](DELIVERY_API.md) — Delivery state machine, assignment, and admin endpoints
+- [Trip Management API](TRIP_API.md) — Admin trip management endpoints
 - [Driver Assignment Rules](DRIVER_ASSIGNMENT.md) — Business rules for availability derivation
 - [Auth API](AUTH_API.md) — Login, token refresh, and password management
 - [Alert API](ALERT_API.md) — In-app alert management

@@ -30,9 +30,11 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
+import com.ebee.trip.dto.TripOrderMarkerDto;
 import com.ebee.trip.dto.TripResponse;
 import com.ebee.trip.entity.Trip;
 import com.ebee.trip.enums.TripStatus;
+import com.ebee.trip.event.TripOrdersChangedEvent;
 import com.ebee.trip.mapper.TripMapper;
 import com.ebee.trip.repository.TripRepository;
 import com.ebee.user.entity.User;
@@ -535,6 +537,8 @@ public class DriverAppService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Orders updated on trip '" + trip.getName() + "'");
 
+        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
+
         return tripMapper.toResponse(trip);
     }
 
@@ -735,5 +739,86 @@ public class DriverAppService {
         info.setUnitPrice(item.getUnitPrice());
         info.setSubtotal(item.getSubtotal());
         return info;
+    }
+
+    private List<TripOrderMarkerDto> buildOrderMarkers(Trip trip) {
+        List<Order> orders = orderRepository.findByTripId(trip.getId());
+        if (orders == null || orders.isEmpty()) {
+            return List.of();
+        }
+        return orders.stream()
+                .map(this::toTripOrderMarkerDto)
+                .toList();
+    }
+
+    private TripOrderMarkerDto toTripOrderMarkerDto(Order order) {
+        String customerName = null;
+        String customerPhone = null;
+        String street = null;
+        String addressLine2 = null;
+        String city = null;
+        String postalCode = null;
+        String district = null;
+        String country = null;
+
+        if (order.getCustomer() != null) {
+            customerName = order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName();
+            customerPhone = order.getCustomer().getPhoneNumber();
+            if (order.getCustomer().getAddress() != null) {
+                var addr = order.getCustomer().getAddress();
+                street = addr.getStreet();
+                addressLine2 = addr.getAddressLine2();
+                city = addr.getCity();
+                postalCode = addr.getPostalCode();
+                district = addr.getDistrict() != null ? addr.getDistrict().getDisplayName() : null;
+                country = addr.getCountry();
+            }
+        }
+
+        String formattedAddress = buildFormattedAddress(street, addressLine2, city, postalCode, district, country);
+
+        return new TripOrderMarkerDto(
+                order.getId(),
+                order.getOrderNumber(),
+                customerName,
+                customerPhone,
+                street,
+                addressLine2,
+                city,
+                postalCode,
+                district,
+                country,
+                order.getDeliveryStatus(),
+                order.getStatus(),
+                order.getTotalAmount(),
+                formattedAddress
+        );
+    }
+
+    private String buildFormattedAddress(String street, String addressLine2, String city,
+                                         String postalCode, String district, String country) {
+        StringBuilder sb = new StringBuilder();
+        if (street != null) sb.append(street);
+        if (addressLine2 != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(addressLine2);
+        }
+        if (city != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(city);
+        }
+        if (postalCode != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(postalCode);
+        }
+        if (district != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(district);
+        }
+        if (country != null) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(country);
+        }
+        return sb.toString();
     }
 }

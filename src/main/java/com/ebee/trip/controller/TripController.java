@@ -3,6 +3,7 @@ package com.ebee.trip.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
 import com.ebee.trip.dto.CreateTripRequest;
+import com.ebee.trip.dto.TripOrderMarkerDto;
 import com.ebee.trip.dto.TripResponse;
 import com.ebee.trip.dto.UpdateTripRequest;
 import com.ebee.trip.enums.TripStatus;
@@ -89,6 +90,20 @@ public class TripController {
     public ResponseEntity<ApiResponse<TripResponse>> completeTrip(@PathVariable UUID id) {
         TripResponse response = tripService.completeTrip(id);
         return ResponseEntity.ok(ApiResponse.success("Trip completed successfully", response));
+    }
+
+    @GetMapping("/{id}/order-markers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
+    public ResponseEntity<ApiResponse<List<TripOrderMarkerDto>>> getTripOrderMarkers(@PathVariable UUID id) {
+        List<TripOrderMarkerDto> markers = tripService.getTripOrderMarkers(id);
+        return ResponseEntity.ok(ApiResponse.success("Trip order markers retrieved successfully", markers));
+    }
+
+    @GetMapping("/driver/{driverId}/active/order-markers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
+    public ResponseEntity<ApiResponse<List<TripOrderMarkerDto>>> getActiveTripOrderMarkers(@PathVariable UUID driverId) {
+        List<TripOrderMarkerDto> markers = tripService.getActiveTripOrderMarkers(driverId);
+        return ResponseEntity.ok(ApiResponse.success("Active trip order markers retrieved successfully", markers));
     }
 
     @DeleteMapping("/{id}")

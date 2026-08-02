@@ -32,10 +32,13 @@ public class TrialBalanceResponse {
         private String entityId;
         private String entityCode;
         private String entityName;
+        private String transactionType;
         private BigDecimal debit;
         private BigDecimal credit;
         private BigDecimal balance;
         private String balanceType;
+        private String description;
+        private LocalDateTime createdAt;
     }
 
     @Data

@@ -1,6 +1,7 @@
 package com.ebee.accounting.controller;
 
 import com.ebee.accounting.dto.LedgerEntryResponse;
+import com.ebee.accounting.dto.SupplierLedgerEntryResponse;
 import com.ebee.accounting.entity.AgentLedger;
 import com.ebee.accounting.entity.CustomerLedger;
 import com.ebee.accounting.entity.SupplierLedger;
@@ -39,6 +40,16 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<BigDecimal>> getSupplierBalance(@PathVariable UUID supplierId) {
         BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
         return ResponseEntity.ok(ApiResponse.success("Supplier balance retrieved", balance));
+    }
+
+    @GetMapping("/supplier/{supplierId}/entries")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<SupplierLedgerEntryResponse>>> getSupplierLedgerEntries(@PathVariable UUID supplierId) {
+        List<SupplierLedger> entries = ledgerService.getSupplierLedgerEntries(supplierId);
+        List<SupplierLedgerEntryResponse> response = entries.stream()
+                .map(this::toSupplierLedgerResponse)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success("Supplier ledger entries retrieved", response));
     }
 
     @GetMapping("/agent/{agentId}/balance")
@@ -175,6 +186,22 @@ public class LedgerController {
             null,
             null,
             null,
+            entry.getCreatedAt()
+        );
+    }
+
+    private SupplierLedgerEntryResponse toSupplierLedgerResponse(SupplierLedger entry) {
+        return new SupplierLedgerEntryResponse(
+            entry.getId(),
+            entry.getSupplierId(),
+            entry.getPurchaseOrderId(),
+            entry.getSupplierPaymentId(),
+            entry.getTransactionType(),
+            entry.getDebit(),
+            entry.getCredit(),
+            entry.getDescription(),
+            entry.getEffectiveDate(),
+            entry.getReference(),
             entry.getCreatedAt()
         );
     }

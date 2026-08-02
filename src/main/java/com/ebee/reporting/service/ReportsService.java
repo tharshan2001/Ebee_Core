@@ -205,10 +205,13 @@ public class ReportsService {
                     .entityId(l.getCustomerId().toString())
                     .entityCode(entityCode)
                     .entityName(l.getDescription())
+                    .transactionType(l.getTransactionType())
                     .debit(debit)
                     .credit(credit)
                     .balance(balance)
                     .balanceType(balance.compareTo(BigDecimal.ZERO) >= 0 ? "DR" : "CR")
+                    .description(l.getDescription())
+                    .createdAt(l.getCreatedAt())
                     .build());
         }
 
@@ -228,10 +231,13 @@ public class ReportsService {
                     .entityId(l.getSupplierId().toString())
                     .entityCode("N/A")
                     .entityName(l.getDescription())
+                    .transactionType(l.getTransactionType())
                     .debit(debit)
                     .credit(credit)
                     .balance(balance)
                     .balanceType(balance.compareTo(BigDecimal.ZERO) >= 0 ? "CR" : "DR")
+                    .description(l.getDescription())
+                    .createdAt(l.getCreatedAt())
                     .build());
         }
 
@@ -254,10 +260,13 @@ public class ReportsService {
                     .entityId(l.getAgentId().toString())
                     .entityCode(entityCode)
                     .entityName(l.getDescription())
+                    .transactionType(l.getTransactionType())
                     .debit(debit)
                     .credit(credit)
                     .balance(balance)
                     .balanceType(balance.compareTo(BigDecimal.ZERO) >= 0 ? "CR" : "DR")
+                    .description(l.getDescription())
+                    .createdAt(l.getCreatedAt())
                     .build());
         }
 

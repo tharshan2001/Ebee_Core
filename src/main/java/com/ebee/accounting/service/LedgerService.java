@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -217,6 +218,11 @@ public class LedgerService {
     @Transactional(readOnly = true)
     public BigDecimal getSupplierBalance(UUID supplierId) {
         return supplierLedgerRepository.calculateBalance(supplierId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SupplierLedger> getSupplierLedgerEntries(UUID supplierId) {
+        return supplierLedgerRepository.findBySupplierIdOrderByCreatedAtDesc(supplierId);
     }
 
     @Transactional

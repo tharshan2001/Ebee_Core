@@ -207,6 +207,11 @@ public class DriverAppService {
             recalculateDriverAvailability(securityService.getCurrentUserId());
         }
 
+        if (request.getStatus() == DeliveryStatus.FAILED
+                && order.getDeliveryAssignedTo() != null) {
+            recalculateDriverAvailability(order.getDeliveryAssignedTo().getId());
+        }
+
         auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
                 "Driver updated delivery for order " + savedOrder.getOrderNumber()
                         + " from " + previousStatus + " to " + request.getStatus());

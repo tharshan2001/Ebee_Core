@@ -17,6 +17,8 @@ public class DeliveryResponse {
     private DeliveryStatus status;
     private UUID driverId;
     private String driverName;
+    private UUID tripId;
+    private String tripName;
     private LocalDate scheduledDate;
     private String notes;
     private String driverNotes;

@@ -4,6 +4,8 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.delivery.event.DeliveryStatusChangedEvent;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseResponse;
@@ -33,6 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -211,9 +214,13 @@ public class TripService {
         trip = tripRepository.save(trip);
 
         for (Order order : trip.getOrders()) {
+            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
             order.setTrip(null);
-            order.setDeliveryStatus(com.ebee.delivery.enums.DeliveryStatus.PENDING);
+            order.setDeliveryStatus(DeliveryStatus.PENDING);
             orderRepository.save(order);
+
+            eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                    this, order, previousDeliveryStatus, "Trip cancelled — order returned to pending", LocalDateTime.now()));
         }
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),

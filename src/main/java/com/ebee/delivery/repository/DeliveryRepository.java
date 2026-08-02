@@ -22,23 +22,32 @@ import java.util.UUID;
  */
 @Repository
 public interface DeliveryRepository extends JpaRepository<Order, UUID> {
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.deliveryStatus = :status")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.deliveryStatus = :status")
     List<Order> findByDeliveryStatus(@Param("status") DeliveryStatus status);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy WHERE o.deliveryAssignedTo.id = :userId")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip WHERE o.deliveryAssignedTo.id = :userId")
     List<Order> findByDeliveryAssignedToId(@Param("userId") UUID userId);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy WHERE o.deliveryStatus = :status AND o.deliveryAssignedTo.id = :userId")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip WHERE o.deliveryAssignedTo.id = :userId AND o.deliveryStatus IN :statuses")
+    List<Order> findByDeliveryAssignedToIdAndActiveStatuses(@Param("userId") UUID userId, @Param("statuses") List<DeliveryStatus> statuses);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip WHERE o.deliveryStatus = :status AND o.deliveryAssignedTo.id = :userId")
     List<Order> findByDeliveryStatusAndDeliveryAssignedToId(@Param("status") DeliveryStatus status, @Param("userId") UUID userId);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.deliveryStatus = :status AND c.address.district = :district")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.deliveryStatus = :status AND c.address.district = :district")
     List<Order> findByDeliveryStatusAndDistrict(@Param("status") DeliveryStatus status, @Param("district") District district);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.deliveryStatus IS NOT NULL AND c.address.district = :district")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.deliveryStatus IS NOT NULL AND c.address.district = :district")
     List<Order> findByDeliveryStatusNotNullAndDistrict(@Param("district") District district);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address WHERE o.deliveryStatus IS NOT NULL")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.deliveryStatus IS NOT NULL")
     List<Order> findByDeliveryStatusNotNull();
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.trip.id = :tripId")
+    List<Order> findByTripId(@Param("tripId") UUID tripId);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.trip WHERE o.trip.id = :tripId AND o.deliveryStatus = :status")
+    List<Order> findByTripIdAndDeliveryStatus(@Param("tripId") UUID tripId, @Param("status") DeliveryStatus status);
 
     long countByDeliveryAssignedToIdAndDeliveryStatusIn(UUID userId, List<DeliveryStatus> statuses);
 

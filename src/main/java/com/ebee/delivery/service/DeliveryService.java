@@ -20,6 +20,8 @@ import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.entity.Order;
+import com.ebee.order.enums.OrderStatus;
+import com.ebee.order.event.OrderStatusChangedEvent;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
@@ -79,6 +81,7 @@ public class DeliveryService {
 
         DeliveryStatus previousStatus = order.getDeliveryStatus();
         DeliveryStatus newStatus = request.getStatus();
+        OrderStatus previousOrderStatus = order.getStatus();
 
         User previousDriver = order.getDeliveryAssignedTo();
 
@@ -122,17 +125,28 @@ public class DeliveryService {
         eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
                 this, savedOrder, previousStatus, request.getReason(), LocalDateTime.now()));
 
+        if (result.wasDelivered()) {
+            eventPublisher.publishEvent(new OrderStatusChangedEvent(
+                    this, savedOrder, previousOrderStatus, LocalDateTime.now()));
+        }
+
         return toDeliveryResponse(savedOrder);
     }
 
     @Transactional(readOnly = true)
-    public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district) {
+    public List<DeliveryResponse> getDeliveries(DeliveryStatus status, String district, UUID tripId) {
         District districtEnum = (district != null && !district.isBlank())
                 ? District.fromDisplayName(district)
                 : null;
 
         List<Order> orders;
-        if (status != null && districtEnum != null) {
+        if (tripId != null) {
+            if (status != null) {
+                orders = deliveryRepository.findByTripIdAndDeliveryStatus(tripId, status);
+            } else {
+                orders = deliveryRepository.findByTripId(tripId);
+            }
+        } else if (status != null && districtEnum != null) {
             orders = deliveryRepository.findByDeliveryStatusAndDistrict(status, districtEnum);
         } else if (status != null) {
             orders = deliveryRepository.findByDeliveryStatus(status);
@@ -147,7 +161,14 @@ public class DeliveryService {
     @Transactional(readOnly = true)
     public List<DeliveryResponse> getMyDeliveries() {
         UUID userId = securityService.getCurrentUserId();
-        List<Order> orders = deliveryRepository.findByDeliveryAssignedToId(userId);
+
+        if (!driverRepository.existsByUserId(userId)) {
+            throw new AccessDeniedException("Only drivers can access their deliveries");
+        }
+
+        List<DeliveryStatus> activeStatuses = List.of(
+                DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+        List<Order> orders = deliveryRepository.findByDeliveryAssignedToIdAndActiveStatuses(userId, activeStatuses);
         return orders.stream().map(this::toDeliveryResponse).toList();
     }
 
@@ -198,6 +219,10 @@ public class DeliveryService {
         if (order.getDeliveryAssignedTo() != null) {
             response.setDriverId(order.getDeliveryAssignedTo().getId());
             response.setDriverName(order.getDeliveryAssignedTo().getFirstName() + " " + order.getDeliveryAssignedTo().getLastName());
+        }
+        if (order.getTrip() != null) {
+            response.setTripId(order.getTrip().getId());
+            response.setTripName(order.getTrip().getName());
         }
         response.setScheduledDate(order.getDeliveryScheduledDate());
         response.setNotes(order.getDeliveryNotes());

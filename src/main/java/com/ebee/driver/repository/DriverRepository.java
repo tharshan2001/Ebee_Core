@@ -17,6 +17,8 @@ import java.util.UUID;
 public interface DriverRepository extends JpaRepository<Driver, UUID> {
     Optional<Driver> findByUserId(UUID userId);
 
+    boolean existsByUserId(UUID userId);
+
     @Query("SELECT d FROM Driver d LEFT JOIN FETCH d.user WHERE d.availability = :availability")
     List<Driver> findByAvailability(@Param("availability") DriverAvailability availability);
 

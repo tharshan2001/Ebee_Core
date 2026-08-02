@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -53,6 +54,12 @@ public class CustomerLedger {
 
     @Column
     private String description;
+
+    @Column(name = "effective_date")
+    private LocalDate effectiveDate;
+
+    @Column
+    private String reference;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Slf4j
@@ -128,6 +129,21 @@ public class LedgerService {
         );
 
         return saved;
+    }
+
+    @Transactional
+    public CustomerLedger recordCustomerAdjustment(UUID customerId, BigDecimal debit, LocalDate effectiveDate, String description, String reference, UUID recordedBy) {
+        CustomerLedger entry = CustomerLedger.builder()
+                .customerId(customerId)
+                .transactionType(LedgerTransactionType.ADJUSTMENT.name())
+                .debit(debit)
+                .credit(BigDecimal.ZERO)
+                .effectiveDate(effectiveDate)
+                .description(description)
+                .reference(reference)
+                .build();
+        log.info("Recording customer adjustment: customer={}, debit={}, effectiveDate={}, description={}", customerId, debit, effectiveDate, description);
+        return customerLedgerRepository.save(entry);
     }
 
     @Transactional(readOnly = true)

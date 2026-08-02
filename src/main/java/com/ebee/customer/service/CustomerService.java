@@ -12,7 +12,9 @@ import com.ebee.customer.dto.AddressRequest;
 import com.ebee.customer.dto.AddressResponse;
 import com.ebee.customer.dto.AdvanceTransactionResponse;
 import com.ebee.customer.dto.AdjustAdvanceRequest;
+import com.ebee.customer.dto.AdjustOutstandingRequest;
 import com.ebee.customer.dto.CreditLimitRequest;
+import com.ebee.customer.dto.OutstandingAdjustmentResponse;
 import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
@@ -41,6 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -383,6 +386,44 @@ public class CustomerService {
                 DuesChangeType.MANUAL_ADJUSTMENT);
 
         return advanceTransactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public OutstandingAdjustmentResponse manualAdjustOutstanding(UUID customerId, AdjustOutstandingRequest request) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        BigDecimal previousOutstanding = customer.getOutstandingBalance();
+        BigDecimal amountAdded = request.amount();
+        BigDecimal newOutstanding = previousOutstanding.add(amountAdded);
+
+        if (newOutstanding.compareTo(BigDecimal.ZERO) < 0) {
+            newOutstanding = BigDecimal.ZERO;
+        }
+
+        customer.setOutstandingBalance(newOutstanding);
+        customerRepository.save(customer);
+
+        ledgerService.recordCustomerAdjustment(
+                customerId,
+                amountAdded,
+                request.date(),
+                request.description(),
+                "Outstanding Adjustment",
+                securityService.getCurrentUserId()
+        );
+
+        publishDuesChange(customer, previousOutstanding, customer.getAdvanceBalance(),
+                DuesChangeType.MANUAL_ADJUSTMENT);
+
+        return new OutstandingAdjustmentResponse(
+                customerId,
+                previousOutstanding,
+                newOutstanding,
+                amountAdded,
+                request.date(),
+                request.description()
+        );
     }
 
     @Transactional

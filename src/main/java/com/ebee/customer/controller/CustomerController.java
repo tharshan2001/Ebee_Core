@@ -7,12 +7,14 @@ import com.ebee.common.response.PageResponse;
 import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.customer.dto.AdjustAdvanceRequest;
+import com.ebee.customer.dto.AdjustOutstandingRequest;
 import com.ebee.customer.dto.AdvanceTransactionResponse;
 import com.ebee.customer.dto.CreditLimitRequest;
 import com.ebee.customer.dto.CustomerBalanceResponse;
 import com.ebee.customer.dto.CustomerPaymentResponse;
 import com.ebee.customer.dto.CustomerRequest;
 import com.ebee.customer.dto.CustomerResponse;
+import com.ebee.customer.dto.OutstandingAdjustmentResponse;
 import com.ebee.customer.entity.CustomerAdvanceTransaction;
 import com.ebee.customer.service.CustomerService;
 import com.ebee.order.dto.RecordPaymentRequest;
@@ -164,6 +166,15 @@ public class CustomerController {
             @Valid @RequestBody AdjustAdvanceRequest request) {
         CustomerAdvanceTransaction transaction = customerService.manualAdjustAdvance(id, request);
         return ResponseEntity.ok(ApiResponse.success("Advance balance adjusted successfully", toAdvanceResponse(transaction)));
+    }
+
+    @PostMapping("/{id}/adjust-outstanding")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<OutstandingAdjustmentResponse>> adjustOutstanding(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdjustOutstandingRequest request) {
+        OutstandingAdjustmentResponse response = customerService.manualAdjustOutstanding(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Outstanding balance adjusted successfully", response));
     }
 
     @GetMapping("/{id}/ledger")

@@ -114,6 +114,17 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - Broadcasts to `/topic/customer-dues` WebSocket topic for real-time UI updates
 - Only increases outstanding (no deduction)
 
+### Supplier Outstanding Management
+- `supplier_ledger` now properly updated on PO receive, payment, and return
+- `effective_date` and `reference` fields added to `supplier_ledger` (V118 migration)
+- `syncSupplierOutstanding()` uses ledger balance calculation (matching customer pattern)
+- New endpoints:
+  - `GET /api/suppliers/with-outstandings` — list suppliers with outstanding balance > 0
+  - `GET /api/suppliers/{id}/outstanding-orders` — get PO breakdown with outstanding amounts
+  - `POST /api/suppliers/{id}/payments` — pay supplier desired amount (FIFO across POs)
+  - `POST /api/suppliers/{id}/adjust-outstanding` — manual outstanding adjustment
+- WebSocket topic `/topic/supplier-dues` configured for ADMIN/SUPER_ADMIN
+
 ### Combo (Product Bundle) Feature
 - New `combo/` domain package (entity, dto, enums, exception, mapper, repository, service, controller)
 - Three rule types: null (plain bundle), `FREE_PRODUCT` (admin picks exact free product), `DISCOUNT` (FIXED/PERCENTAGE)

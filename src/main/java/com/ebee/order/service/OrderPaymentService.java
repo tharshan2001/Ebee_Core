@@ -177,11 +177,8 @@ public class OrderPaymentService {
                 currentUserId
         );
 
-        if (isCreditOrder || isCodOrder) {
-            updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
-            syncCustomerOutstanding(order.getCustomer());
-            customerRepository.save(order.getCustomer());
-        }
+        syncCustomerOutstanding(order.getCustomer());
+        customerRepository.save(order.getCustomer());
 
         auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
                 "Payment recorded for order " + order.getOrderNumber()

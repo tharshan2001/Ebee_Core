@@ -22,6 +22,8 @@ public class CustomerRequest {
     @Email(message = "Invalid email format")
     private String email;
 
+    private Boolean clearEmail;
+
     private String bookNo;
 
     @Valid

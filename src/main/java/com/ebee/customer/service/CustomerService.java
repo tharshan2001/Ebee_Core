@@ -114,8 +114,10 @@ public class CustomerService {
         if (request.getPhoneNumber() != null) {
             customer.setPhoneNumber(request.getPhoneNumber());
         }
-        if (request.getEmail() != null) {
-            customer.setEmail(request.getEmail());
+        if (Boolean.TRUE.equals(request.getClearEmail())) {
+            customer.setEmail(null);
+        } else if (request.getEmail() != null) {
+            customer.setEmail(request.getEmail().isEmpty() ? null : request.getEmail());
         }
         if (request.getBookNo() != null) {
             customer.setBookNo(request.getBookNo());

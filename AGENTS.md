@@ -107,6 +107,13 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - Further sale of 6 exhausts layer 1 (5→0) and consumes 1 from layer 2 (10→9), WAC = 200
 - 308 tests pass
 
+### Manual Outstanding Adjustment
+- `POST /api/customers/{id}/adjust-outstanding` endpoint for admins to manually add outstanding
+- Request body: `{ amount, date, description }` — amount must be positive
+- `effective_date` stored in `customer_ledger` for audit trail
+- Broadcasts to `/topic/customer-dues` WebSocket topic for real-time UI updates
+- Only increases outstanding (no deduction)
+
 ### Combo (Product Bundle) Feature
 - New `combo/` domain package (entity, dto, enums, exception, mapper, repository, service, controller)
 - Three rule types: null (plain bundle), `FREE_PRODUCT` (admin picks exact free product), `DISCOUNT` (FIXED/PERCENTAGE)

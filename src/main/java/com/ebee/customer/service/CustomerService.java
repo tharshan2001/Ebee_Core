@@ -443,20 +443,33 @@ public class CustomerService {
         List<Order> unpaidOrders = orderRepository.findByCustomerIdAndPaymentStatusInWithDetails(
                 customerId, List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID));
 
-        if (unpaidOrders.isEmpty()) {
-            throw new IllegalArgumentException("Customer has no unpaid orders");
-        }
-
         BigDecimal remaining = request.amount();
         int settledCount = 0;
 
-        for (Order order : unpaidOrders) {
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
-            BigDecimal payAmount = remaining.min(order.getOutstandingBalance());
-            orderPaymentService.recordPayment(order.getId(),
-                    new RecordPaymentRequest(payAmount, request.paymentMethod(), null, null), false);
-            remaining = remaining.subtract(payAmount);
-            settledCount++;
+        if (!unpaidOrders.isEmpty()) {
+            for (Order order : unpaidOrders) {
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+                BigDecimal payAmount = remaining.min(order.getOutstandingBalance());
+                orderPaymentService.recordPayment(order.getId(),
+                        new RecordPaymentRequest(payAmount, request.paymentMethod(), null, null), false);
+                remaining = remaining.subtract(payAmount);
+                settledCount++;
+            }
+        }
+
+        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal outstanding = customerLedgerRepository.calculateBalance(customerId);
+            if (outstanding.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal adjustmentPayment = remaining.min(outstanding);
+                ledgerService.recordCustomerPayment(
+                        customerId,
+                        null,
+                        adjustmentPayment,
+                        "Payment for outstanding adjustment via " + request.paymentMethod(),
+                        securityService.getCurrentUserId()
+                );
+                remaining = remaining.subtract(adjustmentPayment);
+            }
         }
 
         customer = customerRepository.findById(customerId)

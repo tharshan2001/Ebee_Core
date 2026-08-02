@@ -227,7 +227,7 @@ public class CustomerService {
     }
 
     public void syncCustomerOutstanding(Customer customer) {
-        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
+        BigDecimal actual = customerLedgerRepository.calculateBalance(customer.getId());
         customer.setOutstandingBalance(actual);
     }
 

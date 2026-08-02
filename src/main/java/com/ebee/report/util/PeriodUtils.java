@@ -15,7 +15,7 @@ public final class PeriodUtils {
             return new PeriodRange(startDate, endDate);
         }
         if (period == null || period.isBlank()) {
-            return resolve("this_month", null, null);
+            return PeriodRange.ALL_TIME;
         }
         LocalDate now = LocalDate.now();
         return switch (period.toLowerCase()) {

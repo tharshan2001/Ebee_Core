@@ -462,6 +462,9 @@ public class CustomerService {
         customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
+        syncCustomerOutstanding(customer);
+        customer = customerRepository.save(customer);
+
         return new CustomerPaymentResponse(
                 customer.getId(),
                 customer.getFirstName() + " " + customer.getLastName(),

@@ -40,6 +40,8 @@ public interface OrderService {
 
     Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable);
 
+    Page<OrderResponse> getCustomerOrdersPaginated(UUID customerId, Pageable pageable);
+
     OrderResponse updateOrderStatus(UUID id, OrderStatus status);
 
     OrderResponse cancelOrder(UUID id, OrderSettlementRequest request);

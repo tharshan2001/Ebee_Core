@@ -492,6 +492,14 @@ public class OrderServiceImpl implements OrderService {
         return orders.map(orderMapper::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public Page<OrderResponse> getCustomerOrdersPaginated(UUID customerId, Pageable pageable) {
+        customerService.getCustomerById(customerId);
+        Page<Order> orders = orderRepository.findByCustomerIdWithDetailsFull(customerId, pageable);
+        return orders.map(orderMapper::toResponse);
+    }
+
     @Transactional
     @Override
     public OrderResponse updateOrderStatus(UUID id, OrderStatus status) {

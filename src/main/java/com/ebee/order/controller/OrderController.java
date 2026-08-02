@@ -84,6 +84,22 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
     }
 
+    @GetMapping("/customer/{customerId}/paginated")
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getCustomerOrdersPaginated(
+            @PathVariable UUID customerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                SortUtils.parse(sort, SortableFields.AllowedFor.ORDER));
+        Page<OrderResponse> ordersPage = orderService.getCustomerOrdersPaginated(customerId, pageable);
+        PageResponse<OrderResponse> response = PageResponse.from(ordersPage);
+        return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", response));
+    }
+
     @GetMapping("/unassigned")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getUnassignedOrders(

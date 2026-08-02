@@ -318,10 +318,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) == 0) {
             order.setOutstandingBalance(receivedTotal);
-            purchaseOrderPaymentService.addSupplierOutstanding(order.getSupplier(), receivedTotal);
+            purchaseOrderPaymentService.addSupplierOutstandingWithLedger(
+                    order.getSupplier(), receivedTotal, order.getId(),
+                    order.getPoNumber(), "PO " + order.getPoNumber() + " - Stock received");
         } else {
             order.setOutstandingBalance(order.getOutstandingBalance().add(receivedTotal));
-            purchaseOrderPaymentService.addSupplierOutstanding(order.getSupplier(), receivedTotal);
+            purchaseOrderPaymentService.addSupplierOutstandingWithLedger(
+                    order.getSupplier(), receivedTotal, order.getId(),
+                    order.getPoNumber(), "PO " + order.getPoNumber() + " - Additional stock received");
         }
 
         order.setStatus(allFullyReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED);
@@ -384,7 +388,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         inventoryService.recordOrderStocks(productIds, quantities, StockMovementType.OUT, notes);
 
         order.setOutstandingBalance(order.getOutstandingBalance().subtract(returnTotal));
-        purchaseOrderPaymentService.subtractSupplierOutstanding(order.getSupplier(), returnTotal);
+        purchaseOrderPaymentService.subtractSupplierOutstandingForReturn(
+                order.getSupplier(), returnTotal, order.getId(),
+                order.getPoNumber(), "Return for PO " + order.getPoNumber());
 
         if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) <= 0) {
             order.setOutstandingBalance(BigDecimal.ZERO);

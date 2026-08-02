@@ -1,5 +1,6 @@
 package com.ebee.purchase.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.purchase.dto.RecordPaymentRequest;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -20,11 +22,14 @@ public class PurchaseOrderPaymentService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
+    private final LedgerService ledgerService;
 
     public PurchaseOrderPaymentService(PurchaseOrderRepository purchaseOrderRepository,
-                                       SupplierRepository supplierRepository) {
+                                       SupplierRepository supplierRepository,
+                                       LedgerService ledgerService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.supplierRepository = supplierRepository;
+        this.ledgerService = ledgerService;
     }
 
     public void initPayment(PurchaseOrder order, PurchasePaymentMethod paymentMethod, BigDecimal paidAmount) {
@@ -97,14 +102,18 @@ public class PurchaseOrderPaymentService {
             order.setPaymentStatus(PurchasePaymentStatus.PARTIALLY_PAID);
         }
 
-        subtractSupplierOutstanding(order.getSupplier(), request.amount());
+        subtractSupplierOutstandingWithLedger(
+                order.getSupplier(), request.amount(), order.getId(),
+                "Payment for PO " + order.getPoNumber() + " via " + request.paymentMethod(),
+                "PO Payment: " + order.getPoNumber());
 
         return purchaseOrderRepository.save(order);
     }
 
     public void releaseSupplierOutstanding(PurchaseOrder order) {
         if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) > 0) {
-            subtractSupplierOutstanding(order.getSupplier(), order.getOutstandingBalance());
+            subtractSupplierOutstandingWithLedger(order.getSupplier(), order.getOutstandingBalance(),
+                    null, "Outstanding released on order cancellation", null);
             order.setOutstandingBalance(BigDecimal.ZERO);
         }
     }
@@ -118,5 +127,58 @@ public class PurchaseOrderPaymentService {
         BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
         supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
         return supplierRepository.save(supplier);
+    }
+
+    public Supplier addSupplierOutstandingWithLedger(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
+                                                     String poNumber, String description) {
+        supplier.setOutstandingBalance(supplier.getOutstandingBalance().add(amount));
+        Supplier saved = supplierRepository.save(supplier);
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.recordSupplierInvoice(
+                    supplier.getId(),
+                    purchaseOrderId,
+                    amount,
+                    description,
+                    LocalDate.now(),
+                    "PO Invoice: " + poNumber
+            );
+        }
+        return saved;
+    }
+
+    public Supplier subtractSupplierOutstandingWithLedger(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
+                                                         String description, String reference) {
+        BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
+        supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
+        Supplier saved = supplierRepository.save(supplier);
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.recordSupplierPayment(
+                    supplier.getId(),
+                    purchaseOrderId,
+                    amount,
+                    description,
+                    LocalDate.now(),
+                    reference
+            );
+        }
+        return saved;
+    }
+
+    public Supplier subtractSupplierOutstandingForReturn(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
+                                                        String poNumber, String description) {
+        BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
+        supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
+        Supplier saved = supplierRepository.save(supplier);
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.recordSupplierExpense(
+                    supplier.getId(),
+                    purchaseOrderId,
+                    amount,
+                    description,
+                    LocalDate.now(),
+                    "PO Return: " + poNumber
+            );
+        }
+        return saved;
     }
 }

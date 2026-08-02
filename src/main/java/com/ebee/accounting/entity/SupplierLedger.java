@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -57,4 +58,10 @@ public class SupplierLedger {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "effective_date")
+    private LocalDate effectiveDate;
+
+    @Column(length = 255)
+    private String reference;
 }

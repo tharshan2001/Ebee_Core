@@ -152,7 +152,7 @@ public class LedgerService {
     }
 
     @Transactional
-    public SupplierLedger recordSupplierInvoice(UUID supplierId, UUID purchaseOrderId, BigDecimal amount, String description) {
+    public SupplierLedger recordSupplierInvoice(UUID supplierId, UUID purchaseOrderId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .purchaseOrderId(purchaseOrderId)
@@ -160,13 +160,15 @@ public class LedgerService {
                 .debit(BigDecimal.ZERO)
                 .credit(amount)
                 .description(description)
+                .effectiveDate(effectiveDate)
+                .reference(reference)
                 .build();
         log.info("Recording supplier invoice: supplier={}, po={}, amount={}", supplierId, purchaseOrderId, amount);
         return supplierLedgerRepository.save(entry);
     }
 
     @Transactional
-    public SupplierLedger recordSupplierPayment(UUID supplierId, UUID supplierPaymentId, BigDecimal amount, String description) {
+    public SupplierLedger recordSupplierPayment(UUID supplierId, UUID supplierPaymentId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .supplierPaymentId(supplierPaymentId)
@@ -174,13 +176,15 @@ public class LedgerService {
                 .debit(amount)
                 .credit(BigDecimal.ZERO)
                 .description(description)
+                .effectiveDate(effectiveDate)
+                .reference(reference)
                 .build();
         log.info("Recording supplier payment: supplier={}, payment={}, amount={}", supplierId, supplierPaymentId, amount);
         return supplierLedgerRepository.save(entry);
     }
 
     @Transactional
-    public SupplierLedger recordSupplierExpense(UUID supplierId, UUID expenseId, BigDecimal amount, String description) {
+    public SupplierLedger recordSupplierExpense(UUID supplierId, UUID expenseId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .expenseId(expenseId)
@@ -188,8 +192,25 @@ public class LedgerService {
                 .debit(amount)
                 .credit(BigDecimal.ZERO)
                 .description(description)
+                .effectiveDate(effectiveDate)
+                .reference(reference)
                 .build();
         log.info("Recording supplier expense: supplier={}, expense={}, amount={}", supplierId, expenseId, amount);
+        return supplierLedgerRepository.save(entry);
+    }
+
+    @Transactional
+    public SupplierLedger recordSupplierAdjustment(UUID supplierId, BigDecimal debit, LocalDate effectiveDate, String description, String reference) {
+        SupplierLedger entry = SupplierLedger.builder()
+                .supplierId(supplierId)
+                .transactionType(LedgerTransactionType.ADJUSTMENT.name())
+                .debit(debit)
+                .credit(BigDecimal.ZERO)
+                .effectiveDate(effectiveDate)
+                .description(description)
+                .reference(reference)
+                .build();
+        log.info("Recording supplier adjustment: supplier={}, debit={}, effectiveDate={}, description={}", supplierId, debit, effectiveDate, description);
         return supplierLedgerRepository.save(entry);
     }
 

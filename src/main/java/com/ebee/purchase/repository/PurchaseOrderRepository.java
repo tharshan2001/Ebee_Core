@@ -2,6 +2,7 @@ package com.ebee.purchase.repository;
 
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchaseOrderStatus;
+import com.ebee.purchase.enums.PurchasePaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
@@ -12,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,4 +49,9 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
 
     @Query("SELECT COALESCE(SUM(po.outstandingBalance), 0) FROM PurchaseOrder po WHERE po.supplier.id = :supplierId AND po.status = 'RECEIVED'")
     BigDecimal sumOutstandingBySupplierId(@Param("supplierId") UUID supplierId);
+
+    @Query("SELECT po FROM PurchaseOrder po LEFT JOIN FETCH po.supplier LEFT JOIN FETCH po.createdBy " +
+            "WHERE po.supplier.id = :supplierId AND po.paymentStatus IN :statuses ORDER BY po.receivedAt ASC")
+    List<PurchaseOrder> findBySupplierIdAndPaymentStatusInOrderByReceivedAtAsc(
+            @Param("supplierId") UUID supplierId, @Param("statuses") List<PurchasePaymentStatus> statuses);
 }

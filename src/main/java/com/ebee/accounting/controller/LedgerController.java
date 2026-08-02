@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -92,8 +93,13 @@ public class LedgerController {
             @PathVariable UUID supplierId,
             @RequestParam UUID purchaseOrderId,
             @RequestParam BigDecimal amount,
-            @RequestParam(required = false) String description) {
-        SupplierLedger entry = ledgerService.recordSupplierInvoice(supplierId, purchaseOrderId, amount, description);
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) LocalDate effectiveDate,
+            @RequestParam(required = false) String reference) {
+        SupplierLedger entry = ledgerService.recordSupplierInvoice(
+                supplierId, purchaseOrderId, amount, description,
+                effectiveDate != null ? effectiveDate : LocalDate.now(),
+                reference);
         BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
         LedgerEntryResponse response = toResponseSupplier(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Supplier invoice recorded", response));
@@ -105,8 +111,13 @@ public class LedgerController {
             @PathVariable UUID supplierId,
             @RequestParam UUID supplierPaymentId,
             @RequestParam BigDecimal amount,
-            @RequestParam(required = false) String description) {
-        SupplierLedger entry = ledgerService.recordSupplierPayment(supplierId, supplierPaymentId, amount, description);
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) LocalDate effectiveDate,
+            @RequestParam(required = false) String reference) {
+        SupplierLedger entry = ledgerService.recordSupplierPayment(
+                supplierId, supplierPaymentId, amount, description,
+                effectiveDate != null ? effectiveDate : LocalDate.now(),
+                reference);
         BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
         LedgerEntryResponse response = toResponseSupplier(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Supplier payment recorded", response));

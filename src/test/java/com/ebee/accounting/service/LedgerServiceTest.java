@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -139,8 +140,10 @@ class LedgerServiceTest {
         UUID poId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("8000.00");
         String description = "PO-001";
+        LocalDate effectiveDate = LocalDate.now();
+        String reference = "PO Invoice: PO-001";
 
-        SupplierLedger result = ledgerService.recordSupplierInvoice(supplierId, poId, amount, description);
+        SupplierLedger result = ledgerService.recordSupplierInvoice(supplierId, poId, amount, description, effectiveDate, reference);
 
         verify(supplierLedgerRepository).save(supplierLedgerCaptor.capture());
         SupplierLedger saved = supplierLedgerCaptor.getValue();
@@ -151,6 +154,8 @@ class LedgerServiceTest {
         assertThat(saved.getDebit()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getCredit()).isEqualTo(amount);
         assertThat(saved.getDescription()).isEqualTo(description);
+        assertThat(saved.getEffectiveDate()).isEqualTo(effectiveDate);
+        assertThat(saved.getReference()).isEqualTo(reference);
     }
 
     @Test
@@ -159,8 +164,10 @@ class LedgerServiceTest {
         UUID paymentId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("3000.00");
         String description = "Payment to supplier";
+        LocalDate effectiveDate = LocalDate.now();
+        String reference = "PO Payment: PO-001";
 
-        SupplierLedger result = ledgerService.recordSupplierPayment(supplierId, paymentId, amount, description);
+        SupplierLedger result = ledgerService.recordSupplierPayment(supplierId, paymentId, amount, description, effectiveDate, reference);
 
         verify(supplierLedgerRepository).save(supplierLedgerCaptor.capture());
         SupplierLedger saved = supplierLedgerCaptor.getValue();
@@ -171,6 +178,8 @@ class LedgerServiceTest {
         assertThat(saved.getDebit()).isEqualTo(amount);
         assertThat(saved.getCredit()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getDescription()).isEqualTo(description);
+        assertThat(saved.getEffectiveDate()).isEqualTo(effectiveDate);
+        assertThat(saved.getReference()).isEqualTo(reference);
     }
 
     @Test

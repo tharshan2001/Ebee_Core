@@ -29,20 +29,24 @@ public class OrderReportService {
         LocalDateTime end = DateUtils.toEndDateTime(range.endDate());
 
         List<Object[]> distribution = orderRepository.findOrderStatusDistribution(start, end);
-        Long pending = 0L, shipped = 0L, delivered = 0L, cancelled = 0L, returned = 0L;
+        Long pending = 0L, confirmed = 0L, processing = 0L, shipped = 0L, delivered = 0L, cancelled = 0L, returned = 0L, failed = 0L, returnExchange = 0L;
         for (Object[] row : distribution) {
             String status = row[0] != null ? row[0].toString() : "";
             Long count = NumberUtils.toLong(row[1]);
             switch (status) {
                 case "PENDING" -> pending = count;
+                case "CONFIRMED" -> confirmed = count;
+                case "PROCESSING" -> processing = count;
                 case "SHIPPED" -> shipped = count;
                 case "DELIVERED" -> delivered = count;
                 case "CANCELLED" -> cancelled = count;
                 case "RETURNED" -> returned = count;
+                case "FAILED" -> failed = count;
+                case "RETURN_EXCHANGE" -> returnExchange = count;
             }
         }
 
-        Long total = pending + shipped + delivered + cancelled + returned;
+        Long total = pending + confirmed + processing + shipped + delivered + cancelled + returned + failed + returnExchange;
         BigDecimal cancellationRate = total > 0
                 ? BigDecimal.valueOf(cancelled).divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
                 : BigDecimal.ZERO;

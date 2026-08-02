@@ -454,7 +454,7 @@ public class CustomerService {
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
             BigDecimal payAmount = remaining.min(order.getOutstandingBalance());
             orderPaymentService.recordPayment(order.getId(),
-                    new RecordPaymentRequest(payAmount, request.paymentMethod(), null, null));
+                    new RecordPaymentRequest(payAmount, request.paymentMethod(), null, null), false);
             remaining = remaining.subtract(payAmount);
             settledCount++;
         }

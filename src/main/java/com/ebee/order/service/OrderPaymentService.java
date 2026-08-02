@@ -114,6 +114,11 @@ public class OrderPaymentService {
 
     @Transactional
     public OrderResponse recordPayment(UUID id, RecordPaymentRequest request) {
+        return recordPayment(id, request, true);
+    }
+
+    @Transactional
+    public OrderResponse recordPayment(UUID id, RecordPaymentRequest request, boolean syncCustomer) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -177,8 +182,10 @@ public class OrderPaymentService {
                 currentUserId
         );
 
-        syncCustomerOutstanding(order.getCustomer());
-        customerRepository.save(order.getCustomer());
+        if (syncCustomer) {
+            syncCustomerOutstanding(order.getCustomer());
+            customerRepository.save(order.getCustomer());
+        }
 
         auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
                 "Payment recorded for order " + order.getOrderNumber()

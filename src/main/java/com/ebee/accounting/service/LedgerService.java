@@ -147,6 +147,20 @@ public class LedgerService {
         return customerLedgerRepository.save(entry);
     }
 
+    @Transactional
+    public CustomerLedger recordReturnExchangeCredit(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
+        CustomerLedger entry = CustomerLedger.builder()
+                .customerId(customerId)
+                .orderId(orderId)
+                .transactionType(LedgerTransactionType.RETURN_EXCHANGE_CREDIT.name())
+                .debit(BigDecimal.ZERO)
+                .credit(amount)
+                .description(description)
+                .build();
+        log.info("Recording return exchange credit: customer={}, order={}, amount={}", customerId, orderId, amount);
+        return customerLedgerRepository.save(entry);
+    }
+
     @Transactional(readOnly = true)
     public BigDecimal getCustomerBalance(UUID customerId) {
         return customerLedgerRepository.calculateBalance(customerId);

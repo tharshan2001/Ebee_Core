@@ -8,6 +8,7 @@ public enum LedgerTransactionType {
     ADJUSTMENT,
     CREDIT_NOTE,
     RETURN_REFUND,
+    RETURN_EXCHANGE_CREDIT,
     DEBIT,
     CREDIT
 }

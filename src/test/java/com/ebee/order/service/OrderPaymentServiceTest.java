@@ -5,6 +5,7 @@ import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
 import com.ebee.customer.entity.Customer;
+import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.entity.Order;
@@ -36,6 +37,7 @@ class OrderPaymentServiceTest {
 
     @Mock private OrderRepository orderRepository;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private CustomerRepository customerRepository;
     @Mock private OrderMapper orderMapper;
     @Mock private AuditLogService auditLogService;
     @Mock private SecurityService securityService;

@@ -12,6 +12,7 @@ import com.ebee.customer.enums.AdvanceTransactionType;
 import com.ebee.customer.enums.DuesChangeType;
 import com.ebee.customer.event.CustomerDuesChangedEvent;
 import com.ebee.customer.repository.CustomerAdvanceTransactionRepository;
+import com.ebee.customer.repository.CustomerRepository;
 import com.ebee.order.dto.RecordPaymentRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.PaymentResponse;
@@ -42,6 +43,7 @@ public class OrderPaymentService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final CustomerAdvanceTransactionRepository advanceTransactionRepository;
+    private final CustomerRepository customerRepository;
     private final OrderMapper orderMapper;
     private final AuditLogService auditLogService;
     private final SecurityService securityService;
@@ -178,6 +180,7 @@ public class OrderPaymentService {
         if (isCreditOrder || isCodOrder) {
             updateCustomerOutstandingBalance(order.getCustomer(), request.amount(), false);
             syncCustomerOutstanding(order.getCustomer());
+            customerRepository.save(order.getCustomer());
         }
 
         auditLogService.record(AuditAction.UPDATE, "Order", order.getId(),
@@ -218,7 +221,9 @@ public class OrderPaymentService {
             order.setOutstandingBalance(BigDecimal.ZERO);
         }
         syncCustomerOutstanding(order.getCustomer());
+        customerRepository.save(order.getCustomer());
     }
+
     public void handleOrderSettlement(Order order, RefundChoice choice, DuesChangeType changeType) {
         BigDecimal paidAmount = order.getPaidAmount();
 
@@ -299,6 +304,7 @@ public class OrderPaymentService {
         advanceTransactionRepository.save(transaction);
 
         syncCustomerOutstanding(customer);
+        customerRepository.save(customer);
         publishDuesChange(customer, previousOutstanding, previousAdvance, DuesChangeType.ADVANCE_USED);
     }
 

@@ -36,12 +36,6 @@ public class TripResponse {
     private BigDecimal netAmount;
 
     private BigDecimal totalExpenses;
-    private BigDecimal petrolCost;
-    private BigDecimal parkingCost;
-    private BigDecimal tollCost;
-    private BigDecimal travelCost;
-    private BigDecimal maintenanceCost;
-    private BigDecimal otherCost;
 
     private List<UUID> orderIds = new ArrayList<>();
     private List<ExpenseResponse> expenses = new ArrayList<>();

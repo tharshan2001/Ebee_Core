@@ -503,7 +503,6 @@ public class TripService {
         TripResponse response = tripMapper.toResponse(trip);
 
         List<Order> orders = orderRepository.findByTripId(trip.getId());
-        List<Expense> expenses = expenseRepository.findByTripId(trip.getId());
 
         response.setOrderCount(orders.size());
 
@@ -538,43 +537,20 @@ public class TripService {
         response.setCollectedAmount(collected);
         response.setOutstandingAmount(expected.subtract(collected));
 
-        BigDecimal totalExpenses = BigDecimal.ZERO;
-        BigDecimal petrolCost = BigDecimal.ZERO;
-        BigDecimal parkingCost = BigDecimal.ZERO;
-        BigDecimal tollCost = BigDecimal.ZERO;
-        BigDecimal travelCost = BigDecimal.ZERO;
-        BigDecimal maintenanceCost = BigDecimal.ZERO;
-        BigDecimal otherCost = BigDecimal.ZERO;
+        List<Expense> expenseList = expenseRepository.findByTripIdWithRelations(trip.getId());
 
-        for (Expense expense : expenses) {
+        BigDecimal totalExpenses = BigDecimal.ZERO;
+        for (Expense expense : expenseList) {
             if (expense.getAmount() != null) {
                 totalExpenses = totalExpenses.add(expense.getAmount());
-            }
-
-            if (expense.getCategory() != null) {
-                switch (expense.getCategory()) {
-                    case PETROL -> petrolCost = petrolCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                    case PARKING -> parkingCost = parkingCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                    case TOLL -> tollCost = tollCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                    case TRAVEL -> travelCost = travelCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                    case MAINTENANCE -> maintenanceCost = maintenanceCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                    case OTHER, MILEAGE -> otherCost = otherCost.add(expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO);
-                }
             }
         }
 
         response.setTotalExpenses(totalExpenses);
-        response.setPetrolCost(petrolCost);
-        response.setParkingCost(parkingCost);
-        response.setTollCost(tollCost);
-        response.setTravelCost(travelCost);
-        response.setMaintenanceCost(maintenanceCost);
-        response.setOtherCost(otherCost);
-
         response.setNetAmount(collected.subtract(totalExpenses));
 
         response.setOrderIds(orders.stream().map(Order::getId).collect(Collectors.toList()));
-        response.setExpenses(expenses.stream().map(expenseMapper::toResponse).collect(Collectors.toList()));
+        response.setExpenses(expenseList.stream().map(expenseMapper::toResponse).collect(Collectors.toList()));
 
         return response;
     }

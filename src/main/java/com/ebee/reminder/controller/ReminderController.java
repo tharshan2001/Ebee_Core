@@ -1,6 +1,7 @@
 package com.ebee.reminder.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.result.Result;
 import com.ebee.common.security.SecurityService;
 import com.ebee.reminder.dto.ReminderRequest;
 import com.ebee.reminder.dto.ReminderResponse;
@@ -52,12 +53,16 @@ public class ReminderController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReminderResponse>> getReminder(@PathVariable UUID id, Authentication authentication) {
-        ReminderResponse response = reminderService.getReminderById(id);
+        Result<ReminderResponse> result = reminderService.getReminderById(id);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
         UUID currentUserId = securityService.getCurrentUserId(authentication);
-        if (!response.getUserId().equals(currentUserId)) {
+        if (!result.getData().getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
-        return ResponseEntity.ok(ApiResponse.success("Reminder retrieved successfully", response));
+        return ResponseEntity.ok(ApiResponse.success("Reminder retrieved successfully", result.getData()));
     }
 
     @PostMapping
@@ -75,9 +80,13 @@ public class ReminderController {
             @PathVariable UUID id,
             @Valid @RequestBody ReminderRequest request,
             Authentication authentication) {
-        ReminderResponse existing = reminderService.getReminderById(id);
+        Result<ReminderResponse> existingResult = reminderService.getReminderById(id);
+        if (!existingResult.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(existingResult.getMessage()));
+        }
         UUID currentUserId = securityService.getCurrentUserId(authentication);
-        if (!existing.getUserId().equals(currentUserId)) {
+        if (!existingResult.getData().getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
         ReminderResponse response = reminderService.updateReminder(id, request);
@@ -86,9 +95,12 @@ public class ReminderController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReminder(@PathVariable UUID id, Authentication authentication) {
-        ReminderResponse existing = reminderService.getReminderById(id);
+        Result<ReminderResponse> existingResult = reminderService.getReminderById(id);
+        if (!existingResult.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
         UUID currentUserId = securityService.getCurrentUserId(authentication);
-        if (!existing.getUserId().equals(currentUserId)) {
+        if (!existingResult.getData().getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
         reminderService.deleteReminder(id);
@@ -97,9 +109,13 @@ public class ReminderController {
 
     @PatchMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<ReminderResponse>> completeReminder(@PathVariable UUID id, Authentication authentication) {
-        ReminderResponse existing = reminderService.getReminderById(id);
+        Result<ReminderResponse> existingResult = reminderService.getReminderById(id);
+        if (!existingResult.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(existingResult.getMessage()));
+        }
         UUID currentUserId = securityService.getCurrentUserId(authentication);
-        if (!existing.getUserId().equals(currentUserId)) {
+        if (!existingResult.getData().getUserId().equals(currentUserId)) {
             throw new AccessDeniedException("You do not have access to this reminder");
         }
         ReminderResponse response = reminderService.completeReminder(id);

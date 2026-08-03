@@ -14,6 +14,10 @@ public record Result<T>(T data, boolean success, String message) {
         return new Result<>(null, false, message);
     }
 
+    public static <T> Result<T> notFound(String entity, String field, Object value) {
+        return new Result<>(null, false, entity + " not found with " + field + ": " + value);
+    }
+
     public T getData() {
         return data;
     }

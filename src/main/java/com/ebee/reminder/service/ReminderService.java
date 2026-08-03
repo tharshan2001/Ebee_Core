@@ -1,6 +1,7 @@
 package com.ebee.reminder.service;
 
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import com.ebee.reminder.dto.ReminderMapper;
 import com.ebee.reminder.dto.ReminderRequest;
 import com.ebee.reminder.dto.ReminderResponse;
@@ -44,10 +45,16 @@ public class ReminderService {
     }
 
     @Transactional(readOnly = true)
-    public ReminderResponse getReminderById(UUID id) {
-        Reminder reminder = reminderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Reminder", "id", id));
-        return reminderMapper.toResponse(reminder);
+    public Result<ReminderResponse> getReminderById(UUID id) {
+        return reminderRepository.findById(id)
+                .map(r -> Result.<ReminderResponse>ok(reminderMapper.toResponse(r)))
+                .orElseGet(() -> Result.<ReminderResponse>notFound("Reminder", "id", id));
+    }
+
+    public Result<Reminder> findReminderById(UUID id) {
+        return reminderRepository.findById(id)
+                .map(Result::ok)
+                .orElseGet(() -> Result.<Reminder>notFound("Reminder", "id", id));
     }
 
     @Transactional

@@ -1,6 +1,7 @@
 package com.ebee.user.entity;
 
 import com.ebee.agent.entity.Agent;
+import com.ebee.common.security.UserRef;
 import com.ebee.order.entity.Order;
 import com.ebee.stock.entity.Stock;
 import com.ebee.user.enums.RoleType;
@@ -29,7 +30,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class User implements UserRef {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

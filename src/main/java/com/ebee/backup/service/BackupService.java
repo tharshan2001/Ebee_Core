@@ -1,7 +1,5 @@
 package com.ebee.backup.service;
 
-import com.ebee.backup.enums.BackupAction;
-import com.ebee.backup.service.BackupAuditLogService;
 import com.ebee.common.config.AppProperties;
 import com.ebee.common.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +23,14 @@ import java.util.*;
 @Slf4j
 public class BackupService {
 
-    private final BackupAuditLogService auditLogService;
+    private final BackupAuditRecorder auditRecorder;
     private final AppProperties appProperties;
     private final DataSourceProperties dataSourceProperties;
 
-    public BackupService(BackupAuditLogService auditLogService,
+    public BackupService(BackupAuditRecorder auditRecorder,
                          AppProperties appProperties,
                          DataSourceProperties dataSourceProperties) {
-        this.auditLogService = auditLogService;
+        this.auditRecorder = auditRecorder;
         this.appProperties = appProperties;
         this.dataSourceProperties = dataSourceProperties;
     }
@@ -104,7 +102,7 @@ public class BackupService {
             result.put("size", Files.size(filePath));
             result.put("path", filePath.toAbsolutePath().toString());
             result.put("verified", true);
-            auditLogService.record(BackupAction.CREATE, filename, null);
+            auditRecorder.recordCreate(filename);
             return result;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Backup failed: " + e.getMessage(), e);
@@ -180,12 +178,7 @@ public class BackupService {
             result.put("restoredFrom", filename);
             result.put("preRestoreBackup", preBackup.get("name"));
 
-            try {
-                auditLogService.record(BackupAction.RESTORE, filename,
-                        "Pre-restore backup: " + preBackup.get("name"));
-            } catch (Exception e) {
-                log.warn("Audit log failed after restore: {}", e.getMessage());
-            }
+            auditRecorder.recordRestore(filename, (String) preBackup.get("name"));
 
             return result;
         } catch (Exception e) {
@@ -223,7 +216,7 @@ public class BackupService {
             result.put("name", target.getFileName().toString());
             result.put("size", Files.size(target));
             result.put("verified", valid);
-            auditLogService.record(BackupAction.UPLOAD, target.getFileName().toString(),
+            auditRecorder.recordUpload(target.getFileName().toString(),
                     valid ? null : "Verification failed");
             return result;
         } catch (IOException e) {

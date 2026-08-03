@@ -2,6 +2,8 @@ package com.ebee.trip.repository;
 
 import com.ebee.trip.entity.Trip;
 import com.ebee.trip.enums.TripStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,4 +34,12 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     Optional<Trip> findByDriverIdAndStatus(@Param("driverId") UUID driverId, @Param("status") TripStatus status);
 
     Optional<Trip> findById(UUID id);
+
+    Page<Trip> findAll(Pageable pageable);
+
+    Page<Trip> findByStatus(TripStatus status, Pageable pageable);
+
+    Page<Trip> findByDriverId(UUID driverId, Pageable pageable);
+
+    Page<Trip> findByDriverIdAndStatus(UUID driverId, TripStatus status, Pageable pageable);
 }

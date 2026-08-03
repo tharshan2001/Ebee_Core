@@ -3,6 +3,7 @@ package com.ebee.trip.service;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.response.PageResponse;
 import com.ebee.common.security.SecurityService;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.event.DeliveryStatusChangedEvent;
@@ -30,6 +31,8 @@ import com.ebee.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -178,6 +181,35 @@ public class TripService {
         }
 
         return trips.stream().map(this::toTripResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TripResponse> getAllTripsPaginated(
+            TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
+        Page<Trip> tripsPage;
+
+        if (status != null && driverId != null) {
+            tripsPage = tripRepository.findByDriverIdAndStatus(driverId, status, pageable);
+        } else if (status != null) {
+            tripsPage = tripRepository.findByStatus(status, pageable);
+        } else if (driverId != null) {
+            tripsPage = tripRepository.findByDriverId(driverId, pageable);
+        } else {
+            tripsPage = tripRepository.findAll(pageable);
+        }
+
+        if (dateFrom != null || dateTo != null) {
+            List<Trip> filtered = tripsPage.getContent().stream()
+                    .filter(t -> (dateFrom == null || !t.getStartDate().isBefore(dateFrom)))
+                    .filter(t -> (dateTo == null || !t.getEndDate().isAfter(dateTo)))
+                    .collect(Collectors.toList());
+            long total = tripsPage.getTotalElements();
+            return new PageResponse<>(filtered.stream().map(this::toTripResponse).collect(Collectors.toList()),
+                    tripsPage.getNumber(), tripsPage.getSize(), total,
+                    tripsPage.getTotalPages(), tripsPage.isFirst(), tripsPage.isLast());
+        }
+
+        return PageResponse.from(tripsPage.map(this::toTripResponse));
     }
 
     @Transactional(readOnly = true)

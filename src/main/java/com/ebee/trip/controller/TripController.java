@@ -1,6 +1,10 @@
 package com.ebee.trip.controller;
 
 import com.ebee.common.response.ApiResponse;
+import com.ebee.common.response.PageResponse;
+import com.ebee.common.util.PaginationUtils;
+import com.ebee.common.util.SortUtils;
+import com.ebee.common.util.SortableFields;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
 import com.ebee.trip.dto.CreateTripRequest;
 import com.ebee.trip.dto.TripOrderMarkerDto;
@@ -10,6 +14,8 @@ import com.ebee.trip.enums.TripStatus;
 import com.ebee.trip.service.TripService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,6 +50,25 @@ public class TripController {
             @RequestParam(required = false) LocalDate dateTo) {
         List<TripResponse> trips = tripService.getAllTrips(status, driverId, dateFrom, dateTo);
         return ResponseEntity.ok(ApiResponse.success("Trips retrieved successfully", trips));
+    }
+
+    @GetMapping("/paginated")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<TripResponse>>> getTripsPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) TripStatus status,
+            @RequestParam(required = false) UUID driverId,
+            @RequestParam(required = false) LocalDate dateFrom,
+            @RequestParam(required = false) LocalDate dateTo) {
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                SortUtils.parse(sort, SortableFields.AllowedFor.TRIP));
+        PageResponse<TripResponse> response = tripService.getAllTripsPaginated(
+                status, driverId, dateFrom, dateTo, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Trips retrieved successfully", response));
     }
 
     @GetMapping("/{id}")

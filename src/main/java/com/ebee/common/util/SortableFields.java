@@ -48,6 +48,11 @@ public final class SortableFields {
             "scheduledDate", "deliveredAt"
     );
 
+    public static final Set<String> TRIP = Set.of(
+            "createdAt", "updatedAt", "startDate", "endDate",
+            "status", "name"
+    );
+
     /**
      * Parse a {@code sort} query parameter (e.g. {@code "createdAt,desc"})
      * and validate the field against the allow-list. Returns a normalised
@@ -76,7 +81,7 @@ public final class SortableFields {
         return validate(sort, allowList(allowedFor));
     }
 
-    public enum AllowedFor { ORDER, PRODUCT, CUSTOMER, AGENT, COMMISSION, DRIVER_DELIVERY }
+    public enum AllowedFor { ORDER, PRODUCT, CUSTOMER, AGENT, COMMISSION, DRIVER_DELIVERY, TRIP }
 
     public static Set<String> allowList(AllowedFor which) {
         return switch (which) {
@@ -86,6 +91,7 @@ public final class SortableFields {
             case AGENT -> AGENT;
             case COMMISSION -> COMMISSION;
             case DRIVER_DELIVERY -> DRIVER_DELIVERY;
+            case TRIP -> TRIP;
         };
     }
 }

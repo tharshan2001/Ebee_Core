@@ -38,8 +38,12 @@ public class AgentApplicationController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentApplicationResponse>> getById(@PathVariable UUID id) {
-        AgentApplicationResponse response = service.getById(id);
-        return ResponseEntity.ok(ApiResponse.success("Application retrieved successfully", response));
+        var result = service.getById(id);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Application retrieved successfully", result.getData()));
     }
 
     @DeleteMapping("/{id}")

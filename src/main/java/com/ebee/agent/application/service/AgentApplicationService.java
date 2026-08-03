@@ -6,6 +6,7 @@ import com.ebee.agent.application.entity.AgentApplication;
 import com.ebee.agent.application.repository.AgentApplicationRepository;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.notification.NotificationPort;
 import com.ebee.user.repository.UserRepository;
@@ -82,10 +83,10 @@ public class AgentApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public AgentApplicationResponse getById(UUID id) {
-        AgentApplication application = repository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("AgentApplication", "id", id.toString()));
-        return mapToResponse(application);
+    public Result<AgentApplicationResponse> getById(UUID id) {
+        return repository.findById(id)
+                .map(app -> Result.<AgentApplicationResponse>ok(mapToResponse(app)))
+                .orElseGet(() -> Result.<AgentApplicationResponse>notFound("AgentApplication", "id", id));
     }
 
     @Transactional

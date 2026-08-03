@@ -48,4 +48,10 @@ failsafe-reports/
 cookies.txt
 
 # OpenCode
+.opencode/
 .opencode/node_modules/
+
+# Graphify
+graphify-out/
+.graphify_python
+.graphify_cache/

@@ -2,7 +2,6 @@ package com.ebee.common.security;
 
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.user.entity.User;
-import com.ebee.user.enums.RoleType;
 import com.ebee.user.service.UserLookupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -19,8 +18,8 @@ public class SecurityService {
     private final UserLookupService userLookupService;
 
     public boolean isCurrentUser(UUID userId, Authentication authentication) {
-        User user = getCurrentUser(authentication);
-        return user != null && user.getId().equals(userId);
+        UserRef userRef = getCurrentUserRef(authentication);
+        return userRef != null && userRef.getId().equals(userId);
     }
 
     public User getCurrentUser(Authentication authentication) {
@@ -37,9 +36,24 @@ public class SecurityService {
         return userLookupService.findByEmail(authentication.getName()).orElse(null);
     }
 
+    public UserRef getCurrentUserRef(Authentication authentication) {
+        if (authentication == null) {
+            authentication = SecurityContextHolder.getContext().getAuthentication();
+        }
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            return userPrincipal.getUser();
+        }
+        User user = userLookupService.findByEmail(authentication.getName()).orElse(null);
+        return user;
+    }
+
     public UUID getCurrentUserId(Authentication authentication) {
-        User user = getCurrentUser(authentication);
-        return user != null ? user.getId() : null;
+        UserRef userRef = getCurrentUserRef(authentication);
+        return userRef != null ? userRef.getId() : null;
     }
 
     public UUID getCurrentUserId() {

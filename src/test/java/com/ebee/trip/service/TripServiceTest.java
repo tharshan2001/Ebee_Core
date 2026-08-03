@@ -124,7 +124,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         var result = tripService.createTrip(request);
 
@@ -188,7 +187,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         var result = tripService.updateTrip(tripId, request);
 
@@ -212,7 +210,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         tripService.updateTrip(tripId, request);
@@ -230,7 +227,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         var result = tripService.startTrip(tripId);
 
@@ -285,7 +281,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         AddOrdersToTripRequest request = new AddOrdersToTripRequest();
@@ -306,7 +301,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         AddOrdersToTripRequest request = new AddOrdersToTripRequest();
         request.setOrderIdsToAdd(List.of(orderId));
@@ -355,7 +349,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         AddOrdersToTripRequest request = new AddOrdersToTripRequest();
@@ -379,7 +372,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         var result = tripService.cancelTrip(tripId);
@@ -399,7 +391,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         var result = tripService.completeTrip(tripId);
 
@@ -446,7 +437,6 @@ class TripServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(expenseRepository.findByTripId(tripId)).thenReturn(List.of());
 
         var result = tripService.updateMileage(tripId, new BigDecimal("150.5"));
 

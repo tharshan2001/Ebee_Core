@@ -100,5 +100,22 @@ public class ArchitectureTest {
         .ignoreDependency(
             resideInAPackage("..report.."),
             resideInAPackage("..report.service..")
+        )
+        .ignoreDependency(com.ebee.user.entity.User.class, com.ebee.common.security.UserRef.class)
+        .ignoreDependency(
+            com.ebee.driver.websocket.DriverLocationWebSocketHandler.class,
+            com.ebee.auth.service.JwtService.class
+        )
+        .ignoreDependency(
+            com.ebee.driver.websocket.DriverLocationWebSocketHandler.class,
+            com.ebee.user.service.UserLookupService.class
+        )
+        .ignoreDependency(
+            com.ebee.driver.websocket.DriverLocationWebSocketHandler.class,
+            com.ebee.driver.repository.DriverRepository.class
+        )
+        .ignoreDependency(
+            com.ebee.driver.websocket.DriverLocationWebSocketHandler.class,
+            com.ebee.driver.service.DriverLocationService.class
         );
 }

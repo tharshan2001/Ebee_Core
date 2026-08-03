@@ -176,8 +176,12 @@ public class OrderServiceImpl implements OrderService {
     private Agent resolveAgent(OrderRequest request) {
         if (securityService.isAdmin()) {
             if (request.getAgentCode() != null) {
-                return agentRepository.findByAgentCode(request.getAgentCode())
+                Agent agent = agentRepository.findByAgentCode(request.getAgentCode())
                         .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", request.getAgentCode()));
+                if (!Boolean.TRUE.equals(agent.getIsActive())) {
+                    throw new IllegalArgumentException("Agent is not active");
+                }
+                return agent;
             }
             return null;
         }

@@ -4,6 +4,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
 import com.ebee.commission.service.CommissionLifecycleService;
@@ -173,15 +174,19 @@ public class DeliveryService {
     }
 
     @Transactional(readOnly = true)
-    public DeliveryResponse getDeliveryDetail(UUID orderId) {
+    public Result<DeliveryResponse> getDeliveryDetail(UUID orderId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+                .orElseGet(() -> null);
 
-        if (order.getDeliveryStatus() == null) {
-            throw new ResourceNotFoundException("Delivery", "orderId", orderId);
+        if (order == null) {
+            return Result.<DeliveryResponse>notFound("Order", "id", orderId);
         }
 
-        return toDeliveryResponse(order);
+        if (order.getDeliveryStatus() == null) {
+            return Result.<DeliveryResponse>notFound("Delivery", "orderId", orderId);
+        }
+
+        return Result.ok(toDeliveryResponse(order));
     }
 
     /**

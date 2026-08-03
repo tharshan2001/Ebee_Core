@@ -7,6 +7,7 @@ import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.service.DeliveryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -50,7 +51,11 @@ public class DeliveryController {
     @GetMapping("/{orderId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
     public ResponseEntity<ApiResponse<DeliveryResponse>> getDeliveryDetail(@PathVariable UUID orderId) {
-        DeliveryResponse response = deliveryService.getDeliveryDetail(orderId);
-        return ResponseEntity.ok(ApiResponse.success("Delivery retrieved successfully", response));
+        var result = deliveryService.getDeliveryDetail(orderId);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Delivery retrieved successfully", result.getData()));
     }
 }

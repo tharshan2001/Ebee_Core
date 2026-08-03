@@ -2,6 +2,7 @@ package com.ebee.combo.service;
 
 import com.ebee.combo.dto.ComboRequest;
 import com.ebee.combo.dto.ComboResponse;
+import com.ebee.common.result.Result;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -15,7 +16,7 @@ public interface ComboService {
 
     void deleteCombo(UUID id);
 
-    ComboResponse getComboById(UUID id);
+    Result<ComboResponse> getComboById(UUID id);
 
     Page<ComboResponse> listActiveCombos(Pageable pageable);
 

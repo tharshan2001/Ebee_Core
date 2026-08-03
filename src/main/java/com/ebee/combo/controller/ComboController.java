@@ -50,8 +50,12 @@ public class ComboController {
 
     @GetMapping("/combos/{id}")
     public ResponseEntity<ApiResponse<ComboResponse>> getComboById(@PathVariable UUID id) {
-        ComboResponse combo = comboService.getComboById(id);
-        return ResponseEntity.ok(ApiResponse.success("Combo retrieved successfully", combo));
+        var result = comboService.getComboById(id);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Combo retrieved successfully", result.getData()));
     }
 
     @GetMapping("/combos")

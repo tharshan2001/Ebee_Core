@@ -13,6 +13,7 @@ import com.ebee.combo.mapper.ComboMapper;
 import com.ebee.combo.repository.ComboRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.enums.DiscountType;
+import com.ebee.common.result.Result;
 import com.ebee.order.repository.OrderItemRepository;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
@@ -196,10 +197,10 @@ public class ComboServiceImpl implements ComboService {
 
     @Transactional(readOnly = true)
     @Override
-    public ComboResponse getComboById(UUID id) {
-        Combo combo = comboRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Combo", "id", id));
-        return comboMapper.toResponse(combo);
+    public Result<ComboResponse> getComboById(UUID id) {
+        return comboRepository.findByIdWithDetails(id)
+                .map(combo -> Result.<ComboResponse>ok(comboMapper.toResponse(combo)))
+                .orElseGet(() -> Result.<ComboResponse>notFound("Combo", "id", id));
     }
 
     @Transactional(readOnly = true)

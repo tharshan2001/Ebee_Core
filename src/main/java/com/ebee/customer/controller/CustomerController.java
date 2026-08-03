@@ -4,6 +4,7 @@ import com.ebee.accounting.dto.LedgerEntryResponse;
 import com.ebee.accounting.entity.CustomerLedger;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
+import com.ebee.common.result.Result;
 import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.util.SortableFields;
 import com.ebee.customer.dto.AdjustAdvanceRequest;
@@ -53,22 +54,34 @@ public class CustomerController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerById(@PathVariable UUID id) {
-        CustomerResponse response = customerService.getCustomerById(id);
-        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
+        var result = customerService.getCustomerById(id);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", result.getData()));
     }
 
     @GetMapping("/phone/{phoneNumber}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByPhone(@PathVariable String phoneNumber) {
-        CustomerResponse response = customerService.getCustomerByPhone(phoneNumber);
-        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
+        var result = customerService.getCustomerByPhone(phoneNumber);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", result.getData()));
     }
 
     @GetMapping("/book-no/{bookNo}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByBookNo(@PathVariable String bookNo) {
-        CustomerResponse response = customerService.getCustomerByBookNo(bookNo);
-        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", response));
+        var result = customerService.getCustomerByBookNo(bookNo);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(result.getMessage()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Customer retrieved successfully", result.getData()));
     }
 
     @PutMapping("/{id}")
@@ -137,7 +150,12 @@ public class CustomerController {
     @GetMapping("/{id}/balance")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CustomerBalanceResponse>> getCustomerBalance(@PathVariable UUID id) {
-        CustomerResponse customer = customerService.getCustomerById(id);
+        var customerResult = customerService.getCustomerById(id);
+        if (!customerResult.isSuccess()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(customerResult.getMessage()));
+        }
+        CustomerResponse customer = customerResult.getData();
         CustomerBalanceResponse response = new CustomerBalanceResponse(
                 customer.getId(),
                 customer.getFirstName() + " " + customer.getLastName(),

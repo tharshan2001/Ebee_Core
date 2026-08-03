@@ -5,6 +5,7 @@ import com.ebee.accounting.repository.CustomerLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import com.ebee.common.security.SecurityService;
 import com.ebee.common.service.CodeGenerationService;
 import com.ebee.common.util.PhoneUtils;
@@ -160,32 +161,32 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerById(UUID id) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
-        return toResponse(customer);
+    public Result<CustomerResponse> getCustomerById(UUID id) {
+        return customerRepository.findById(id)
+                .map(c -> Result.<CustomerResponse>ok(toResponse(c)))
+                .orElseGet(() -> Result.<CustomerResponse>notFound("Customer", "id", id));
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerByCode(String customerCode) {
-        Customer customer = customerRepository.findByCustomerCode(customerCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "customerCode", customerCode));
-        return toResponse(customer);
+    public Result<CustomerResponse> getCustomerByCode(String customerCode) {
+        return customerRepository.findByCustomerCode(customerCode)
+                .map(c -> Result.<CustomerResponse>ok(toResponse(c)))
+                .orElseGet(() -> Result.<CustomerResponse>notFound("Customer", "customerCode", customerCode));
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerByPhone(String phoneNumber) {
+    public Result<CustomerResponse> getCustomerByPhone(String phoneNumber) {
         String normalized = PhoneUtils.normalize(phoneNumber);
-        Customer customer = customerRepository.findByPhoneNumber(normalized)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "phoneNumber", phoneNumber));
-        return toResponse(customer);
+        return customerRepository.findByPhoneNumber(normalized)
+                .map(c -> Result.<CustomerResponse>ok(toResponse(c)))
+                .orElseGet(() -> Result.<CustomerResponse>notFound("Customer", "phoneNumber", phoneNumber));
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getCustomerByBookNo(String bookNo) {
-        Customer customer = customerRepository.findByBookNo(bookNo)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "bookNo", bookNo));
-        return toResponse(customer);
+    public Result<CustomerResponse> getCustomerByBookNo(String bookNo) {
+        return customerRepository.findByBookNo(bookNo)
+                .map(c -> Result.<CustomerResponse>ok(toResponse(c)))
+                .orElseGet(() -> Result.<CustomerResponse>notFound("Customer", "bookNo", bookNo));
     }
 
     @Transactional(readOnly = true)

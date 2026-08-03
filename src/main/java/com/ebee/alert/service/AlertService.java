@@ -3,11 +3,12 @@ package com.ebee.alert.service;
 import com.ebee.alert.entity.Alert;
 import com.ebee.alert.repository.AlertRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,14 +31,17 @@ public class AlertService {
     }
 
     @Transactional
-    public void markAsRead(UUID alertId, UUID recipientId) {
-        Alert alert = alertRepository.findById(alertId)
-                .orElseThrow(() -> new ResourceNotFoundException("Alert", "id", alertId));
-        if (!alert.getRecipient().getId().equals(recipientId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied");
-        }
-        alert.setIsRead(true);
-        alertRepository.save(alert);
+    public Result<Void> markAsRead(UUID alertId, UUID recipientId) {
+        return alertRepository.findById(alertId)
+                .map(alert -> {
+                    if (!alert.getRecipient().getId().equals(recipientId)) {
+                        return Result.<Void>fail("Access denied");
+                    }
+                    alert.setIsRead(true);
+                    alertRepository.save(alert);
+                    return Result.<Void>ok(null);
+                })
+                .orElseGet(() -> Result.<Void>notFound("Alert", "id", alertId));
     }
 
     @Transactional

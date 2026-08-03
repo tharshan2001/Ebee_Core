@@ -52,7 +52,10 @@ public class AlertController {
     @PatchMapping("/{id}/read")
     public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable UUID id, Authentication authentication) {
         UUID userId = securityService.getCurrentUserId(authentication);
-        alertService.markAsRead(id, userId);
+        var result = alertService.markAsRead(id, userId);
+        if (!result.isSuccess()) {
+            return ResponseEntity.status(403).body(ApiResponse.error(result.getMessage()));
+        }
         return ResponseEntity.ok(ApiResponse.success("Alert marked as read"));
     }
 

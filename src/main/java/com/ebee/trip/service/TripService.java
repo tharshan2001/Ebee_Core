@@ -340,7 +340,8 @@ public class TripService {
                 }
 
                 if (order.getTrip() != null) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is already on trip '" + order.getTrip().getName() + "'");
+                    order.setTrip(null);
+                    order.setDeliveryAssignedTo(null);
                 }
 
                 order.setTrip(trip);

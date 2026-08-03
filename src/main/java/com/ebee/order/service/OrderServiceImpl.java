@@ -480,6 +480,18 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional(readOnly = true)
     @Override
+    public List<OrderResponse> getUnassignedOrdersIncludingFailed() {
+        List<Order> shipped = orderRepository.findByTripIsNullAndStatus(OrderStatus.SHIPPED);
+        List<Order> failed = orderRepository.findByTripIsNullAndDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
+        List<Order> combined = new java.util.ArrayList<>(shipped);
+        for (Order o : failed) {
+            if (!combined.contains(o)) combined.add(o);
+        }
+        return orderMapper.toResponseList(combined);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
         Page<Order> orders = orderRepository.findAllWithDetails(pageable);
         return orders.map(orderMapper::toResponse);

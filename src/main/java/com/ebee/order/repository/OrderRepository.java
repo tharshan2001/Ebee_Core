@@ -1,5 +1,6 @@
 package com.ebee.order.repository;
 
+import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.entity.Order;
 import com.ebee.order.enums.PaymentStatus;
 import jakarta.persistence.LockModeType;
@@ -129,6 +130,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o FROM Order o WHERE o.trip IS NULL AND o.status = :status")
     List<Order> findByTripIsNullAndStatus(@Param("status") com.ebee.order.enums.OrderStatus status);
+
+    @Query("SELECT o FROM Order o WHERE o.trip IS NULL AND o.deliveryStatus = :deliveryStatus")
+    List<Order> findByTripIsNullAndDeliveryStatus(@Param("deliveryStatus") DeliveryStatus deliveryStatus);
 
     @Query("SELECT o FROM Order o WHERE o.trip IS NULL")
     List<Order> findByTripIsNull();

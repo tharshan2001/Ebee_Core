@@ -103,10 +103,16 @@ public class OrderController {
     @GetMapping("/unassigned")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getUnassignedOrders(
-            @RequestParam(required = false) OrderStatus status) {
-        List<OrderResponse> response = status != null
-                ? orderService.getUnassignedOrdersByStatus(status)
-                : orderService.getUnassignedOrders();
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false, defaultValue = "false") boolean includeFailedDelivery) {
+        List<OrderResponse> response;
+        if (includeFailedDelivery) {
+            response = orderService.getUnassignedOrdersIncludingFailed();
+        } else if (status != null) {
+            response = orderService.getUnassignedOrdersByStatus(status);
+        } else {
+            response = orderService.getUnassignedOrders();
+        }
         return ResponseEntity.ok(ApiResponse.success("Unassigned orders retrieved successfully", response));
     }
 

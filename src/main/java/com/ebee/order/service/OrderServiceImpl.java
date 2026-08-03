@@ -98,42 +98,21 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     @Override
     public OrderResponse createOrder(OrderRequest request) {
-        Agent agent = null;
+        CreationContext ctx = new CreationContext();
 
-        if (!securityService.isAdmin()) {
-            UUID userId = securityService.getCurrentUserId();
-            agent = agentRepository.findByUserId(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
-            if (!Boolean.TRUE.equals(agent.getIsActive())) {
-                throw new IllegalArgumentException("Agent is not active");
-            }
-        } else if (request.getAgentCode() != null) {
-            agent = agentRepository.findByAgentCode(request.getAgentCode())
-                    .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", request.getAgentCode()));
+        ctx.agent = resolveAgent(request);
+        ctx.currentUser = resolveCurrentUser();
+        ctx.customer = customerService.findByPhone(request.getCustomerPhoneNumber());
 
-            if (!Boolean.TRUE.equals(agent.getIsActive())) {
-                throw new IllegalArgumentException("Agent is not active");
-            }
-        }
+        District district = resolveDistrict(ctx.customer);
+        OrderSource orderSource = ctx.agent != null ? OrderSource.AGENT : OrderSource.DIRECT;
+        ctx.orderNumber = orderNumberService.generateOrderNumber(district, orderSource);
 
-        User currentUser = userRepository.findById(securityService.getCurrentUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
-
-        Customer customer = customerService.findByPhone(request.getCustomerPhoneNumber());
-
-        OrderSource orderSource = agent != null ? OrderSource.AGENT : OrderSource.DIRECT;
-        District district = (customer.getAddress() != null) ? customer.getAddress().getDistrict() : null;
-        if (district == null) {
-            throw new IllegalArgumentException(
-                    "Customer has no district. Update their address first.");
-        }
-        String orderNumber = orderNumberService.generateOrderNumber(district, orderSource);
-
-        Order order = Order.builder()
-                .agent(agent)
-                .customer(customer)
-                .createdBy(currentUser)
-                .orderNumber(orderNumber)
+        ctx.order = Order.builder()
+                .agent(ctx.agent)
+                .customer(ctx.customer)
+                .createdBy(ctx.currentUser)
+                .orderNumber(ctx.orderNumber)
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
                 .orderSource(orderSource)
@@ -141,99 +120,142 @@ public class OrderServiceImpl implements OrderService {
                 .items(new ArrayList<>())
                 .build();
 
+        ItemProcessing split = splitItems(request.getItems());
+        processRegularItems(split.regularItems(), ctx);
+        processComboItems(split.comboItems(), ctx);
+
+        inventoryService.recordOrderStocks(ctx.stockProductIds, ctx.stockQuantities,
+                StockMovementType.OUT, ctx.stockNotes);
+
+        ctx.order.setTotalAmount(ctx.totalAmount);
+        orderPaymentService.initPayment(ctx.order, request.getPaymentMethod(),
+                request.getPaidAmount(), request.getChequeNumber(), request.getProofFileUrl());
+
+        Order savedOrder;
+        try {
+            savedOrder = orderRepository.save(ctx.order);
+        } catch (DataIntegrityViolationException ex) {
+            if (isDuplicateOrderNumber(ex)) {
+                throw new DuplicateOrderNumberException("Duplicate order number: " + ctx.order.getOrderNumber(), ex);
+            }
+            throw ex;
+        }
+
+        recordPostSaveOperations(savedOrder, ctx, request);
+
+        return orderMapper.toResponse(savedOrder);
+    }
+
+    private static class CreationContext {
+        Agent agent;
+        User currentUser;
+        Customer customer;
+        Order order;
+        String orderNumber;
         List<UUID> stockProductIds = new ArrayList<>();
         List<Integer> stockQuantities = new ArrayList<>();
         List<String> stockNotes = new ArrayList<>();
-
         BigDecimal totalAmount = BigDecimal.ZERO;
+    }
 
+    private record ItemProcessing(List<OrderItemRequest> regularItems, List<OrderItemRequest> comboItems) {}
+
+    private ItemProcessing splitItems(List<OrderItemRequest> items) {
         List<OrderItemRequest> regularItems = new ArrayList<>();
         List<OrderItemRequest> comboItems = new ArrayList<>();
-
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            if (itemRequest.getComboId() != null) {
-                comboItems.add(itemRequest);
+        for (OrderItemRequest item : items) {
+            if (item.getComboId() != null) {
+                comboItems.add(item);
             } else {
-                regularItems.add(itemRequest);
+                regularItems.add(item);
+            }
+        }
+        return new ItemProcessing(regularItems, comboItems);
+    }
+
+    private Agent resolveAgent(OrderRequest request) {
+        if (securityService.isAdmin()) {
+            if (request.getAgentCode() != null) {
+                return agentRepository.findByAgentCode(request.getAgentCode())
+                        .orElseThrow(() -> new ResourceNotFoundException("Agent", "agentCode", request.getAgentCode()));
+            }
+            return null;
+        }
+        UUID userId = securityService.getCurrentUserId();
+        Agent agent = agentRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
+        if (!Boolean.TRUE.equals(agent.getIsActive())) {
+            throw new IllegalArgumentException("Agent is not active");
+        }
+        return agent;
+    }
+
+    private User resolveCurrentUser() {
+        return userRepository.findById(securityService.getCurrentUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", securityService.getCurrentUserId()));
+    }
+
+    private District resolveDistrict(Customer customer) {
+        District district = (customer.getAddress() != null) ? customer.getAddress().getDistrict() : null;
+        if (district == null) {
+            throw new IllegalArgumentException("Customer has no district. Update their address first.");
+        }
+        return district;
+    }
+
+    private void processRegularItems(List<OrderItemRequest> regularItems, CreationContext ctx) {
+        if (regularItems.isEmpty()) return;
+
+        List<String> itemCodes = regularItems.stream()
+                .map(OrderItemRequest::getProductItemCode)
+                .toList();
+        Map<String, Product> productMap = productRepository.findByItemCodeIn(itemCodes).stream()
+                .collect(Collectors.toMap(Product::getItemCode, Function.identity()));
+
+        for (String itemCode : itemCodes) {
+            Product product = productMap.get(itemCode);
+            if (product == null) throw new ResourceNotFoundException("Product", "itemCode", itemCode);
+            if (!Boolean.TRUE.equals(product.getIsActive())) {
+                throw new IllegalArgumentException("Product is not active: " + product.getName());
             }
         }
 
-        if (!regularItems.isEmpty()) {
-            List<String> itemCodes = regularItems.stream()
-                    .map(OrderItemRequest::getProductItemCode)
-                    .toList();
-            Map<String, Product> productMap = productRepository.findByItemCodeIn(itemCodes).stream()
-                    .collect(Collectors.toMap(Product::getItemCode, Function.identity()));
+        for (int i = 0; i < regularItems.size(); i++) {
+            OrderItemRequest itemRequest = regularItems.get(i);
+            Product product = productMap.get(itemRequest.getProductItemCode());
 
-            for (String itemCode : itemCodes) {
-                Product product = productMap.get(itemCode);
-                if (product == null) {
-                    throw new ResourceNotFoundException("Product", "itemCode", itemCode);
-                }
-                if (!Boolean.TRUE.equals(product.getIsActive())) {
-                    throw new IllegalArgumentException("Product is not active: " + product.getName());
-                }
-            }
+            BigDecimal originalUnitPrice = product.getPrice();
+            String discountType = itemRequest.getDiscountType() != null ? itemRequest.getDiscountType().name() : null;
+            BigDecimal unitPrice = product.getPriceWithDiscount(discountType, itemRequest.getDiscountValue());
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
-            for (int i = 0; i < regularItems.size(); i++) {
-                OrderItemRequest itemRequest = regularItems.get(i);
-                Product product = productMap.get(itemRequest.getProductItemCode());
+            OrderItem item = OrderItem.builder()
+                    .order(ctx.order)
+                    .product(product)
+                    .quantity(itemRequest.getQuantity())
+                    .unitPrice(unitPrice)
+                    .originalUnitPrice(originalUnitPrice)
+                    .subtotal(subtotal)
+                    .discountType(discountType)
+                    .discountValue(itemRequest.getDiscountValue())
+                    .build();
 
-                BigDecimal originalUnitPrice = product.getPrice();
-                String discountType = itemRequest.getDiscountType() != null
-                        ? itemRequest.getDiscountType().name()
-                        : null;
-                BigDecimal unitPrice = product.getPriceWithDiscount(
-                        discountType,
-                        itemRequest.getDiscountValue());
-                BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            ctx.order.getItems().add(item);
+            ctx.totalAmount = ctx.totalAmount.add(subtotal);
 
-                OrderItem item = OrderItem.builder()
-                        .order(order)
-                        .product(product)
-                        .quantity(itemRequest.getQuantity())
-                        .unitPrice(unitPrice)
-                        .originalUnitPrice(originalUnitPrice)
-                        .subtotal(subtotal)
-                        .discountType(discountType)
-                        .discountValue(itemRequest.getDiscountValue())
-                        .build();
-
-                order.getItems().add(item);
-                totalAmount = totalAmount.add(subtotal);
-
-                stockProductIds.add(product.getId());
-                stockQuantities.add(itemRequest.getQuantity());
-                stockNotes.add("Order " + orderNumber + " - Item " + (i + 1));
-            }
+            ctx.stockProductIds.add(product.getId());
+            ctx.stockQuantities.add(itemRequest.getQuantity());
+            ctx.stockNotes.add("Order " + ctx.orderNumber + " - Item " + (i + 1));
         }
+    }
 
+    private void processComboItems(List<OrderItemRequest> comboItems, CreationContext ctx) {
         for (OrderItemRequest itemRequest : comboItems) {
             Combo combo = comboRepository.findByIdWithDetails(itemRequest.getComboId())
                     .orElseThrow(() -> new ResourceNotFoundException("Combo", "id", itemRequest.getComboId()));
-
-            if (!Boolean.TRUE.equals(combo.getIsActive())) {
-                throw new IllegalArgumentException("Combo '" + combo.getName() + "' is not active");
-            }
-
-            for (ComboItem ci : combo.getItems()) {
-                if (!Boolean.TRUE.equals(ci.getProduct().getIsActive())) {
-                    throw new IllegalArgumentException(
-                            "Combo '" + combo.getName() + "' contains inactive product: "
-                                    + ci.getProduct().getName()
-                                    + ". Remove or replace it before ordering.");
-                }
-            }
+            validateCombo(combo);
 
             ComboRule rule = combo.getRule();
-            if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
-                if (!Boolean.TRUE.equals(rule.getFreeProduct().getIsActive())) {
-                    throw new IllegalArgumentException(
-                            "Combo '" + combo.getName() + "' free product '"
-                                    + rule.getFreeProduct().getName() + "' is no longer available.");
-                }
-            }
-
             List<UUID> comboStockProductIds = new ArrayList<>();
             List<Integer> comboStockQuantities = new ArrayList<>();
             List<String> comboStockNotes = new ArrayList<>();
@@ -241,7 +263,7 @@ public class OrderServiceImpl implements OrderService {
             for (ComboItem ci : combo.getItems()) {
                 comboStockProductIds.add(ci.getProduct().getId());
                 comboStockQuantities.add(ci.getQuantity());
-                comboStockNotes.add("Order " + orderNumber + " - Combo " + combo.getName()
+                comboStockNotes.add("Order " + ctx.orderNumber + " - Combo " + combo.getName()
                         + " - " + ci.getProduct().getName());
             }
 
@@ -249,127 +271,125 @@ public class OrderServiceImpl implements OrderService {
                     && !Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
                 comboStockProductIds.add(rule.getFreeProduct().getId());
                 comboStockQuantities.add(1);
-                comboStockNotes.add("Order " + orderNumber + " - Combo " + combo.getName()
+                comboStockNotes.add("Order " + ctx.orderNumber + " - Combo " + combo.getName()
                         + " - FREE " + rule.getFreeProduct().getName());
             }
 
             inventoryService.checkStockAvailability(comboStockProductIds, comboStockQuantities);
-
-            stockProductIds.addAll(comboStockProductIds);
-            stockQuantities.addAll(comboStockQuantities);
-            stockNotes.addAll(comboStockNotes);
-
-            Map<UUID, BigDecimal> avgCosts = inventoryService.getAverageCosts(comboStockProductIds);
+            ctx.stockProductIds.addAll(comboStockProductIds);
+            ctx.stockQuantities.addAll(comboStockQuantities);
+            ctx.stockNotes.addAll(comboStockNotes);
 
             BigDecimal comboPrice = combo.calculateComboPrice();
-            BigDecimal originalUnitPrice = comboPrice;
-            BigDecimal unitPrice;
-
-            if (rule == null) {
-                unitPrice = comboPrice;
-            } else if (rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
-                if (Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
-                    // Deduct free product price from combo total instead of adding free item
-                    unitPrice = comboPrice.subtract(rule.getFreeProduct().getPrice()).max(BigDecimal.ZERO);
-                } else {
-                    unitPrice = comboPrice;
-
-                    BigDecimal freeProductAvgCost = avgCosts.getOrDefault(
-                            rule.getFreeProduct().getId(), BigDecimal.ZERO);
-
-                    OrderItem freeItem = OrderItem.builder()
-                            .order(order)
-                            .product(rule.getFreeProduct())
-                            .quantity(1)
-                            .unitPrice(BigDecimal.ZERO)
-                            .originalUnitPrice(rule.getFreeProduct().getPrice())
-                            .subtotal(BigDecimal.ZERO)
-                            .costPrice(freeProductAvgCost.setScale(2, RoundingMode.HALF_UP))
-                            .isFreeProduct(true)
-                            .build();
-
-                    order.getItems().add(freeItem);
-                }
-            } else if (rule.getRuleType() == ComboRuleType.DISCOUNT) {
-                unitPrice = switch (rule.getDiscountType()) {
-                    case "FIXED" -> comboPrice.subtract(rule.getDiscountValue()).max(BigDecimal.ZERO);
-                    case "PERCENTAGE" -> comboPrice.multiply(
-                            BigDecimal.ONE.subtract(rule.getDiscountValue()
-                                    .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
-                            .max(BigDecimal.ZERO)
-                            .setScale(2, RoundingMode.HALF_UP);
-                    // default branch is defensive — DB CHECK guarantees FIXED or PERCENTAGE.
-                    // Exists to prevent NPE if a rule was saved before validation was added.
-                    default -> comboPrice;
-                };
-            } else {
-                unitPrice = comboPrice;
-            }
-
-            BigDecimal comboCostPrice = BigDecimal.ZERO;
-            for (ComboItem ci : combo.getItems()) {
-                BigDecimal avgCost = avgCosts.get(ci.getProduct().getId());
-                if (avgCost != null && avgCost.compareTo(BigDecimal.ZERO) > 0) {
-                    comboCostPrice = comboCostPrice.add(
-                            avgCost.multiply(BigDecimal.valueOf(ci.getQuantity())));
-                }
-            }
+            BigDecimal unitPrice = calculateComboUnitPrice(combo, rule, itemRequest, comboPrice);
+            BigDecimal comboCostPrice = calculateComboCostPrice(combo);
 
             OrderItem comboItem = OrderItem.builder()
-                    .order(order)
+                    .order(ctx.order)
                     .product(null)
                     .combo(combo)
                     .quantity(1)
                     .unitPrice(unitPrice)
-                    .originalUnitPrice(originalUnitPrice)
+                    .originalUnitPrice(comboPrice)
                     .subtotal(unitPrice)
                     .costPrice(comboCostPrice.setScale(2, RoundingMode.HALF_UP))
                     .build();
+            ctx.order.getItems().add(comboItem);
+            ctx.totalAmount = ctx.totalAmount.add(unitPrice);
 
-            order.getItems().add(comboItem);
-            totalAmount = totalAmount.add(unitPrice);
-        }
-
-        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.OUT, stockNotes);
-
-        order.setTotalAmount(totalAmount);
-        orderPaymentService.initPayment(order, request.getPaymentMethod(), request.getPaidAmount(), request.getChequeNumber(), request.getProofFileUrl());
-        Order savedOrder;
-        try {
-            savedOrder = orderRepository.save(order);
-        } catch (DataIntegrityViolationException ex) {
-            if (isDuplicateOrderNumber(ex)) {
-                throw new DuplicateOrderNumberException("Duplicate order number: " + order.getOrderNumber(), ex);
+            if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT
+                    && !Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
+                Map<UUID, BigDecimal> avgCosts = inventoryService.getAverageCosts(
+                        List.of(rule.getFreeProduct().getId()));
+                BigDecimal freeProductAvgCost = avgCosts.getOrDefault(rule.getFreeProduct().getId(), BigDecimal.ZERO);
+                OrderItem freeItem = OrderItem.builder()
+                        .order(ctx.order)
+                        .product(rule.getFreeProduct())
+                        .quantity(1)
+                        .unitPrice(BigDecimal.ZERO)
+                        .originalUnitPrice(rule.getFreeProduct().getPrice())
+                        .subtotal(BigDecimal.ZERO)
+                        .costPrice(freeProductAvgCost.setScale(2, RoundingMode.HALF_UP))
+                        .isFreeProduct(true)
+                        .build();
+                ctx.order.getItems().add(freeItem);
             }
-            throw ex;
         }
+    }
 
-        if (customer != null) {
+    private void validateCombo(Combo combo) {
+        if (!Boolean.TRUE.equals(combo.getIsActive())) {
+            throw new IllegalArgumentException("Combo '" + combo.getName() + "' is not active");
+        }
+        for (ComboItem ci : combo.getItems()) {
+            if (!Boolean.TRUE.equals(ci.getProduct().getIsActive())) {
+                throw new IllegalArgumentException("Combo '" + combo.getName() + "' contains inactive product: "
+                        + ci.getProduct().getName() + ". Remove or replace it before ordering.");
+            }
+        }
+        ComboRule rule = combo.getRule();
+        if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
+            if (!Boolean.TRUE.equals(rule.getFreeProduct().getIsActive())) {
+                throw new IllegalArgumentException("Combo '" + combo.getName() + "' free product '"
+                        + rule.getFreeProduct().getName() + "' is no longer available.");
+            }
+        }
+    }
+
+    private BigDecimal calculateComboUnitPrice(Combo combo, ComboRule rule,
+            OrderItemRequest itemRequest, BigDecimal comboPrice) {
+        if (rule == null) return comboPrice;
+        if (rule.getRuleType() == ComboRuleType.FREE_PRODUCT) {
+            if (Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
+                return comboPrice.subtract(rule.getFreeProduct().getPrice()).max(BigDecimal.ZERO);
+            }
+            return comboPrice;
+        }
+        if (rule.getRuleType() == ComboRuleType.DISCOUNT) {
+            return switch (rule.getDiscountType()) {
+                case "FIXED" -> comboPrice.subtract(rule.getDiscountValue()).max(BigDecimal.ZERO);
+                case "PERCENTAGE" -> comboPrice.multiply(
+                        BigDecimal.ONE.subtract(rule.getDiscountValue()
+                                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
+                        .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+                default -> comboPrice;
+            };
+        }
+        return comboPrice;
+    }
+
+    private BigDecimal calculateComboCostPrice(Combo combo) {
+        BigDecimal costPrice = BigDecimal.ZERO;
+        for (ComboItem ci : combo.getItems()) {
+            costPrice = costPrice.add(
+                    inventoryService.getAverageCosts(List.of(ci.getProduct().getId()))
+                            .getOrDefault(ci.getProduct().getId(), BigDecimal.ZERO)
+                            .multiply(BigDecimal.valueOf(ci.getQuantity())));
+        }
+        return costPrice;
+    }
+
+    private void recordPostSaveOperations(Order savedOrder, CreationContext ctx, OrderRequest request) {
+        if (ctx.customer != null) {
             ledgerService.recordCustomerInvoice(
-                    customer.getId(),
-                    savedOrder.getId(),
-                    savedOrder.getTotalAmount(),
-                    "Order " + savedOrder.getOrderNumber(),
-                    currentUser.getId()
-            );
+                    ctx.customer.getId(), savedOrder.getId(), savedOrder.getTotalAmount(),
+                    "Order " + savedOrder.getOrderNumber(), ctx.currentUser.getId());
         }
 
-        if (customer != null) {
-            BigDecimal previousOutstanding = customer.getOutstandingBalance();
-            BigDecimal previousAdvance = customer.getAdvanceBalance();
-            orderPaymentService.syncCustomerOutstanding(customer);
-            customerRepository.save(customer);
+        if (ctx.customer != null) {
+            BigDecimal previousOutstanding = ctx.customer.getOutstandingBalance();
+            BigDecimal previousAdvance = ctx.customer.getAdvanceBalance();
+            orderPaymentService.syncCustomerOutstanding(ctx.customer);
+            customerRepository.save(ctx.customer);
             eventPublisher.publishEvent(new CustomerDuesChangedEvent(
-                    this, customer,
-                    previousOutstanding, customer.getOutstandingBalance(),
-                    previousAdvance, customer.getAdvanceBalance(),
-                    DuesChangeType.ORDER_CREATED
-            ));
+                    this, ctx.customer,
+                    previousOutstanding, ctx.customer.getOutstandingBalance(),
+                    previousAdvance, ctx.customer.getAdvanceBalance(),
+                    DuesChangeType.ORDER_CREATED));
         } else {
-            orderPaymentService.syncCustomerOutstanding(order.getCustomer());
+            orderPaymentService.syncCustomerOutstanding(ctx.order.getCustomer());
         }
 
-        // Record initial payment in payments table
         if (savedOrder.getPaidAmount() != null && savedOrder.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             Payment initialPayment = new Payment();
             initialPayment.setOrderId(savedOrder.getId());
@@ -383,24 +403,21 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Commission commission = null;
-        if (agent != null) {
+        if (ctx.agent != null) {
             commission = commissionCalculationService.calculateCommissionForOrder(savedOrder);
         }
 
         auditLogService.record(AuditAction.CREATE, "Order", savedOrder.getId(),
                 "Order " + savedOrder.getOrderNumber() + " created for "
-                + (customer != null ? OrderItemSummaryBuilder.customerDisplayName(customer) : "walk-in")
+                + (ctx.customer != null ? OrderItemSummaryBuilder.customerDisplayName(ctx.customer) : "walk-in")
                 + " via " + savedOrder.getOrderSource());
 
-        if (customer != null) {
-            customerService.incrementTotalOrders(customer.getId());
+        if (ctx.customer != null) {
+            customerService.incrementTotalOrders(ctx.customer.getId());
         }
 
         orderNotificationService.sendOrderCreated(savedOrder, commission);
-
         eventPublisher.publishEvent(new OrderStatusChangedEvent(this, savedOrder, null, LocalDateTime.now()));
-
-        return orderMapper.toResponse(savedOrder);
     }
 
     @Transactional(readOnly = true)

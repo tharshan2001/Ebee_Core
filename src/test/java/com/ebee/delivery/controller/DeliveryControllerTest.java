@@ -7,6 +7,7 @@ import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
 import com.ebee.common.config.CommonPropertiesConfig;
+import com.ebee.common.result.Result;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
 import com.ebee.delivery.enums.DeliveryStatus;
@@ -110,6 +111,9 @@ class DeliveryControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getDeliveryDetail_returns200() throws Exception {
+        when(deliveryService.getDeliveryDetail(orderId))
+                .thenReturn(Result.ok(new DeliveryResponse()));
+
         mockMvc.perform(get("/api/deliveries/{orderId}", orderId))
                 .andExpect(status().isOk());
 

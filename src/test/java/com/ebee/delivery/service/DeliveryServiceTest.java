@@ -232,17 +232,19 @@ class DeliveryServiceTest {
 
         var result = deliveryService.getDeliveryDetail(orderId);
 
-        assertThat(result).isNotNull();
-        assertThat(result.getOrderId()).isEqualTo(orderId);
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).isNotNull();
+        assertThat(result.getData().getOrderId()).isEqualTo(orderId);
     }
 
     @Test
-    void getDeliveryDetail_noDelivery_throws() {
+    void getDeliveryDetail_noDelivery_returnsFail() {
         order.setDeliveryStatus(null);
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> deliveryService.getDeliveryDetail(orderId))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Delivery");
+        var result = deliveryService.getDeliveryDetail(orderId);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains("Delivery");
     }
 }

@@ -335,18 +335,21 @@ class ComboServiceTest {
         when(comboRepository.findByIdWithDetails(comboId)).thenReturn(Optional.of(combo));
         when(comboMapper.toResponse(combo)).thenReturn(new ComboResponse());
 
-        ComboResponse result = comboService.getComboById(comboId);
+        var result = comboService.getComboById(comboId);
 
-        assertThat(result).isNotNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).isNotNull();
         verify(comboRepository).findByIdWithDetails(comboId);
     }
 
     @Test
-    void getComboById_notFound_throws() {
+    void getComboById_notFound_returnsFail() {
         when(comboRepository.findByIdWithDetails(any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> comboService.getComboById(UUID.randomUUID()))
-                .isInstanceOf(ResourceNotFoundException.class);
+        var result = comboService.getComboById(UUID.randomUUID());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains("Combo");
     }
 
     @Test

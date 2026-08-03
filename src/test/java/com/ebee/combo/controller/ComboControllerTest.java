@@ -13,6 +13,7 @@ import com.ebee.combo.exception.ComboImmutabilityException;
 import com.ebee.combo.service.ComboService;
 import com.ebee.common.config.CommonPropertiesConfig;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -160,7 +161,7 @@ class ComboControllerTest {
     @WithMockUser(roles = "ADMIN")
     void getComboById_found_returns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(comboService.getComboById(id)).thenReturn(comboResponse);
+        when(comboService.getComboById(id)).thenReturn(Result.ok(comboResponse));
 
         mockMvc.perform(get("/api/combos/{id}", id))
                 .andExpect(status().isOk())

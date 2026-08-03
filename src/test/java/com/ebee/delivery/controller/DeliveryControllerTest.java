@@ -95,7 +95,7 @@ class DeliveryControllerTest {
                         .param("status", "PENDING"))
                 .andExpect(status().isOk());
 
-        verify(deliveryService).getDeliveries(DeliveryStatus.PENDING, null);
+        verify(deliveryService).getDeliveries(DeliveryStatus.PENDING, null, null);
     }
 
     @Test

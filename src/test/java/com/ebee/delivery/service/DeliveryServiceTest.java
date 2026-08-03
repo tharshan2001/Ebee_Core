@@ -208,7 +208,7 @@ class DeliveryServiceTest {
     void getDeliveries_filterByStatus() {
         when(deliveryRepository.findByDeliveryStatus(DeliveryStatus.PENDING)).thenReturn(List.of(order));
 
-        var results = deliveryService.getDeliveries(DeliveryStatus.PENDING, null);
+        var results = deliveryService.getDeliveries(DeliveryStatus.PENDING, null, null);
 
         assertThat(results).hasSize(1);
         verify(deliveryRepository).findByDeliveryStatus(DeliveryStatus.PENDING);
@@ -217,7 +217,8 @@ class DeliveryServiceTest {
     @Test
     void getMyDeliveries_success() {
         when(securityService.getCurrentUserId()).thenReturn(driverUserId);
-        when(deliveryRepository.findByDeliveryAssignedToId(driverUserId)).thenReturn(List.of(order));
+        when(driverRepository.existsByUserId(driverUserId)).thenReturn(true);
+        when(deliveryRepository.findByDeliveryAssignedToIdAndActiveStatuses(eq(driverUserId), anyList())).thenReturn(List.of(order));
 
         var results = deliveryService.getMyDeliveries();
 

@@ -30,16 +30,14 @@ public class LedgerController {
 
     @GetMapping("/customer/{customerId}/balance")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
-    public ResponseEntity<ApiResponse<BigDecimal>> getCustomerBalance(@PathVariable UUID customerId) {
-        BigDecimal balance = ledgerService.getCustomerBalance(customerId);
-        return ResponseEntity.ok(ApiResponse.success("Customer balance retrieved", balance));
+    public ResponseEntity<BigDecimal> getCustomerBalance(@PathVariable UUID customerId) {
+        return ResponseEntity.ok(ledgerService.getCustomerBalance(customerId));
     }
 
     @GetMapping("/supplier/{supplierId}/balance")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<BigDecimal>> getSupplierBalance(@PathVariable UUID supplierId) {
-        BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
-        return ResponseEntity.ok(ApiResponse.success("Supplier balance retrieved", balance));
+    public ResponseEntity<BigDecimal> getSupplierBalance(@PathVariable UUID supplierId) {
+        return ResponseEntity.ok(ledgerService.getSupplierBalance(supplierId));
     }
 
     @GetMapping("/supplier/{supplierId}/entries")
@@ -54,9 +52,8 @@ public class LedgerController {
 
     @GetMapping("/agent/{agentId}/balance")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<BigDecimal>> getAgentBalance(@PathVariable UUID agentId) {
-        BigDecimal balance = ledgerService.getAgentBalance(agentId);
-        return ResponseEntity.ok(ApiResponse.success("Agent balance retrieved", balance));
+    public ResponseEntity<BigDecimal> getAgentBalance(@PathVariable UUID agentId) {
+        return ResponseEntity.ok(ledgerService.getAgentBalance(agentId));
     }
 
     @PostMapping("/customer/{customerId}/invoice")

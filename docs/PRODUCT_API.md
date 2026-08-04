@@ -42,7 +42,10 @@ Product responses include:
 | `maxDiscountValue` | `BigDecimal` | Max discount value (paired with `maxDiscountType`). When set, admin can supply a discount on each order item up to this cap. |
 | `brand` | `String` | Brand name |
 | `tags` | `String` | Comma-separated tags (e.g. `"premium,sport"`) |
+| `specifications` | `Array` | List of `{key, value, sortOrder}` objects stored as JSONB |
+| `featured` | `Boolean` | Whether product appears in featured carousel |
 | `effectivePrice` | `BigDecimal` | Computed price after discount: `price * (1 - value/100)` or `price - value` |
+| `totalSold` | `Long` | Total quantity sold across all orders |
 | `imageUrls` | `String[]` | S3 URLs of product images |
 | `images` | `ProductImageResponse[]` | Structured image data with IDs, URLs, names, types, and sortOrder |
 | `inventory` | `Object` | Inventory snapshot (`availableQuantity`, `isLowStock`) |
@@ -285,6 +288,104 @@ curl http://localhost:8085/api/products/stats
 
 **Access:** Public
 
+Returns all products (including inactive) matching the given category name (case-insensitive).
+
+```bash
+curl "http://localhost:8085/api/products/category/Electronics"
+```
+
+---
+
+### Get Featured Products
+
+**GET** `/api/products/featured`
+
+**Access:** Public
+
+Returns active products where `featured = true`.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `8` | Page size |
+
+```bash
+curl "http://localhost:8085/api/products/featured?page=0&size=8"
+```
+
+---
+
+### Get Deal Products
+
+**GET** `/api/products/deals`
+
+**Access:** Public
+
+Returns active products that have a catalog discount set (`discountType IS NOT NULL AND discountValue > 0`).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `4` | Page size |
+
+```bash
+curl "http://localhost:8085/api/products/deals?page=0&size=4"
+```
+
+---
+
+### Get Best Sellers
+
+**GET** `/api/products/best-sellers`
+
+**Access:** Public
+
+Returns active products ranked by total quantity sold (excluding CANCELLED/RETURNED orders).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `9` | Page size |
+
+```bash
+curl "http://localhost:8085/api/products/best-sellers?page=0&size=9"
+```
+
+---
+
+### Get New Arrivals
+
+**GET** `/api/products/new-arrivals`
+
+**Access:** Public
+
+Returns active products ordered by `createdAt DESC`.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Zero-based page index |
+| `size` | Integer | `8` | Page size |
+
+```bash
+curl "http://localhost:8085/api/products/new-arrivals?page=0&size=8"
+```
+
+---
+
+### Download Product Label
+
+**GET** `/api/products/{id}/label`
+
+**Access:** Public
+
+Generates and downloads a PDF product label with name, item code, price, category, and brand.
+
+**Response:** `application/pdf` with `Content-Disposition: attachment` header.
+
+```bash
+curl -o label.pdf "http://localhost:8085/api/products/<UUID>/label"
+```
+
 ---
 
 ### Create Product
@@ -309,6 +410,7 @@ curl http://localhost:8085/api/products/stats
 | `maxDiscountValue` | `BigDecimal` | No | Required if `maxDiscountType` is set. Max value for per-order discount. |
 | `brand` | `String` | No | Brand name (max 100 chars) |
 | `tags` | `String` | No | Comma-separated tags |
+| `specifications` | `String` (JSON) | No | JSON array: `[{"key":"Material","value":"Cotton","sortOrder":0}]` |
 | `images` | `File[]` | No | Up to 10 product images |
 
 ```bash
@@ -323,6 +425,7 @@ curl -X POST http://localhost:8085/api/products \
   -F "discountValue=10" \
   -F "brand=Nike" \
   -F "tags=premium,sport" \
+  -F 'specifications=[{"key":"Material","value":"Cotton","sortOrder":0}]' \
   -F "images=@product.jpg"
 ```
 
@@ -354,14 +457,17 @@ All fields are optional — only provided fields are updated.
 | `maxDiscountValue` | `BigDecimal` | No | Required if `maxDiscountType` is set. Max value for per-order discount. |
 | `brand` | `String` | No | Brand name |
 | `tags` | `String` | No | Comma-separated tags |
+| `specifications` | `String` (JSON) | No | JSON array: replaces all existing specs |
 | `images` | `File[]` | No | New images to **append** (up to 10 total) |
+| `removeImageUrls` | `String` | No | Comma-separated S3 URLs of images to remove |
 
 ```bash
-# Update fields, add new image
+# Update fields, add new image, remove old image
 curl -X PATCH http://localhost:8085/api/products/<UUID> \
   -H "Authorization: Bearer <TOKEN>" \
   -F "name=Updated Name" \
-  -F "images=@new-photo.jpg"
+  -F "images=@new-photo.jpg" \
+  -F "removeImageUrls=https://s3.amazonaws.com/.../old.jpg"
 ```
 
 **Response (200):** Updated product response.
@@ -500,17 +606,6 @@ The `images` field provides structured image metadata for frontend targeting, wh
 
 ---
 
-### Error Responses
-
-| HTTP Status | Scenario |
-|-------------|----------|
-| 400 | Validation failure, duplicate item code, category not found, already active, max 10 images reached |
-| 401 / 403 | Missing/invalid JWT, non-ADMIN role for mutations |
-| 404 | Product not found, product image not found |
-| 500 | S3 upload failure, server error |
-
----
-
 ### Activate Product
 
 **PATCH** `/api/products/{id}/activate`
@@ -537,13 +632,240 @@ curl -X PATCH http://localhost:8085/api/products/<UUID>/activate \
 
 ---
 
+### Deactivate Product
+
+**PATCH** `/api/products/{id}/deactivate`
+
+**Access:** ADMIN
+
+Soft-deletes a product by setting `isActive = false`. The product is excluded from active/list results and cannot be used in new orders, but past orders retain full product details. Returns 400 if already inactive.
+
+```bash
+curl -X PATCH http://localhost:8085/api/products/<UUID>/deactivate \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Product deactivated successfully",
+  "data": null
+}
+```
+
+---
+
+## Inventory Endpoints (Product-Related)
+
+These endpoints are in the InventoryController but operate on products by `productId`.
+
+### Get Inventory by Product
+
+**GET** `/api/inventory/product/{productId}`
+
+**Access:** ADMIN, AGENT
+
+Returns inventory snapshot for a product (quantity, reserved, available, reorder level, average cost).
+
+```bash
+curl "http://localhost:8085/api/inventory/product/<UUID>" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Get Stock History by Product
+
+**GET** `/api/inventory/product/{productId}/history`
+
+**Access:** ADMIN, AGENT
+
+Returns paginated stock movement history sorted by `createdAt DESC`. Each entry includes `reservedQuantityBefore`/`reservedQuantityAfter` for reserve/release movements.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Page number |
+| `size` | Integer | `10` | Page size |
+
+```bash
+curl "http://localhost:8085/api/inventory/product/<UUID>/history?page=0&size=10" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Get FIFO Inventory Layers by Product
+
+**GET** `/api/inventory/product/{productId}/layers`
+
+**Access:** ADMIN, AGENT
+
+Returns paginated cost layers sorted by `receivedAt ASC` (oldest first for FIFO consumption).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | Integer | `0` | Page number |
+| `size` | Integer | `10` | Page size |
+
+```bash
+curl "http://localhost:8085/api/inventory/product/<UUID>/layers?page=0&size=10" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Reserve Stock
+
+**POST** `/api/inventory/reserve`
+
+**Access:** ADMIN
+
+Reserves quantity for a product (increments `reservedQuantity`). Available stock = quantity - reservedQuantity.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `productId` | UUID | Yes | Product ID |
+| `quantity` | Integer | Yes | Quantity to reserve |
+
+```bash
+curl -X POST "http://localhost:8085/api/inventory/reserve?productId=<UUID>&quantity=5" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Release Reserved Stock
+
+**POST** `/api/inventory/release`
+
+**Access:** ADMIN
+
+Releases previously reserved quantity (decrements `reservedQuantity`).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `productId` | UUID | Yes | Product ID |
+| `quantity` | Integer | Yes | Quantity to release |
+
+```bash
+curl -X POST "http://localhost:8085/api/inventory/release?productId=<UUID>&quantity=5" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Record Order Stock Movement
+
+**POST** `/api/inventory/order-stock`
+
+**Access:** ADMIN
+
+Records a stock movement (IN, OUT, or RETURN) with FIFO layer consumption.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `productId` | UUID | Yes | Product ID |
+| `quantity` | Integer | Yes | Quantity |
+| `movementType` | String | Yes | `IN`, `OUT`, or `RETURN` |
+| `notes` | String | No | Notes |
+
+```bash
+curl -X POST "http://localhost:8085/api/inventory/order-stock?productId=<UUID>&quantity=10&movementType=OUT&notes=Sold" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+### Confirm Order Stock
+
+**POST** `/api/inventory/confirm-order-stock`
+
+**Access:** ADMIN
+
+Releases reserved stock AND deducts quantity (consuming FIFO layers). Records a stock movement with reserved before/after history. Used when an order is confirmed and ready for fulfillment.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `productId` | UUID | Yes | Product ID |
+| `quantity` | Integer | Yes | Quantity to confirm |
+
+```bash
+curl -X POST "http://localhost:8085/api/inventory/confirm-order-stock?productId=<UUID>&quantity=5" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+---
+
+## Report Endpoints (Product-Related)
+
+All report endpoints require `ADMIN` role.
+
+### Product Summary Report
+
+**GET** `/api/reports/products/summary`
+
+**Access:** ADMIN
+
+```bash
+curl "http://localhost:8085/api/reports/products/summary" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Response fields:** `totalProducts`, `activeCount`, `inactiveCount`, `categoryCount`
+
+---
+
+### Top Sellers Report
+
+**GET** `/api/reports/products/top-sellers`
+
+**Access:** ADMIN
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `period` | String | `this_month` | Period preset |
+| `limit` | int | `10` | Number of results |
+| `startDate` | LocalDate | null | Custom start date |
+| `endDate` | LocalDate | null | Custom end date |
+
+```bash
+curl "http://localhost:8085/api/reports/products/top-sellers?period=this_month&limit=10" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Response fields per item:** `productId`, `productName`, `itemCode`, `category`, `quantitySold`, `revenue`, `rank`
+
+---
+
+### Products by Category Report
+
+**GET** `/api/reports/products/by-category`
+
+**Access:** ADMIN
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `period` | String | `this_month` | Period preset |
+| `startDate` | LocalDate | null | Custom start date |
+| `endDate` | LocalDate | null | Custom end date |
+
+```bash
+curl "http://localhost:8085/api/reports/products/by-category?period=this_month" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Response fields per item:** `category`, `productCount`, `quantitySold`, `revenue`
+
+---
+
 ## Error Responses
 
 | HTTP Status | Scenario |
 |-------------|----------|
-| 400 | Validation failure, duplicate item code, category not found, already active, max 10 images reached |
-| 401 / 403 | Missing/invalid JWT, non-ADMIN role for mutations |
-| 404 | Product not found |
+| 400 | Validation failure, duplicate item code, category not found, already active/inactive, max 10 images reached, insufficient reserved stock |
+| 401 / 404 | Missing/invalid JWT, non-ADMIN role for mutations |
+| 404 | Product not found, product image not found, inventory not found |
 | 500 | S3 upload failure, server error |
 
 ---

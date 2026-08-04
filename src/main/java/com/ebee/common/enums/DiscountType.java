@@ -17,7 +17,7 @@ public enum DiscountType {
      * with a clear message for unknown values.
      */
     public static DiscountType fromString(String raw) {
-        if (raw == null) {
+        if (raw == null || raw.trim().isEmpty()) {
             return null;
         }
         try {

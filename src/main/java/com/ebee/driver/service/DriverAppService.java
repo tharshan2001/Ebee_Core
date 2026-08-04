@@ -28,6 +28,7 @@ import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.notification.NotificationPort;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
+import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
 import com.ebee.trip.dto.TripOrderMarkerDto;
@@ -485,6 +486,16 @@ public class DriverAppService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Driver started trip '" + trip.getName() + "'");
 
+        for (Order order : trip.getOrders()) {
+            if (order.getDeliveryStatus() == DeliveryStatus.PENDING) {
+                DeliveryStateTransition.TransitionResult result =
+                        deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", false);
+                orderRepository.save(order);
+                eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                        this, order, result.previousStatus(), "Trip started", LocalDateTime.now()));
+            }
+        }
+
         return tripMapper.toResponse(trip);
     }
 
@@ -515,6 +526,10 @@ public class DriverAppService {
                 }
                 if (order.getTrip() != null) {
                     throw new IllegalStateException("Order " + order.getOrderNumber() + " is already on trip '" + order.getTrip().getName() + "'");
+                }
+
+                if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.FAILED) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED or FAILED status to add to a trip");
                 }
 
                 order.setTrip(trip);

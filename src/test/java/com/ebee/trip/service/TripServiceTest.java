@@ -3,6 +3,7 @@ package com.ebee.trip.service;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.security.SecurityService;
 import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.delivery.service.DeliveryStateTransition;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.entity.Expense;
@@ -10,6 +11,7 @@ import com.ebee.expense.enums.ExpenseCategory;
 import com.ebee.expense.mapper.ExpenseMapper;
 import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.order.entity.Order;
+import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
 import com.ebee.trip.dto.CreateTripRequest;
@@ -52,6 +54,7 @@ class TripServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private SecurityService securityService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private DeliveryStateTransition deliveryStateTransition;
 
     @InjectMocks private TripService tripService;
 
@@ -85,6 +88,7 @@ class TripServiceTest {
         order = Order.builder()
                 .id(orderId)
                 .orderNumber("JF-A-20250614-001")
+                .status(OrderStatus.SHIPPED)
                 .totalAmount(new BigDecimal("5000.00"))
                 .paidAmount(new BigDecimal("0.00"))
                 .outstandingBalance(new BigDecimal("5000.00"))
@@ -324,6 +328,21 @@ class TripServiceTest {
         assertThatThrownBy(() -> tripService.addOrdersToTrip(tripId, request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("assigned to a different driver");
+    }
+
+    @Test
+    void addOrdersToTrip_orderNotShippedOrFailed_throws() {
+        order.setStatus(OrderStatus.CONFIRMED);
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        AddOrdersToTripRequest request = new AddOrdersToTripRequest();
+        request.setOrderIdsToAdd(List.of(orderId));
+
+        assertThatThrownBy(() -> tripService.addOrdersToTrip(tripId, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be in SHIPPED or FAILED status");
     }
 
     @Test

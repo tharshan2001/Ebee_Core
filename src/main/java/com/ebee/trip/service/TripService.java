@@ -7,6 +7,7 @@ import com.ebee.common.response.PageResponse;
 import com.ebee.common.security.SecurityService;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.event.DeliveryStatusChangedEvent;
+import com.ebee.delivery.service.DeliveryStateTransition;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseResponse;
@@ -15,6 +16,7 @@ import com.ebee.expense.enums.ExpenseCategory;
 import com.ebee.expense.mapper.ExpenseMapper;
 import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.order.entity.Order;
+import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.trip.dto.AddOrdersToTripRequest;
 import com.ebee.trip.dto.CreateTripRequest;
@@ -60,6 +62,7 @@ public class TripService {
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
     private final SecurityService securityService;
+    private final DeliveryStateTransition deliveryStateTransition;
 
     @Transactional
     public TripResponse createTrip(CreateTripRequest request) {
@@ -307,6 +310,16 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' started");
 
+        for (Order order : trip.getOrders()) {
+            if (order.getDeliveryStatus() == DeliveryStatus.PENDING) {
+                DeliveryStateTransition.TransitionResult result =
+                        deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", true);
+                orderRepository.save(order);
+                eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                        this, order, result.previousStatus(), "Trip started", LocalDateTime.now()));
+            }
+        }
+
         eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
 
@@ -332,6 +345,10 @@ public class TripService {
 
                 if (order.getTrip() != null && order.getTrip().getId().equals(tripId)) {
                     continue;
+                }
+
+                if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.FAILED) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED or FAILED status to add to a trip");
                 }
 
                 if (order.getDeliveryAssignedTo() != null

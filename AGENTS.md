@@ -87,7 +87,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - CORS origins are configured via `app.cors.allowed-origins`
 - IP whitelisting reads `X-Forwarded-For`/`X-Real-IP`; ensure the app runs behind a trusted reverse proxy
 
-## Current State (July 9, 2026)
+## Current State (August 4, 2026)
 
 ### FIFO-Layered WAC Implemented
 - New `inventory_layers` table (V79 migration) stores per-receipt cost layers: `quantity`, `remaining_quantity`, `unit_cost`, `received_at`
@@ -95,9 +95,11 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `recordPurchaseStocks()` inserts a new layer with the received quantity and unit cost, recalculates WAC from all remaining layers
 - `recordOrderStock(s)` with OUT consumes from oldest layers first (FIFO), recalcs WAC
 - `recordOrderStock(s)` with RETURN adds a new layer at current WAC
-- `confirmOrderStock()` also consumes FIFO layers
+- `confirmOrderStock()` consumes FIFO layers and records stock movement with reserved history
 - Private helpers: `consumeFifoLayers()`, `recalculateWac()`
-- The `stock` table remains a quantity-only audit log (no cost stored)
+- `stock` table tracks reserved quantity snapshots (`reserved_quantity_before`, `reserved_quantity_after`) via V120 migration
+- `StockMovementRecorder.record()` overloaded to accept reserved before/after params
+- `POST /api/inventory/confirm-order-stock` endpoint releases reserved stock + deducts quantity (ADMIN only)
 - `order_items.cost_price` snapshots the WAC at order time (before FIFO consumption), giving a reasonable COGS approximation
 
 ### Curl-Verified
@@ -105,6 +107,8 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - WAC correctly calculated from layers: (10×100 + 10×200)/20 = 150
 - FIFO consumption: selling 5 consumes from oldest layer (10→5 remaining), WAC recalculates to 166.67
 - Further sale of 6 exhausts layer 1 (5→0) and consumes 1 from layer 2 (10→9), WAC = 200
+- Reserve 3 units: reservedBefore=25, reservedAfter=28 ✓
+- Confirm order stock: OUT qty=-3, reservedBefore=28, reservedAfter=25 ✓
 - 308 tests pass
 
 ### Manual Outstanding Adjustment
@@ -136,6 +140,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `ComboImmutabilityException` mapped to 400 in `GlobalExceptionHandler`
 - `/api/combos/**` public for GET (like products/categories) in SecurityConfig + JwtAuthenticationFilter
 - 351 tests pass (2 pre-existing CommissionLockTest errors need running DB)
+- 413 tests pass
 
 ## Agent Workflow
 

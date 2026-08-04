@@ -23,6 +23,14 @@ public class StockMovementRecorder {
     public Stock record(Inventory inventory, Integer quantityChange,
                         Integer quantityBefore, Integer quantityAfter,
                         StockMovementType movementType, String notes) {
+        return record(inventory, quantityChange, quantityBefore, quantityAfter,
+                movementType, notes, null, null);
+    }
+
+    public Stock record(Inventory inventory, Integer quantityChange,
+                        Integer quantityBefore, Integer quantityAfter,
+                        StockMovementType movementType, String notes,
+                        Integer reservedBefore, Integer reservedAfter) {
         UUID userId = securityService.getCurrentUserId();
         User createdBy = userId != null ? userRepository.findById(userId).orElse(null) : null;
 
@@ -31,6 +39,8 @@ public class StockMovementRecorder {
                 .quantityChange(quantityChange)
                 .quantityBefore(quantityBefore)
                 .quantityAfter(quantityAfter)
+                .reservedQuantityBefore(reservedBefore)
+                .reservedQuantityAfter(reservedAfter)
                 .movementType(movementType)
                 .notes(notes)
                 .createdBy(createdBy)

@@ -174,6 +174,8 @@ class InventoryServiceTest {
         inventoryService.reserveStock(productId, 20);
 
         assertThat(inventory.getReservedQuantity()).isEqualTo(30);
+        verify(stockMovementRecorder).record(inventory, 0, 50, 50,
+                StockMovementType.RESERVE, "Reserved 20 units", 10, 30);
     }
 
     @Test
@@ -186,6 +188,33 @@ class InventoryServiceTest {
         assertThatThrownBy(() -> inventoryService.reserveStock(productId, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Insufficient available stock");
+    }
+
+    @Test
+    void releaseReservedStock_success_releases() {
+        inventory.setQuantity(50);
+        inventory.setReservedQuantity(30);
+
+        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.save(any())).thenReturn(inventory);
+        when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
+
+        inventoryService.releaseReservedStock(productId, 10);
+
+        assertThat(inventory.getReservedQuantity()).isEqualTo(20);
+        verify(stockMovementRecorder).record(inventory, 0, 50, 50,
+                StockMovementType.RELEASE, "Released 10 units", 30, 20);
+    }
+
+    @Test
+    void releaseReservedStock_moreThanReserved_throws() {
+        inventory.setReservedQuantity(5);
+
+        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+
+        assertThatThrownBy(() -> inventoryService.releaseReservedStock(productId, 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot release more than reserved quantity");
     }
 
     @Test

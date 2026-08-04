@@ -16,6 +16,8 @@ public class StockResponse {
     private Integer quantityChange;
     private Integer quantityBefore;
     private Integer quantityAfter;
+    private Integer reservedQuantityBefore;
+    private Integer reservedQuantityAfter;
     private StockMovementType movementType;
     private String notes;
     private UUID createdById;

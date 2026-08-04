@@ -47,6 +47,12 @@ public class Stock {
     @Column(name = "quantity_after", nullable = false)
     private Integer quantityAfter;
 
+    @Column(name = "reserved_quantity_before")
+    private Integer reservedQuantityBefore;
+
+    @Column(name = "reserved_quantity_after")
+    private Integer reservedQuantityAfter;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "movement_type", nullable = false)
     private StockMovementType movementType;

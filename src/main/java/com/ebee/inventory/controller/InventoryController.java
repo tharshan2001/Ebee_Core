@@ -120,4 +120,13 @@ public class InventoryController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Order stock recorded successfully", response));
     }
+
+    @PostMapping("/confirm-order-stock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<InventoryResponse>> confirmOrderStock(
+            @RequestParam UUID productId,
+            @RequestParam Integer quantity) {
+        InventoryResponse response = inventoryService.confirmOrderStock(productId, quantity);
+        return ResponseEntity.ok(ApiResponse.success("Order stock confirmed successfully", response));
+    }
 }

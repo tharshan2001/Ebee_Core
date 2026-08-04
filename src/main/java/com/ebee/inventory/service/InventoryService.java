@@ -254,11 +254,13 @@ public class InventoryService {
             throw new IllegalArgumentException(msg);
         }
 
-        inventory.setReservedQuantity(inventory.getReservedQuantity() + quantity);
+        int reservedBefore = inventory.getReservedQuantity();
+        inventory.setReservedQuantity(reservedBefore + quantity);
         Inventory saved = inventoryRepository.save(inventory);
 
         stockMovementRecorder.record(inventory, 0, inventory.getQuantity(), inventory.getQuantity(),
-                StockMovementType.RESERVE, "Reserved " + quantity + " units");
+                StockMovementType.RESERVE, "Reserved " + quantity + " units",
+                reservedBefore, reservedBefore + quantity);
 
         return inventoryMapper.toResponse(saved);
     }
@@ -273,11 +275,13 @@ public class InventoryService {
             throw new IllegalArgumentException("Cannot release more than reserved quantity");
         }
 
-        inventory.setReservedQuantity(inventory.getReservedQuantity() - quantity);
+        int reservedBefore = inventory.getReservedQuantity();
+        inventory.setReservedQuantity(reservedBefore - quantity);
         Inventory saved = inventoryRepository.save(inventory);
 
         stockMovementRecorder.record(inventory, 0, inventory.getQuantity(), inventory.getQuantity(),
-                StockMovementType.RELEASE, "Released " + quantity + " units");
+                StockMovementType.RELEASE, "Released " + quantity + " units",
+                reservedBefore, reservedBefore - quantity);
 
         return inventoryMapper.toResponse(saved);
     }
@@ -292,13 +296,21 @@ public class InventoryService {
             throw new IllegalArgumentException("Insufficient reserved stock");
         }
 
+        int quantityBefore = inventory.getQuantity();
+        int reservedBefore = inventory.getReservedQuantity();
+
         consumeFifoLayers(inventory, quantity);
         updateCurrentCost(inventory);
 
-        inventory.setReservedQuantity(inventory.getReservedQuantity() - quantity);
-        inventory.setQuantity(inventory.getQuantity() - quantity);
+        inventory.setReservedQuantity(reservedBefore - quantity);
+        inventory.setQuantity(quantityBefore - quantity);
 
         Inventory saved = inventoryRepository.save(inventory);
+
+        stockMovementRecorder.record(inventory, -quantity, quantityBefore, inventory.getQuantity(),
+                StockMovementType.OUT, "Confirmed order: released " + quantity + " reserved units",
+                reservedBefore, inventory.getReservedQuantity());
+
         inventoryAlertService.checkAndNotify(saved);
         return inventoryMapper.toResponse(saved);
     }

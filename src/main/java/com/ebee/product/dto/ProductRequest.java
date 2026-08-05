@@ -45,6 +45,19 @@ public class ProductRequest {
 
     private BigDecimal maxDiscountValue;
 
+    /**
+     * Set by the controller when the discount fields were supplied in the
+     * request (even as empty strings). When true, updateProduct applies the
+     * (possibly null) catalog discount fields; when false they are left
+     * untouched on a partial update.
+     */
+    private boolean discountFieldsSet;
+
+    /**
+     * Same as {@link #discountFieldsSet} but for the maxDiscount pair.
+     */
+    private boolean maxDiscountFieldsSet;
+
     @Size(max = 100, message = "Brand must not exceed 100 characters")
     private String brand;
 

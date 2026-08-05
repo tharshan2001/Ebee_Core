@@ -228,6 +228,12 @@ public class OrderServiceImpl implements OrderService {
             OrderItemRequest itemRequest = regularItems.get(i);
             Product product = productMap.get(itemRequest.getProductItemCode());
 
+            if ((itemRequest.getDiscountType() == null) != (itemRequest.getDiscountValue() == null)) {
+                throw new IllegalArgumentException(
+                        "discountType and discountValue must both be provided together for item '"
+                                + itemRequest.getProductItemCode() + "'");
+            }
+
             BigDecimal originalUnitPrice = product.getPrice();
             String discountType = itemRequest.getDiscountType() != null ? itemRequest.getDiscountType().name() : null;
             BigDecimal unitPrice = product.getPriceWithDiscount(discountType, itemRequest.getDiscountValue());

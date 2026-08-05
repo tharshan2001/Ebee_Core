@@ -267,10 +267,14 @@ public class ProductServiceImpl implements ProductService {
             product.setCostPrice(request.getCostPrice());
         }
         validateDiscount(request);
-        product.setDiscountType(request.getDiscountType() != null ? request.getDiscountType().name() : null);
-        product.setDiscountValue(request.getDiscountValue());
-        product.setMaxDiscountType(request.getMaxDiscountType() != null ? request.getMaxDiscountType().name() : null);
-        product.setMaxDiscountValue(request.getMaxDiscountValue());
+        if (request.isDiscountFieldsSet()) {
+            product.setDiscountType(request.getDiscountType() != null ? request.getDiscountType().name() : null);
+            product.setDiscountValue(request.getDiscountValue());
+        }
+        if (request.isMaxDiscountFieldsSet()) {
+            product.setMaxDiscountType(request.getMaxDiscountType() != null ? request.getMaxDiscountType().name() : null);
+            product.setMaxDiscountValue(request.getMaxDiscountValue());
+        }
         if (request.getBrand() != null) {
             product.setBrand(request.getBrand());
         }

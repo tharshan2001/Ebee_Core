@@ -224,8 +224,10 @@ public class ProductController {
         request.setCostPrice(costPrice);
         request.setDiscountType(DiscountType.fromString(discountType));
         request.setDiscountValue(discountValue);
+        request.setDiscountFieldsSet(discountType != null || discountValue != null);
         request.setMaxDiscountType(DiscountType.fromString(maxDiscountType));
         request.setMaxDiscountValue(maxDiscountValue);
+        request.setMaxDiscountFieldsSet(maxDiscountType != null || maxDiscountValue != null);
         request.setBrand(brand);
         request.setTags(tags);
         if (specificationsJson != null && !specificationsJson.isBlank()) {

@@ -1077,6 +1077,82 @@ class OrderServiceTest {
     }
 
     @Test
+    void createOrder_discountValueWithoutDiscountType_throws() {
+        Product product = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("MIXED-001")
+                .name("Mixed Pair Item")
+                .price(new BigDecimal("500.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("10"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("MIXED-001");
+        item.setQuantity(1);
+        item.setDiscountValue(new BigDecimal("5"));
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-008");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product));
+
+        assertThatThrownBy(() -> orderService.createOrder(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("discountType and discountValue must both be provided together");
+    }
+
+    @Test
+    void createOrder_discountTypeWithoutDiscountValue_throws() {
+        Product product = Product.builder()
+                .id(UUID.randomUUID())
+                .itemCode("MIXED-002")
+                .name("Mixed Pair Item Two")
+                .price(new BigDecimal("500.00"))
+                .maxDiscountType("PERCENTAGE")
+                .maxDiscountValue(new BigDecimal("10"))
+                .isActive(true)
+                .build();
+
+        OrderItemRequest item = new OrderItemRequest();
+        item.setProductItemCode("MIXED-002");
+        item.setQuantity(1);
+        item.setDiscountType(com.ebee.common.enums.DiscountType.PERCENTAGE);
+
+        OrderRequest req = new OrderRequest();
+        req.setAgentCode("JF-008");
+        req.setCustomerPhoneNumber("0771234567");
+        req.setPaymentMethod(PaymentMethod.CASH);
+        req.setItems(List.of(item));
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(agentRepository.findByAgentCode("JF-008")).thenReturn(Optional.of(agent));
+        when(securityService.getCurrentUserId()).thenReturn(adminUserId);
+        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(adminUser));
+        when(customerService.findByPhone("0771234567")).thenReturn(customer);
+        when(orderNumberService.generateOrderNumber(District.JF, OrderSource.AGENT))
+                .thenReturn("JF-A-20250614-009");
+        when(productRepository.findByItemCodeIn(anyList()))
+                .thenReturn(List.of(product));
+
+        assertThatThrownBy(() -> orderService.createOrder(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("discountType and discountValue must both be provided together");
+    }
+
+    @Test
     void createOrder_noPerItemDiscount_usesOriginalPrice() {
         // Admin does NOT apply any per-order discount -> original price used
         Product product = Product.builder()

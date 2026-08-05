@@ -23,8 +23,10 @@ class DeliveryStateMachine implements DeliveryStateTransition {
      * Notes:
      * <ul>
      *   <li>PENDING transitions to ASSIGNED when order is added to a trip with a driver.</li>
-     *   <li>DELIVERED and FAILED_PERMANENT are terminal — no outgoing transitions.</li>
+     *   <li>DELIVERED and FAILED_PERMANENT are terminal for non-admins.</li>
      *   <li>FAILED_PERMANENT requires admin role.</li>
+     *   <li>Admins bypass all transition validation — they can force any delivery
+     *       status to fix stuck or edge-case deliveries.</li>
      *   <li>Same-status transitions are a no-op (idempotent).</li>
      * </ul>
      */
@@ -50,15 +52,17 @@ class DeliveryStateMachine implements DeliveryStateTransition {
             return new TransitionResult(false, false, currentStatus);
         }
 
-        Set<DeliveryStatus> allowed = VALID_TRANSITIONS.getOrDefault(currentStatus, Set.of());
-        if (!allowed.contains(newStatus)) {
-            String allowedList = allowed.isEmpty()
-                    ? "none (terminal state)"
-                    : String.join(", ",
-                            allowed.stream().map(Enum::name).sorted().toList());
-            throw new IllegalArgumentException(
-                    "Invalid delivery status transition: " + currentStatus + " → " + newStatus
-                            + ". Allowed: " + allowedList);
+        if (!isAdmin) {
+            Set<DeliveryStatus> allowed = VALID_TRANSITIONS.getOrDefault(currentStatus, Set.of());
+            if (!allowed.contains(newStatus)) {
+                String allowedList = allowed.isEmpty()
+                        ? "none (terminal state)"
+                        : String.join(", ",
+                                allowed.stream().map(Enum::name).sorted().toList());
+                throw new IllegalArgumentException(
+                        "Invalid delivery status transition: " + currentStatus + " → " + newStatus
+                                + ". Allowed: " + allowedList);
+            }
         }
 
         if (newStatus == DeliveryStatus.FAILED_PERMANENT && !isAdmin) {

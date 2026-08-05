@@ -56,7 +56,7 @@ class DeliveryStateMachineTest {
     void pending_throwsForInvalidTransition() {
         Order order = orderWithStatus(DeliveryStatus.PENDING);
 
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -112,12 +112,12 @@ class DeliveryStateMachineTest {
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.FAILED);
     }
 
-    // ---------- Strict flow: backward and skip transitions rejected ----------
+    // ---------- Strict flow: backward and skip transitions rejected (non-admin) ----------
 
     @Test
     void assigned_cannotGoBackToPending() {
         Order order = orderWithStatus(DeliveryStatus.ASSIGNED);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PENDING, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PENDING, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition")
                 .hasMessageContaining("ASSIGNED");
@@ -126,7 +126,7 @@ class DeliveryStateMachineTest {
     @Test
     void pickedUp_cannotGoBackToAssigned() {
         Order order = orderWithStatus(DeliveryStatus.PICKED_UP);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition")
                 .hasMessageContaining("PICKED_UP → ASSIGNED");
@@ -135,7 +135,7 @@ class DeliveryStateMachineTest {
     @Test
     void inTransit_cannotGoBackToPickedUp() {
         Order order = orderWithStatus(DeliveryStatus.IN_TRANSIT);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -143,7 +143,7 @@ class DeliveryStateMachineTest {
     @Test
     void assigned_cannotSkipToDelivered() {
         Order order = orderWithStatus(DeliveryStatus.ASSIGNED);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -151,7 +151,7 @@ class DeliveryStateMachineTest {
     @Test
     void pickedUp_cannotSkipToDelivered() {
         Order order = orderWithStatus(DeliveryStatus.PICKED_UP);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -188,7 +188,7 @@ class DeliveryStateMachineTest {
     @Test
     void failed_cannotSkipToDelivered() {
         Order order = orderWithStatus(DeliveryStatus.FAILED);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -196,17 +196,17 @@ class DeliveryStateMachineTest {
     @Test
     void failed_cannotSkipToAssigned() {
         Order order = orderWithStatus(DeliveryStatus.FAILED);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.ASSIGNED, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
 
-    // ---------- Terminal states ----------
+    // ---------- Terminal states (non-admin) ----------
 
     @Test
     void delivered_isTerminal() {
         Order order = orderWithStatus(DeliveryStatus.DELIVERED);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.IN_TRANSIT, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.IN_TRANSIT, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition")
                 .hasMessageContaining("DELIVERED");
@@ -215,7 +215,7 @@ class DeliveryStateMachineTest {
     @Test
     void failedPermanent_isTerminal() {
         Order order = orderWithStatus(DeliveryStatus.FAILED_PERMANENT);
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PENDING, null, true))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PENDING, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }
@@ -229,6 +229,34 @@ class DeliveryStateMachineTest {
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PICKED_UP);
         assertThat(result.wasDelivered()).isFalse();
         assertThat(result.wasFailedPermanent()).isFalse();
+    }
+
+    // ---------- Admin bypass ----------
+
+    @Test
+    void admin_canForceAnyTransition() {
+        Order order = orderWithStatus(DeliveryStatus.ASSIGNED);
+        var result = stateMachine.transition(order, DeliveryStatus.DELIVERED, null, true);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(order.getDeliveredAt()).isNotNull();
+        assertThat(result.wasDelivered()).isTrue();
+    }
+
+    @Test
+    void admin_canForceFailedToDelivered() {
+        Order order = orderWithStatus(DeliveryStatus.FAILED);
+        var result = stateMachine.transition(order, DeliveryStatus.DELIVERED, null, true);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(result.wasDelivered()).isTrue();
+    }
+
+    @Test
+    void admin_canForceDeliveredBackToInTransit() {
+        Order order = orderWithStatus(DeliveryStatus.DELIVERED);
+        var result = stateMachine.transition(order, DeliveryStatus.IN_TRANSIT, null, true);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.IN_TRANSIT);
+        assertThat(result.wasDelivered()).isFalse();
     }
 
     // ---------- Null / uninitialized ----------

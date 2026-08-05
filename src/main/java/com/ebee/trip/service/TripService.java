@@ -414,6 +414,19 @@ public class TripService {
             throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
         }
 
+        List<Order> orders = orderRepository.findByTripId(trip.getId());
+        Set<DeliveryStatus> activeDeliveryStatuses = Set.of(
+                DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED,
+                DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+        List<String> unresolvedOrders = orders.stream()
+                .filter(o -> o.getDeliveryStatus() != null && activeDeliveryStatuses.contains(o.getDeliveryStatus()))
+                .map(Order::getOrderNumber)
+                .toList();
+        if (!unresolvedOrders.isEmpty()) {
+            throw new IllegalStateException("Cannot complete trip: orders still in transit or pending delivery: "
+                    + String.join(", ", unresolvedOrders));
+        }
+
         TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.COMPLETED);
         trip = tripRepository.save(trip);

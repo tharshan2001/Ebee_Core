@@ -72,6 +72,7 @@ class DeliveryStateMachine implements DeliveryStateTransition {
         if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.PENDING) {
             order.setDeliveryFailureReason(null);
             order.setDeliveryAssignedTo(null);
+            order.setTrip(null);
         }
 
         if (currentStatus == DeliveryStatus.FAILED && newStatus == DeliveryStatus.FAILED_PERMANENT) {

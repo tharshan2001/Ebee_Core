@@ -105,7 +105,7 @@ class DeliveryControllerTest {
         mockMvc.perform(get("/api/deliveries/mine"))
                 .andExpect(status().isOk());
 
-        verify(deliveryService).getMyDeliveries();
+        verify(deliveryService).getMyDeliveries(false);
     }
 
     @Test

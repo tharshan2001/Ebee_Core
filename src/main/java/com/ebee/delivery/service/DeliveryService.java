@@ -4,6 +4,7 @@ import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.enums.District;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.response.PageResponse;
 import com.ebee.common.result.Result;
 import com.ebee.common.security.SecurityService;
 import com.ebee.alert.enums.AlertType;
@@ -30,6 +31,8 @@ import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -160,16 +163,51 @@ public class DeliveryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<DeliveryResponse> getDeliveriesPaginated(DeliveryStatus status, String district, UUID tripId, Pageable pageable) {
+        District districtEnum = (district != null && !district.isBlank())
+                ? District.fromDisplayName(district)
+                : null;
+
+        Page<Order> ordersPage;
+        if (tripId != null) {
+            if (status != null) {
+                ordersPage = deliveryRepository.findByTripIdAndDeliveryStatusPaged(tripId, status, pageable);
+            } else {
+                ordersPage = deliveryRepository.findByTripIdPaged(tripId, pageable);
+            }
+        } else if (status != null && districtEnum != null) {
+            ordersPage = deliveryRepository.findByDeliveryStatusAndDistrictPaged(status, districtEnum, pageable);
+        } else if (status != null) {
+            ordersPage = deliveryRepository.findByDeliveryStatusPaged(status, pageable);
+        } else if (districtEnum != null) {
+            ordersPage = deliveryRepository.findByDeliveryStatusNotNullAndDistrictPaged(districtEnum, pageable);
+        } else {
+            ordersPage = deliveryRepository.findByDeliveryStatusNotNullPaged(pageable);
+        }
+        return PageResponse.from(ordersPage.map(this::toDeliveryResponse));
+    }
+
+    @Transactional(readOnly = true)
     public List<DeliveryResponse> getMyDeliveries() {
+        return getMyDeliveries(false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeliveryResponse> getMyDeliveries(boolean includeCompleted) {
         UUID userId = securityService.getCurrentUserId();
 
         if (!driverRepository.existsByUserId(userId)) {
             throw new AccessDeniedException("Only drivers can access their deliveries");
         }
 
-        List<DeliveryStatus> activeStatuses = List.of(
-                DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
-        List<Order> orders = deliveryRepository.findByDeliveryAssignedToIdAndActiveStatuses(userId, activeStatuses);
+        List<Order> orders;
+        if (includeCompleted) {
+            orders = deliveryRepository.findByDeliveryAssignedToId(userId);
+        } else {
+            List<DeliveryStatus> activeStatuses = List.of(
+                    DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+            orders = deliveryRepository.findByDeliveryAssignedToIdAndActiveStatuses(userId, activeStatuses);
+        }
         return orders.stream().map(this::toDeliveryResponse).toList();
     }
 
@@ -215,9 +253,19 @@ public class DeliveryService {
         DeliveryResponse response = new DeliveryResponse();
         response.setOrderId(order.getId());
         response.setOrderNumber(order.getOrderNumber());
+        response.setOrderStatus(order.getStatus());
         if (order.getCustomer() != null) {
             response.setCustomerName(order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName());
             response.setCustomerPhone(order.getCustomer().getPhoneNumber());
+            if (order.getCustomer().getAddress() != null) {
+                var addr = order.getCustomer().getAddress();
+                response.setCustomerStreet(addr.getStreet());
+                response.setCustomerAddressLine2(addr.getAddressLine2());
+                response.setCustomerCity(addr.getCity());
+                response.setCustomerPostalCode(addr.getPostalCode());
+                response.setCustomerDistrict(addr.getDistrict() != null ? addr.getDistrict().getDisplayName() : null);
+                response.setCustomerCountry(addr.getCountry());
+            }
         }
         response.setDistrict(order.getDistrict());
         response.setStatus(order.getDeliveryStatus());
@@ -230,12 +278,18 @@ public class DeliveryService {
             response.setTripName(order.getTrip().getName());
         }
         response.setScheduledDate(order.getDeliveryScheduledDate());
-        response.setNotes(order.getDeliveryNotes());
+        response.setNotes(order.getNotes());
+        response.setDeliveryNotes(order.getDeliveryNotes());
         response.setDriverNotes(order.getDriverNotes());
         response.setDeliveredAt(order.getDeliveredAt());
         response.setDeliveryFailureReason(order.getDeliveryFailureReason());
         response.setDeliveryPhotoUrl(order.getDeliveryPhotoUrl());
         response.setDeliverySignatureUrl(order.getDeliverySignatureUrl());
+        response.setTotalAmount(order.getTotalAmount());
+        response.setPaidAmount(order.getPaidAmount());
+        response.setOutstandingBalance(order.getOutstandingBalance());
+        response.setPaymentStatus(order.getPaymentStatus());
+        response.setCreatedAt(order.getCreatedAt());
         return response;
     }
 

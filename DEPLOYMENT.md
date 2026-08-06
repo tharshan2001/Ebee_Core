@@ -33,6 +33,54 @@ See `.env.sample` in Ebee_Core. Required secrets:
 - `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD` — Email notifications
 - `APP_CORS_ALLOWED_ORIGINS` — Comma-separated CORS origins
 
+## Database Management
+
+Two separate PostgreSQL databases are used:
+
+| Database | Purpose | `DB_NAME` value |
+|----------|---------|-----------------|
+| `ebee_prod` | Production (live data) | `ebee_prod` |
+| `ebee_test` | Testing (copy of old production data) | `ebee_test` |
+
+The database name is driven by the `DB_NAME` env var in `.env`. Docker Compose uses it for `POSTGRES_DB`, the JDBC URL, and the healthcheck.
+
+### One-Time VPS Migration (rename old DB + create new prod DB)
+
+```bash
+ssh root@129.121.117.178
+cd /opt/ebee-core
+
+# Stop the app (keep db running)
+docker compose stop app
+
+# Rename current ebee_db → ebee_test
+docker exec ebee-core-db-1 psql -U ebee -d postgres -c "ALTER DATABASE ebee_db RENAME TO ebee_test;"
+
+# Create fresh production database
+docker exec ebee-core-db-1 psql -U ebee -d postgres -c "CREATE DATABASE ebee_prod;"
+
+# Update .env — set DB_NAME=ebee_prod and DB_URL to use it
+sed -i 's/^DB_NAME=.*/DB_NAME=ebee_prod/' .env
+sed -i 's|^DB_URL=.*|DB_URL=jdbc:postgresql://db:5432/${DB_NAME}|' .env
+
+# Restart app (Flyway will run migrations on the empty ebee_prod)
+docker compose up -d
+```
+
+### Switching to Test Database
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --force-recreate app
+```
+
+This overrides `DB_URL` and `POSTGRES_DB` to point at `ebee_test`.
+
+### Switching Back to Production Database
+
+```bash
+docker compose up -d --force-recreate app
+```
+
 ## Deployment
 
 ### 1. Backend + Nginx

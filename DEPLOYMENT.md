@@ -26,6 +26,7 @@ nginx (443 → reverse proxy + static files)
 
 See `.env.sample` in Ebee_Core. Required secrets:
 
+- `DB_NAME` — PostgreSQL database name (`ebee_prod` or `ebee_test`)
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` — PostgreSQL
 - `JWT_SECRET`, `JWT_RESET_SECRET` — JWT auth (>= 256 bits)
 - `REDIS_HOST`, `REDIS_PORT` — Redis connection
@@ -35,16 +36,21 @@ See `.env.sample` in Ebee_Core. Required secrets:
 
 ## Database Management
 
-Two separate PostgreSQL databases are used:
+Two separate PostgreSQL databases are used (both live on VPS):
 
-| Database | Purpose | `DB_NAME` value |
-|----------|---------|-----------------|
-| `ebee_prod` | Production (live data) | `ebee_prod` |
-| `ebee_test` | Testing (copy of old production data) | `ebee_test` |
+| Database | Purpose | `DB_NAME` value | Status |
+|----------|---------|-----------------|--------|
+| `ebee_prod` | Production (live data) | `ebee_prod` | Active — Flyway migrated |
+| `ebee_test` | Testing (old `ebee_db` data) | `ebee_test` | Available — contains historical data |
 
 The database name is driven by the `DB_NAME` env var in `.env`. Docker Compose uses it for `POSTGRES_DB`, the JDBC URL, and the healthcheck.
 
-### One-Time VPS Migration (rename old DB + create new prod DB)
+### ~~One-Time VPS Migration~~ (Completed — 2026-08-06)
+
+> The migration below has already been run. `ebee_db` was renamed to `ebee_test` and a fresh `ebee_prod` was created. Flyway migrated `ebee_prod` automatically on startup.
+
+<details>
+<summary>Original migration steps (for reference)</summary>
 
 ```bash
 ssh root@129.121.117.178
@@ -66,6 +72,8 @@ sed -i 's|^DB_URL=.*|DB_URL=jdbc:postgresql://db:5432/${DB_NAME}|' .env
 # Restart app (Flyway will run migrations on the empty ebee_prod)
 docker compose up -d
 ```
+
+</details>
 
 ### Switching to Test Database
 
@@ -237,8 +245,14 @@ APP_CORS_ALLOWED_ORIGINS=https://ebee.lk,https://www.ebee.lk
 ## Useful Commands
 
 ```bash
+# Check which database is active
+docker exec ebee-core-app-1 printenv DB_URL
+
 # Backend logs
 docker logs -f ebee-core-app-1 | grep -E "Broadcast|Snapshot|ERROR"
+
+# List databases
+docker exec ebee-core-db-1 psql -U ebee -d postgres -c "\l" | grep ebee
 
 # Redis driver locations
 docker exec ebee-core-redis-1 redis-cli KEYS "driver:location:*"

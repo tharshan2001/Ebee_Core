@@ -13,6 +13,7 @@ import com.ebee.combo.repository.ComboRepository;
 import com.ebee.commission.service.CommissionCalculationService;
 import com.ebee.commission.service.CommissionLifecycleService;
 import com.ebee.common.enums.District;
+import com.ebee.common.response.PageResponse;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.enums.DuesChangeType;
 import com.ebee.customer.event.CustomerDuesChangedEvent;
@@ -515,6 +516,13 @@ public class OrderServiceImpl implements OrderService {
             if (!combined.contains(o)) combined.add(o);
         }
         return orderMapper.toResponseList(combined);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<OrderResponse> getUnassignedOrdersPaginated(Pageable pageable) {
+        Page<Order> ordersPage = orderRepository.findUnassignedOrdersPaged(pageable);
+        return PageResponse.from(ordersPage.map(orderMapper::toResponse));
     }
 
     @Transactional(readOnly = true)

@@ -136,4 +136,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o FROM Order o WHERE o.trip IS NULL")
     List<Order> findByTripIsNull();
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.deliveryAssignedTo LEFT JOIN FETCH o.trip WHERE o.trip IS NULL AND o.deliveryAssignedTo IS NULL AND o.status IN ('SHIPPED', 'FAILED')")
+    List<Order> findUnassignedOrders();
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.deliveryAssignedTo LEFT JOIN FETCH o.trip WHERE o.trip IS NULL AND o.deliveryAssignedTo IS NULL AND o.status IN ('SHIPPED', 'FAILED')")
+    Page<Order> findUnassignedOrdersPaged(Pageable pageable);
 }

@@ -1,5 +1,6 @@
 package com.ebee.order.service;
 
+import com.ebee.common.response.PageResponse;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
@@ -37,6 +38,8 @@ public interface OrderService {
     List<OrderResponse> getUnassignedOrdersByStatus(OrderStatus status);
 
     List<OrderResponse> getUnassignedOrdersIncludingFailed();
+
+    PageResponse<OrderResponse> getUnassignedOrdersPaginated(Pageable pageable);
 
     Page<OrderResponse> getAllOrdersPaginated(Pageable pageable);
 

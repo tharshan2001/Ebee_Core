@@ -212,6 +212,25 @@ public class DeliveryService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<DeliveryResponse> getMyDeliveriesPaginated(boolean includeCompleted, Pageable pageable) {
+        UUID userId = securityService.getCurrentUserId();
+
+        if (!driverRepository.existsByUserId(userId)) {
+            throw new AccessDeniedException("Only drivers can access their deliveries");
+        }
+
+        Page<Order> ordersPage;
+        if (includeCompleted) {
+            ordersPage = deliveryRepository.findByDeliveryAssignedToIdPaged(userId, pageable);
+        } else {
+            List<DeliveryStatus> activeStatuses = List.of(
+                    DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+            ordersPage = deliveryRepository.findByDeliveryAssignedToIdAndActiveStatusesPaged(userId, activeStatuses, pageable);
+        }
+        return PageResponse.from(ordersPage.map(this::toDeliveryResponse));
+    }
+
+    @Transactional(readOnly = true)
     public Result<DeliveryResponse> getDeliveryDetail(UUID orderId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseGet(() -> null);

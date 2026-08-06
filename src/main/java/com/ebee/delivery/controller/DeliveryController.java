@@ -39,17 +39,7 @@ public class DeliveryController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<List<DeliveryResponse>>> getDeliveries(
-            @RequestParam(required = false) DeliveryStatus status,
-            @RequestParam(required = false) String district,
-            @RequestParam(required = false) UUID tripId) {
-        List<DeliveryResponse> responses = deliveryService.getDeliveries(status, district, tripId);
-        return ResponseEntity.ok(ApiResponse.success("Deliveries retrieved successfully", responses));
-    }
-
-    @GetMapping("/paginated")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<PageResponse<DeliveryResponse>>> getDeliveriesPaginated(
+    public ResponseEntity<ApiResponse<PageResponse<DeliveryResponse>>> getDeliveries(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort,
@@ -66,10 +56,17 @@ public class DeliveryController {
 
     @GetMapping("/mine")
     @PreAuthorize("hasAnyRole('ADMIN', 'DRIVER')")
-    public ResponseEntity<ApiResponse<List<DeliveryResponse>>> getMyDeliveries(
+    public ResponseEntity<ApiResponse<PageResponse<DeliveryResponse>>> getMyDeliveries(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "updatedAt,desc") String sort,
             @RequestParam(defaultValue = "false") boolean includeCompleted) {
-        List<DeliveryResponse> responses = deliveryService.getMyDeliveries(includeCompleted);
-        return ResponseEntity.ok(ApiResponse.success("My deliveries retrieved successfully", responses));
+        Pageable pageable = PageRequest.of(
+                PaginationUtils.safePage(page),
+                PaginationUtils.safeSize(size),
+                SortUtils.parse(sort, SortableFields.AllowedFor.ORDER));
+        PageResponse<DeliveryResponse> response = deliveryService.getMyDeliveriesPaginated(includeCompleted, pageable);
+        return ResponseEntity.ok(ApiResponse.success("My deliveries retrieved successfully", response));
     }
 
     @GetMapping("/{orderId}")

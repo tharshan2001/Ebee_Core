@@ -33,6 +33,12 @@ public interface DeliveryRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip LEFT JOIN FETCH o.deliveryAssignedTo WHERE o.deliveryAssignedTo.id = :userId AND o.deliveryStatus IN :statuses")
     List<Order> findByDeliveryAssignedToIdAndActiveStatuses(@Param("userId") UUID userId, @Param("statuses") List<DeliveryStatus> statuses);
 
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip LEFT JOIN FETCH o.deliveryAssignedTo WHERE o.deliveryAssignedTo.id = :userId AND o.deliveryStatus IN :statuses")
+    Page<Order> findByDeliveryAssignedToIdAndActiveStatusesPaged(@Param("userId") UUID userId, @Param("statuses") List<DeliveryStatus> statuses, Pageable pageable);
+
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip LEFT JOIN FETCH o.deliveryAssignedTo WHERE o.deliveryAssignedTo.id = :userId")
+    Page<Order> findByDeliveryAssignedToIdPaged(@Param("userId") UUID userId, Pageable pageable);
+
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.trip LEFT JOIN FETCH o.deliveryAssignedTo WHERE o.deliveryStatus = :status AND o.deliveryAssignedTo.id = :userId")
     List<Order> findByDeliveryStatusAndDeliveryAssignedToId(@Param("status") DeliveryStatus status, @Param("userId") UUID userId);
 

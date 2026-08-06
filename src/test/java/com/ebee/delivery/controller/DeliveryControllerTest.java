@@ -7,6 +7,7 @@ import com.ebee.auth.service.IpWhitelistService;
 import com.ebee.auth.service.JwtService;
 import com.ebee.auth.service.UserDetailsServiceImpl;
 import com.ebee.common.config.CommonPropertiesConfig;
+import com.ebee.common.response.PageResponse;
 import com.ebee.common.result.Result;
 import com.ebee.delivery.dto.DeliveryResponse;
 import com.ebee.delivery.dto.DeliveryStatusUpdateRequest;
@@ -23,9 +24,11 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -92,20 +95,26 @@ class DeliveryControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getDeliveries_returns200() throws Exception {
+        when(deliveryService.getDeliveriesPaginated(any(), any(), any(), any()))
+                .thenReturn(new PageResponse<>(List.of(), 0, 20, 0, 1, true, true));
+
         mockMvc.perform(get("/api/deliveries")
                         .param("status", "PENDING"))
                 .andExpect(status().isOk());
 
-        verify(deliveryService).getDeliveries(DeliveryStatus.PENDING, null, null);
+        verify(deliveryService).getDeliveriesPaginated(any(), any(), any(), any());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getMyDeliveries_returns200() throws Exception {
+        when(deliveryService.getMyDeliveriesPaginated(anyBoolean(), any()))
+                .thenReturn(new PageResponse<>(List.of(), 0, 20, 0, 1, true, true));
+
         mockMvc.perform(get("/api/deliveries/mine"))
                 .andExpect(status().isOk());
 
-        verify(deliveryService).getMyDeliveries(false);
+        verify(deliveryService).getMyDeliveriesPaginated(anyBoolean(), any());
     }
 
     @Test

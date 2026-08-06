@@ -420,15 +420,17 @@ public class TripService {
                 DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
         Set<OrderStatus> terminalOrderStatuses = Set.of(
                 OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.RETURN_EXCHANGE);
-        List<String> unresolvedOrders = orders.stream()
-                .filter(o -> o.getDeliveryStatus() != null
-                        && activeDeliveryStatuses.contains(o.getDeliveryStatus())
-                        && !terminalOrderStatuses.contains(o.getStatus()))
-                .map(Order::getOrderNumber)
-                .toList();
-        if (!unresolvedOrders.isEmpty()) {
-            throw new IllegalStateException("Cannot complete trip: orders still in transit or pending delivery: "
-                    + String.join(", ", unresolvedOrders));
+
+        for (Order order : orders) {
+            boolean isUnresolved = order.getDeliveryStatus() != null
+                    && activeDeliveryStatuses.contains(order.getDeliveryStatus())
+                    && !terminalOrderStatuses.contains(order.getStatus());
+            if (isUnresolved) {
+                order.setTrip(null);
+                order.setDeliveryAssignedTo(null);
+                order.setDeliveryStatus(DeliveryStatus.PENDING);
+                orderRepository.save(order);
+            }
         }
 
         TripStatus previousStatus = trip.getStatus();

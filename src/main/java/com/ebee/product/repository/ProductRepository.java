@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -86,4 +87,22 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true ORDER BY p.createdAt DESC")
     Page<UUID> findNewArrivalProductIds(Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.price >= :minPrice AND p.price <= :maxPrice ORDER BY p.createdAt DESC")
+    Page<UUID> findActiveProductIdsByPriceRange(@Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.category = :category AND p.price >= :minPrice AND p.price <= :maxPrice ORDER BY p.createdAt DESC")
+    Page<UUID> findActiveProductIdsByCategoryAndPriceRange(@Param("category") String category, @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.isActive = true AND p.price >= :minPrice AND p.price <= :maxPrice ORDER BY p.createdAt DESC")
+    Page<UUID> findProductIdsBySearchTermAndPriceRange(@Param("search") String search, @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
+
+    @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.category = :category AND p.isActive = true AND p.price >= :minPrice AND p.price <= :maxPrice ORDER BY p.createdAt DESC")
+    Page<UUID> findProductIdsBySearchTermAndCategoryAndPriceRange(@Param("search") String search, @Param("category") String category, @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
+
+    @Query("SELECT MIN(p.price) FROM Product p WHERE p.isActive = true")
+    BigDecimal findMinActivePrice();
+
+    @Query("SELECT MAX(p.price) FROM Product p WHERE p.isActive = true")
+    BigDecimal findMaxActivePrice();
 }

@@ -2,10 +2,12 @@ package com.ebee.product.service;
 
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
+import com.ebee.product.dto.ProductSearchResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,11 +30,13 @@ public interface ProductService {
 
     Page<ProductResponse> getActiveProductsPaginated(Pageable pageable, String category, String stock);
 
-    Map<String, Long> getProductStats();
+    Map<String, Object> getProductStats();
 
     Page<ProductResponse> searchProducts(String search, Pageable pageable, String category, String stock);
 
     List<ProductResponse> searchProducts(String search);
+
+    ProductSearchResponse searchProductsAdvanced(String search, String category, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String sortOrder, int page, int size);
 
     ProductResponse updateProduct(UUID id, ProductRequest request);
 

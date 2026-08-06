@@ -5,6 +5,7 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
+import com.ebee.product.dto.ProductSearchResponse;
 import com.ebee.product.dto.ProductSpecification;
 import com.ebee.product.service.ProductService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -134,6 +135,22 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
     }
 
+    @GetMapping("/search/advanced")
+    public ResponseEntity<ApiResponse<ProductSearchResponse>> searchProductsAdvanced(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+
+        ProductSearchResponse response = productService.searchProductsAdvanced(
+                search, category, minPrice, maxPrice, sortBy, sortOrder, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", response));
+    }
+
     @GetMapping("/active")
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getActiveProducts(
             @RequestParam(defaultValue = "0") int page,
@@ -191,7 +208,7 @@ public class ProductController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<java.util.Map<String, Long>>> getProductStats() {
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getProductStats() {
         return ResponseEntity.ok(ApiResponse.success("Product stats retrieved successfully", productService.getProductStats()));
     }
 

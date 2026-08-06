@@ -10,6 +10,7 @@ import com.ebee.inventory.service.InventoryService;
 import com.ebee.product.dto.ProductImageResponse;
 import com.ebee.product.dto.ProductRequest;
 import com.ebee.product.dto.ProductResponse;
+import com.ebee.product.dto.ProductSearchResponse;
 import com.ebee.product.entity.Product;
 import com.ebee.product.entity.ProductImage;
 import com.ebee.product.mapper.ProductMapper;
@@ -154,11 +155,12 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Map<String, Long> getProductStats() {
-        Map<String, Long> stats = new java.util.HashMap<>();
-        stats.put("total", productRepository.count());
-        stats.put("active", productRepository.countByIsActiveTrue());
-        stats.put("lowStock", productRepository.countLowStockProducts());
+    public Map<String, Object> getProductStats() {
+        Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        BigDecimal minPrice = productRepository.findMinActivePrice();
+        BigDecimal maxPrice = productRepository.findMaxActivePrice();
+        stats.put("minPrice", minPrice != null ? minPrice : BigDecimal.ZERO);
+        stats.put("maxPrice", maxPrice != null ? maxPrice : BigDecimal.ZERO);
         return stats;
     }
 
@@ -212,6 +214,51 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findBySearchTerm(search).stream()
                 .map(this::toResponseWithRelations)
                 .toList();
+    }
+
+    @Override
+    public ProductSearchResponse searchProductsAdvanced(String search, String category, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String sortOrder, int page, int size) {
+        boolean hasSearch = search != null && !search.trim().isEmpty();
+        boolean hasCategory = category != null && !category.trim().isEmpty();
+        boolean hasPriceRange = minPrice != null && maxPrice != null;
+
+        org.springframework.data.domain.Sort sort = org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.fromString(sortOrder != null ? sortOrder : "desc"),
+                sortBy != null ? sortBy : "createdAt"
+        );
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, sort);
+
+        Page<UUID> idPage;
+
+        if (hasSearch && hasCategory && hasPriceRange) {
+            idPage = productRepository.findProductIdsBySearchTermAndCategoryAndPriceRange(search.trim(), category.trim(), minPrice, maxPrice, pageable);
+        } else if (hasSearch && hasCategory) {
+            idPage = productRepository.findProductIdsBySearchTermAndCategory(search.trim(), category.trim(), pageable);
+        } else if (hasSearch && hasPriceRange) {
+            idPage = productRepository.findProductIdsBySearchTermAndPriceRange(search.trim(), minPrice, maxPrice, pageable);
+        } else if (hasSearch) {
+            idPage = productRepository.findProductIdsBySearchTerm(search.trim(), pageable);
+        } else if (hasCategory && hasPriceRange) {
+            idPage = productRepository.findActiveProductIdsByCategoryAndPriceRange(category.trim(), minPrice, maxPrice, pageable);
+        } else if (hasCategory) {
+            idPage = productRepository.findActiveProductIdsByCategory(category.trim(), pageable);
+        } else if (hasPriceRange) {
+            idPage = productRepository.findActiveProductIdsByPriceRange(minPrice, maxPrice, pageable);
+        } else {
+            idPage = productRepository.findActiveProductIds(pageable);
+        }
+
+        if (!idPage.hasContent()) {
+            return new ProductSearchResponse(List.of(), false, idPage.getTotalPages() - 1, idPage.getTotalElements());
+        }
+
+        List<UUID> ids = idPage.getContent();
+        boolean hasMore = idPage.hasNext();
+
+        List<Product> products = productRepository.findProductsWithRelationsByIds(Set.copyOf(ids));
+        Map<UUID, Product> productMap = products.stream().collect(Collectors.toMap(Product::getId, p -> p));
+        List<ProductResponse> responses = ids.stream().map(id -> toResponseWithRelations(productMap.get(id))).toList();
+        return new ProductSearchResponse(responses, hasMore, idPage.getTotalPages(), idPage.getTotalElements());
     }
 
     private List<ProductResponse> buildResponsesWithBatchImages(List<Product> products) {

@@ -6,6 +6,7 @@ import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.ReturnOrderItemRequest;
 import com.ebee.order.dto.UseAdvanceRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentStatus;
@@ -51,7 +52,7 @@ public interface OrderService {
 
     OrderResponse cancelOrder(UUID id, OrderSettlementRequest request);
 
-    OrderResponse returnOrder(UUID id, OrderSettlementRequest request);
+    OrderResponse returnOrder(UUID id, ReturnOrderItemRequest request);
 
     byte[] generateInvoicePdf(UUID id);
 

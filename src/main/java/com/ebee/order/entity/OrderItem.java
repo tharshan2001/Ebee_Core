@@ -65,6 +65,10 @@ public class OrderItem {
     @JoinColumn(name = "combo_id")
     private Combo combo;
 
+    @Column(name = "returned_quantity", nullable = false)
+    @Builder.Default
+    private Integer returnedQuantity = 0;
+
     @Column(name = "is_free_product", nullable = false)
     @Builder.Default
     private Boolean isFreeProduct = false;
@@ -72,4 +76,14 @@ public class OrderItem {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Transient
+    public int getReturnableQuantity() {
+        return quantity - returnedQuantity;
+    }
+
+    @Transient
+    public boolean isFullyReturned() {
+        return returnedQuantity >= quantity;
+    }
 }

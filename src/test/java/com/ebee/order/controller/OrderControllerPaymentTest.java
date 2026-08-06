@@ -11,6 +11,7 @@ import com.ebee.common.response.ApiResponse;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.ReturnOrderItemRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
@@ -187,7 +188,7 @@ class OrderControllerPaymentTest {
         response.setStatus(OrderStatus.RETURNED);
         response.setPaymentStatus(PaymentStatus.REFUNDED);
 
-        when(orderService.returnOrder(eq(orderId), any(OrderSettlementRequest.class))).thenReturn(response);
+        when(orderService.returnOrder(eq(orderId), any(ReturnOrderItemRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/orders/{id}/return", orderId)
                         .contentType(MediaType.APPLICATION_JSON)

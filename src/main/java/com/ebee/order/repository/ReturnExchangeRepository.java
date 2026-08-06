@@ -20,6 +20,9 @@ public interface ReturnExchangeRepository extends JpaRepository<ReturnExchangeRe
 
     boolean existsByOrderId(UUID orderId);
 
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM ReturnExchangeRequest r WHERE r.order.id = :orderId AND r.status <> 'REJECTED'")
+    boolean existsActiveByOrderId(@Param("orderId") UUID orderId);
+
     List<ReturnExchangeRequest> findByStatusOrderByCreatedAtDesc(ReturnExchangeStatus status);
 
     Page<ReturnExchangeRequest> findByStatus(ReturnExchangeStatus status, Pageable pageable);

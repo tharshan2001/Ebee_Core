@@ -22,4 +22,6 @@ public class OrderItemResponse {
     private UUID comboId;
     private String comboName;
     private Boolean isFreeProduct;
+    private Integer returnedQuantity;
+    private Integer returnableQuantity;
 }

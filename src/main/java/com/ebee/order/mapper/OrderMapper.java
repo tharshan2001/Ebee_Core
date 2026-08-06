@@ -44,6 +44,8 @@ public interface OrderMapper {
     @Mapping(target = "comboId", source = "combo.id")
     @Mapping(target = "comboName", source = "combo.name")
     @Mapping(target = "isFreeProduct", source = "isFreeProduct")
+    @Mapping(target = "returnedQuantity", source = "returnedQuantity")
+    @Mapping(target = "returnableQuantity", expression = "java(item.getReturnableQuantity())")
     OrderItemResponse toItemResponse(OrderItem item);
 
     List<OrderItemResponse> toItemResponseList(List<OrderItem> items);

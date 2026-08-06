@@ -75,10 +75,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT MAX(o.orderNumber) FROM Order o WHERE o.orderNumber LIKE :pattern")
     String findMaxOrderNumberByPattern(@Param("pattern") String pattern);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     BigDecimal sumRevenueByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(SUM(o.paidAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    @Query("SELECT COALESCE(SUM(o.paidAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     BigDecimal sumCollectedRevenueByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COALESCE(SUM(o.outstandingBalance), 0) FROM Order o WHERE o.paymentStatus IN ('UNPAID', 'PARTIALLY_PAID') AND o.createdAt >= :start AND o.createdAt < :end")
@@ -87,22 +87,22 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COALESCE(SUM(o.outstandingBalance), 0) FROM Order o WHERE o.customer.id = :customerId AND o.paymentStatus IN ('UNPAID', 'PARTIALLY_PAID')")
     BigDecimal sumOutstandingByCustomerId(@Param("customerId") UUID customerId);
 
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     Long countOrdersByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT a.id AS agentId, a.agentCode AS agentCode, a.user.firstName AS firstName, a.user.lastName AS lastName, COUNT(o) AS totalOrders, COALESCE(SUM(o.totalAmount), 0) AS totalRevenue FROM Order o LEFT JOIN o.agent a LEFT JOIN a.user WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY a.id, a.agentCode, a.user.firstName, a.user.lastName")
+    @Query("SELECT a.id AS agentId, a.agentCode AS agentCode, a.user.firstName AS firstName, a.user.lastName AS lastName, COUNT(o) AS totalOrders, COALESCE(SUM(o.totalAmount), 0) AS totalRevenue FROM Order o LEFT JOIN o.agent a LEFT JOIN a.user WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY a.id, a.agentCode, a.user.firstName, a.user.lastName")
     List<AgentSalesProjection> findSalesByAgent(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) AS totalRevenue, COUNT(o) AS totalOrders FROM Order o WHERE o.agent.id = :agentId AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) AS totalRevenue, COUNT(o) AS totalOrders FROM Order o WHERE o.agent.id = :agentId AND o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     List<SalesSummaryProjection> findSalesSummaryByAgent(@Param("agentId") UUID agentId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query(value = "SELECT DATE_TRUNC('day', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('day', o.created_at) ORDER BY period", nativeQuery = true)
+    @Query(value = "SELECT DATE_TRUNC('day', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('day', o.created_at) ORDER BY period", nativeQuery = true)
     List<Object[]> findDailyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query(value = "SELECT DATE_TRUNC('month', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('month', o.created_at) ORDER BY period", nativeQuery = true)
+    @Query(value = "SELECT DATE_TRUNC('month', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('month', o.created_at) ORDER BY period", nativeQuery = true)
     List<Object[]> findMonthlyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query(value = "SELECT DATE_TRUNC('year', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('year', o.created_at) ORDER BY period", nativeQuery = true)
+    @Query(value = "SELECT DATE_TRUNC('year', o.created_at) AS period, COUNT(*) AS orderCount, COALESCE(SUM(o.total_amount), 0) AS revenue FROM orders o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.created_at >= :start AND o.created_at < :end GROUP BY DATE_TRUNC('year', o.created_at) ORDER BY period", nativeQuery = true)
     List<Object[]> findYearlyTrend(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end")
@@ -114,10 +114,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT o.status, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.createdAt >= :start AND o.createdAt < :end GROUP BY o.status")
     List<Object[]> findOrderStatusDistribution(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT o.orderSource, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY o.orderSource")
+    @Query("SELECT o.orderSource, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY o.orderSource")
     List<Object[]> findSalesBySource(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT c.id, CONCAT(c.firstName, ' ', c.lastName), c.phoneNumber, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o JOIN o.customer c WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY c.id, c.firstName, c.lastName, c.phoneNumber ORDER BY COALESCE(SUM(o.totalAmount), 0) DESC")
+    @Query("SELECT c.id, CONCAT(c.firstName, ' ', c.lastName), c.phoneNumber, COUNT(o), COALESCE(SUM(o.totalAmount), 0) FROM Order o JOIN o.customer c WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY c.id, c.firstName, c.lastName, c.phoneNumber ORDER BY COALESCE(SUM(o.totalAmount), 0) DESC")
     List<Object[]> findTopCustomersByRevenue(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), MIN(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), MAX(EXTRACT(EPOCH FROM (o.delivered_at - o.created_at)) / 3600), COUNT(o) FROM orders o WHERE o.status = 'DELIVERED' AND o.delivered_at >= :start AND o.delivered_at < :end", nativeQuery = true)

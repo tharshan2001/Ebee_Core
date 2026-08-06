@@ -158,7 +158,19 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording return exchange credit: customer={}, order={}, amount={}", customerId, orderId, amount);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.RETURN_EXCHANGE_CREDIT.name(),
+                amount,
+                BigDecimal.ZERO,
+                orderId,
+                "RETURN_EXCHANGE",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional(readOnly = true)

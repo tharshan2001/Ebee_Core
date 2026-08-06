@@ -87,7 +87,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - CORS origins are configured via `app.cors.allowed-origins`
 - IP whitelisting reads `X-Forwarded-For`/`X-Real-IP`; ensure the app runs behind a trusted reverse proxy
 
-## Current State (August 4, 2026)
+## Current State (August 7, 2026)
 
 ### FIFO-Layered WAC Implemented
 - New `inventory_layers` table (V79 migration) stores per-receipt cost layers: `quantity`, `remaining_quantity`, `unit_cost`, `received_at`
@@ -141,6 +141,38 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `/api/combos/**` public for GET (like products/categories) in SecurityConfig + JwtAuthenticationFilter
 - 351 tests pass (2 pre-existing CommissionLockTest errors need running DB)
 - 413 tests pass
+
+### Order Return & Exchange Overhaul (Item-Level Returns)
+- **Item-level returns**: `order_items.returned_quantity` tracks per-item return state (V121 migration)
+- `OrderItem.getReturnableQuantity()` = `quantity - returnedQuantity`; `isFullyReturned()` checks full return
+- `POST /api/orders/{id}/return` accepts optional `items` list (`ReturnOrderItemRequest`): null/empty = return all, otherwise specify `{orderItemId, quantity}` per item
+- `POST /api/orders/{orderId}/return-exchange` accepts item-level `InitiateReturnExchangeRequest`: `{items: [{orderItemId, quantity}], reason}`
+- `POST /api/orders/{returnExchangeId}/return-exchange/review` — all 4 resolutions work: `ADVANCE`, `CASH`, `BANK_TRANSFER` (approve), `REJECTED` (reject)
+- **Partial returns**: order stays `DELIVERED` until ALL items returned, then becomes `RETURNED`
+- **Order financial adjustment**: `order.totalAmount` reduced by returned items' subtotal; `paidAmount` and `outstandingBalance` recalculated
+- **Combo returns**: whole combo only — expands to constituent products via `ComboItem` for inventory restore
+- `return_exchange_requests.order_id` UNIQUE dropped; partial unique index allows resubmission after rejection
+- `return_request_items` table stores item-level detail per return request
+- `ReturnExchangeService` handles: commission cancellation, notifications, audit logging, `CustomerDuesChangedEvent`, `OrderStatusChangedEvent`
+- `LedgerService.recordReturnExchangeCredit()` now records accounting period transactions
+- `InventoryService.updateCurrentCost()` renamed to `updateCostFromLatestLayer()`
+- 10 reporting queries in `OrderRepository` now exclude `RETURN_EXCHANGE` status
+- `OrderItemResponse` exposes `returnedQuantity` and `returnableQuantity`
+- 442 tests pass (21 in `ReturnExchangeServiceTest`)
+
+### Curl-Verified Return Flows
+- Initiate return exchange → PENDING_REVIEW with item-level tracking ✓
+- Review ADVANCE on PAID order → paid=0, advance credited, total=0, RETURNED ✓
+- Review CASH on PAID order → paid=0, paymentStatus=REFUNDED, total=0, RETURNED ✓
+- Review BANK_TRANSFER → APPROVED, same financial adjustments ✓
+- Review REJECTED → order stays DELIVERED, returnedQuantity unchanged ✓
+- Resubmit after rejection → new PENDING_REVIEW created ✓
+- Direct return with REFUND → RETURNED, paid=0, REFUNDED ✓
+- Direct return with CREDIT_ADVANCE → RETURNED, advance credited ✓
+- Direct return with empty items → returns all (backward compatible) ✓
+- Edge: already returned → "Cannot return...already RETURNED" ✓
+- Edge: exceeds returnable qty → "Cannot return 5...Returnable: 1" ✓
+- Edge: return exchange on RETURNED order → "Can only initiate...DELIVERED" ✓
 
 ## Agent Workflow
 

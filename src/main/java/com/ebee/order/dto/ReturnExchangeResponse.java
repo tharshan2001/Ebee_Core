@@ -5,6 +5,7 @@ import com.ebee.order.enums.ReturnExchangeStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record ReturnExchangeResponse(
@@ -21,5 +22,6 @@ public record ReturnExchangeResponse(
     String notes,
     String reviewedByName,
     LocalDateTime reviewedAt,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    List<ReturnRequestItemResponse> items
 ) {}

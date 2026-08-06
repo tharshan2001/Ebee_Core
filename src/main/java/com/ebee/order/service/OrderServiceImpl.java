@@ -33,6 +33,8 @@ import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.ReturnItemRequest;
+import com.ebee.order.dto.ReturnOrderItemRequest;
 import com.ebee.order.dto.UseAdvanceRequest;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
@@ -658,7 +660,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public OrderResponse returnOrder(UUID id, OrderSettlementRequest request) {
+    public OrderResponse returnOrder(UUID id, ReturnOrderItemRequest request) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -666,54 +668,127 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Cannot return an order that is already " + order.getStatus());
         }
 
-        List<UUID> stockProductIds = order.getItems().stream()
-                .map(item -> item.getProduct().getId())
-                .toList();
-        List<Integer> stockQuantities = order.getItems().stream()
-                .map(OrderItem::getQuantity)
-                .toList();
-        List<String> stockNotes = order.getItems().stream()
-                .map(item -> "Order " + order.getOrderNumber() + " returned - Item restored")
-                .toList();
-        inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+        Map<UUID, OrderItem> orderItemMap = order.getItems().stream()
+                .collect(Collectors.toMap(OrderItem::getId, oi -> oi));
+
+        List<ReturnItemRequest> itemsToReturn;
+        if (request.items() == null || request.items().isEmpty()) {
+            itemsToReturn = order.getItems().stream()
+                    .filter(oi -> oi.getReturnableQuantity() > 0)
+                    .map(oi -> new ReturnItemRequest(oi.getId(), oi.getReturnableQuantity()))
+                    .toList();
+        } else {
+            itemsToReturn = request.items();
+        }
+
+        List<UUID> stockProductIds = new ArrayList<>();
+        List<Integer> stockQuantities = new ArrayList<>();
+        List<String> stockNotes = new ArrayList<>();
+        BigDecimal totalReturnedSubtotal = BigDecimal.ZERO;
+
+        for (ReturnItemRequest itemReq : itemsToReturn) {
+            OrderItem orderItem = orderItemMap.get(itemReq.orderItemId());
+            if (orderItem == null) {
+                throw new IllegalArgumentException("Order item " + itemReq.orderItemId() + " does not belong to this order");
+            }
+            if (itemReq.quantity() > orderItem.getReturnableQuantity()) {
+                throw new IllegalArgumentException(
+                        "Cannot return " + itemReq.quantity() + " units of " + orderItem.getProduct().getName()
+                                + ". Returnable: " + orderItem.getReturnableQuantity());
+            }
+            if (orderItem.getCombo() != null && itemReq.quantity() != orderItem.getQuantity()) {
+                throw new IllegalArgumentException("Combo items must be returned in full quantity");
+            }
+
+            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + itemReq.quantity());
+
+            if (orderItem.getCombo() != null) {
+                for (ComboItem ci : orderItem.getCombo().getItems()) {
+                    stockProductIds.add(ci.getProduct().getId());
+                    stockQuantities.add(ci.getQuantity() * itemReq.quantity());
+                    stockNotes.add("Order " + order.getOrderNumber() + " returned - Combo item restored");
+                }
+            } else {
+                stockProductIds.add(orderItem.getProduct().getId());
+                stockQuantities.add(itemReq.quantity());
+                stockNotes.add("Order " + order.getOrderNumber() + " returned - Item restored");
+            }
+
+            totalReturnedSubtotal = totalReturnedSubtotal.add(
+                    orderItem.getUnitPrice().multiply(BigDecimal.valueOf(itemReq.quantity())));
+        }
+
+        if (!stockProductIds.isEmpty()) {
+            inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+        }
 
         commissionLifecycleService.cancelCommissionForOrder(id);
 
-        BigDecimal previousOutstanding = order.getCustomer().getOutstandingBalance();
-        BigDecimal previousAdvance = order.getCustomer().getAdvanceBalance();
+        Customer customer = order.getCustomer();
+        BigDecimal previousOutstanding = customer.getOutstandingBalance();
+        BigDecimal previousAdvance = customer.getAdvanceBalance();
 
-        boolean hasPaidAmount = order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0;
+        order.setTotalAmount(order.getTotalAmount().subtract(totalReturnedSubtotal));
+
+        BigDecimal refundAmount;
+        if (order.getPaidAmount().compareTo(totalReturnedSubtotal) > 0) {
+            refundAmount = totalReturnedSubtotal;
+        } else {
+            refundAmount = order.getPaidAmount();
+        }
+
         DuesChangeType changeType;
+        boolean hasPaidAmount = refundAmount.compareTo(BigDecimal.ZERO) > 0;
 
         if (hasPaidAmount) {
             changeType = request.refundChoice() == RefundChoice.CREDIT_ADVANCE
                     ? DuesChangeType.RETURN_ADVANCE
                     : DuesChangeType.RETURN_REFUND;
-            orderPaymentService.handleOrderSettlement(order, request.refundChoice(), changeType);
+
+            if (request.refundChoice() == RefundChoice.CREDIT_ADVANCE) {
+                customer.setAdvanceBalance(customer.getAdvanceBalance().add(refundAmount));
+                order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
+            } else {
+                order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
+                if (order.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                    order.setPaymentStatus(PaymentStatus.REFUNDED);
+                    order.setPaidAmount(BigDecimal.ZERO);
+                }
+            }
         } else {
             changeType = DuesChangeType.CANCEL_UNPAID;
+        }
+
+        order.setOutstandingBalance(order.getTotalAmount().subtract(order.getPaidAmount()));
+        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
             order.setOutstandingBalance(BigDecimal.ZERO);
         }
 
+        boolean allReturned = order.getItems().stream().allMatch(OrderItem::isFullyReturned);
         OrderStatus oldStatus = order.getStatus();
-        order.setStatus(OrderStatus.RETURNED);
+        if (allReturned) {
+            order.setStatus(OrderStatus.RETURNED);
+        }
+
         Order updatedOrder = orderRepository.save(order);
 
-        ledgerService.recordCustomerRefund(
-                order.getCustomer().getId(),
-                updatedOrder.getId(),
-                order.getPaidAmount(),
-                "Return for Order " + order.getOrderNumber(),
-                securityService.getCurrentUserId()
-        );
+        if (hasPaidAmount) {
+            ledgerService.recordCustomerRefund(
+                    customer.getId(),
+                    updatedOrder.getId(),
+                    refundAmount,
+                    "Return for Order " + order.getOrderNumber(),
+                    securityService.getCurrentUserId()
+            );
+        }
 
-        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
-        customerRepository.save(order.getCustomer());
+        orderPaymentService.syncCustomerOutstanding(customer);
+        customerRepository.save(customer);
 
         eventPublisher.publishEvent(new CustomerDuesChangedEvent(
-                this, order.getCustomer(),
-                previousOutstanding, order.getCustomer().getOutstandingBalance(),
-                previousAdvance, order.getCustomer().getAdvanceBalance(),
+                this, customer,
+                previousOutstanding, customer.getOutstandingBalance(),
+                previousAdvance, customer.getAdvanceBalance(),
                 changeType
         ));
 

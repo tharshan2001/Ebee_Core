@@ -119,14 +119,14 @@ public class InventoryService {
         int change = request.getQuantityChange();
         if (change < 0) {
             consumeFifoLayers(inventory, -change);
-            updateCurrentCost(inventory);
+            updateCostFromLatestLayer(inventory);
         } else if (change > 0) {
             BigDecimal layerCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
                     .map(InventoryLayer::getUnitCost)
                     .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
                     .orElse(BigDecimal.ZERO);
             inventoryLayerRepository.save(new InventoryLayer(inventory, change, change, layerCost, LocalDateTime.now()));
-            updateCurrentCost(inventory);
+            updateCostFromLatestLayer(inventory);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -164,7 +164,7 @@ public class InventoryService {
 
         if (movementType == StockMovementType.OUT) {
             consumeFifoLayers(inventory, quantity);
-            updateCurrentCost(inventory);
+            updateCostFromLatestLayer(inventory);
         } else if (movementType == StockMovementType.RETURN) {
             BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
                     .map(InventoryLayer::getUnitCost)
@@ -172,7 +172,7 @@ public class InventoryService {
                     .orElse(BigDecimal.ZERO);
             InventoryLayer returnLayer = new InventoryLayer(inventory, quantity, quantity, returnCost, LocalDateTime.now());
             inventoryLayerRepository.save(returnLayer);
-            updateCurrentCost(inventory);
+            updateCostFromLatestLayer(inventory);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -220,7 +220,7 @@ public class InventoryService {
 
             if (movementType == StockMovementType.OUT) {
                 consumeFifoLayers(inv, qty);
-                updateCurrentCost(inv);
+                updateCostFromLatestLayer(inv);
             } else if (movementType == StockMovementType.RETURN) {
                 BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inv.getId())
                         .map(InventoryLayer::getUnitCost)
@@ -228,7 +228,7 @@ public class InventoryService {
                         .orElse(BigDecimal.ZERO);
                 InventoryLayer returnLayer = new InventoryLayer(inv, qty, qty, returnCost, LocalDateTime.now());
                 inventoryLayerRepository.save(returnLayer);
-                updateCurrentCost(inv);
+                updateCostFromLatestLayer(inv);
             }
 
             inv.setQuantity(after);
@@ -300,7 +300,7 @@ public class InventoryService {
         int reservedBefore = inventory.getReservedQuantity();
 
         consumeFifoLayers(inventory, quantity);
-        updateCurrentCost(inventory);
+        updateCostFromLatestLayer(inventory);
 
         inventory.setReservedQuantity(reservedBefore - quantity);
         inventory.setQuantity(quantityBefore - quantity);
@@ -391,7 +391,7 @@ public class InventoryService {
             InventoryLayer layer = new InventoryLayer(inv, qty, qty, unitCost, LocalDateTime.now());
             inventoryLayerRepository.save(layer);
 
-            updateCurrentCost(inv);
+            updateCostFromLatestLayer(inv);
 
             inv.setQuantity(after);
 
@@ -454,7 +454,7 @@ public class InventoryService {
         }
     }
 
-    private void updateCurrentCost(Inventory inventory) {
+    private void updateCostFromLatestLayer(Inventory inventory) {
         inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
                 .ifPresentOrElse(
                         layer -> inventory.setAverageCost(layer.getUnitCost()),

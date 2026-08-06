@@ -12,8 +12,8 @@ Authorization: Bearer <JWT_TOKEN>
 ```
 
 ### Roles
-- `ADMIN` - Full access (create, read, update, cancel orders)
-- `AGENT` - Limited access (create orders, read own orders)
+- `ADMIN` - Full access (create, read, update, cancel, return orders)
+- `AGENT` - Limited access (create orders, read own orders, initiate return exchange)
 
 ---
 
@@ -466,11 +466,12 @@ Updates the order status up to `SHIPPED`. Once shipped, all further status trans
 | `PROCESSING` | Start processing |
 | `SHIPPED` | Mark shipped — auto-initializes `deliveryStatus = PENDING` |
 
-**Blocked target statuses (use delivery/cancel endpoints instead):**
+**Blocked target statuses (use delivery/cancel/return endpoints instead):**
 | Status | Alternative endpoint |
 |--------|---------------------|
 | `DELIVERED` | Use `PATCH /api/deliveries/{id}/status` with `DELIVERED` |
-| `RETURNED` | Use delivery system |
+| `RETURNED` | Use `POST /api/orders/{id}/return` |
+| `RETURN_EXCHANGE` | Use `POST /api/orders/{id}/return-exchange` |
 | `CANCELLED` | Use `PATCH /api/orders/{id}/cancel` |
 
 **Blocked current states (terminal):**
@@ -586,6 +587,346 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
 
 ---
 
+### 11. Return Order (Admin Only)
+**POST** `/api/orders/{id}/return`
+
+Returns items from an order. Supports item-level returns (return specific items/quantities) or full order return.
+
+**Access:** ADMIN only
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | UUID | Order ID |
+
+**Request Body:**
+```json
+{
+  "items": [
+    {
+      "orderItemId": "ecb7f181-37a9-4a56-a8ad-f48c41b25ae6",
+      "quantity": 1
+    }
+  ],
+  "refundChoice": "REFUND",
+  "notes": "Customer requested return"
+}
+```
+
+**Validation:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| items | Array | No | List of items to return. If null or empty, **all items** are returned (backward compatible). |
+| items[].orderItemId | UUID | Yes | Must belong to this order |
+| items[].quantity | Integer | Yes | Must be <= `returnableQuantity` for that item. Combo items must be returned in full. |
+| refundChoice | String | Yes | `REFUND` (cash refund) or `CREDIT_ADVANCE` (credit to customer advance balance) |
+| notes | String | No | Optional return notes |
+
+**Behavior:**
+- `order.totalAmount` is reduced by the returned items' subtotal
+- `order.paidAmount` and `order.outstandingBalance` are recalculated
+- If all items returned → order status becomes `RETURNED`
+- If partial items returned → order stays `DELIVERED`
+- Each item's `returnedQuantity` is incremented
+- Inventory is restored (combo items expand to constituent products)
+- Agent commission is cancelled
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Order returned successfully",
+  "data": {
+    "id": "...",
+    "orderNumber": "TM-D-20260614-001",
+    "status": "RETURNED",
+    "totalAmount": 0.00,
+    "paidAmount": 0.00,
+    "outstandingBalance": 0.00,
+    "paymentStatus": "REFUNDED",
+    "items": [
+      {
+        "id": "ecb7f181-...",
+        "productName": "Product A",
+        "quantity": 2,
+        "returnedQuantity": 2,
+        "returnableQuantity": 0
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- 400: Cannot return an order that is already RETURNED or CANCELLED
+- 400: Cannot return N units of X. Returnable: M
+- 400: Combo items must be returned in full quantity
+- 400: Order item does not belong to this order
+- 404: Order not found
+
+---
+
+### 12. Initiate Return Exchange (Admin, Agent, Super Admin)
+**POST** `/api/orders/{orderId}/return-exchange`
+
+Initiates a return exchange request that requires admin review. Available to agents for orders they are involved with.
+
+**Access:** ADMIN, AGENT, SUPER_ADMIN
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| orderId | UUID | Order ID (must be DELIVERED) |
+
+**Request Body:**
+```json
+{
+  "items": [
+    {
+      "orderItemId": "ecb7f181-37a9-4a56-a8ad-f48c41b25ae6",
+      "quantity": 1
+    }
+  ],
+  "reason": "Customer received defective product"
+}
+```
+
+**Validation:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| items | Array | Yes | At least one item required |
+| items[].orderItemId | UUID | Yes | Must belong to this order |
+| items[].quantity | Integer | Yes | Must be <= `returnableQuantity`. Combo items must be returned in full. |
+| reason | String | Yes | Reason for the return exchange request |
+
+**Behavior:**
+- Order status changes to `RETURN_EXCHANGE` (intermediate status)
+- Creates a `ReturnExchangeRequest` with `PENDING_REVIEW` status
+- Only one active (non-rejected) request per order allowed
+- Can re-initiate after a previous request was rejected
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Return exchange initiated successfully",
+  "data": {
+    "id": "2016c663-3908-4aec-b5db-ea0fbbe47e2a",
+    "orderId": "5058f9c6-...",
+    "orderNumber": "MN-D-20260806-001",
+    "customerId": "d9506657-...",
+    "customerName": "Mariya Sebastian",
+    "requestedAmount": 324.00,
+    "approvedAmount": null,
+    "status": "PENDING_REVIEW",
+    "resolutionType": null,
+    "reason": "Customer received defective product",
+    "notes": null,
+    "reviewedByName": null,
+    "reviewedAt": null,
+    "createdAt": "2026-08-07T01:00:50",
+    "items": [
+      {
+        "id": "c248a344-...",
+        "orderItemId": "ecb7f181-...",
+        "productName": "Kettle",
+        "productItemCode": "FIFO-001",
+        "quantity": 1,
+        "unitRefundAmount": 324.00,
+        "subtotal": 324.00
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- 400: Can only initiate return exchange for DELIVERED orders
+- 400: Return exchange already requested for this order
+- 400: Cannot return N units of X. Returnable: M
+- 400: Combo items must be returned in full quantity
+
+---
+
+### 13. Review Return Exchange (Admin, Super Admin)
+**POST** `/api/orders/{returnExchangeId}/return-exchange/review`
+
+Reviews a pending return exchange request. Can approve with ADVANCE, CASH, or BANK_TRANSFER, or reject.
+
+**Access:** ADMIN, SUPER_ADMIN
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| returnExchangeId | UUID | Return exchange request ID |
+
+**Request Body:**
+```json
+{
+  "approvedAmount": 3200.00,
+  "resolutionType": "ADVANCE",
+  "notes": "Approved - store credit issued"
+}
+```
+
+**Validation:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| approvedAmount | BigDecimal | Yes | Positive amount to approve |
+| resolutionType | String | Yes | `ADVANCE`, `CASH`, `BANK_TRANSFER`, or `REJECTED` |
+| notes | String | No | Review notes |
+
+**Resolution Types:**
+
+| Resolution | Effect |
+|-----------|--------|
+| `ADVANCE` | Credits approved amount to customer advance balance. Reduces `paidAmount`. Order financials adjusted. |
+| `CASH` | Marks payment as REFUNDED, zeroes `paidAmount`. Order financials adjusted. |
+| `BANK_TRANSFER` | Same as CASH — marks as REFUNDED, zeroes `paidAmount`. |
+| `REJECTED` | Request rejected. Order status reverts to `DELIVERED`. No financial changes. |
+
+**Behavior (on approval):**
+- `order.totalAmount` reduced by returned items' subtotal
+- `order.paidAmount` and `order.outstandingBalance` recalculated
+- `orderItem.returnedQuantity` incremented for each returned item
+- Inventory restored (combo items expand to constituent products)
+- Agent commission cancelled
+- Customer ledger entry recorded
+- If all items returned → order becomes `RETURNED`
+- If partial → order stays `DELIVERED`
+
+**Behavior (on rejection):**
+- Order status stays/reverts to `DELIVERED`
+- No inventory, financial, or commission changes
+- Can be resubmitted after rejection
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Return exchange reviewed successfully",
+  "data": {
+    "id": "2016c663-...",
+    "orderId": "5058f9c6-...",
+    "orderNumber": "MN-D-20260806-001",
+    "status": "APPROVED",
+    "resolutionType": "ADVANCE",
+    "approvedAmount": 3200.00,
+    "reviewedByName": "Super Admin",
+    "reviewedAt": "2026-08-07T01:01:13",
+    "items": [
+      {
+        "id": "c248a344-...",
+        "orderItemId": "ecb7f181-...",
+        "productName": "Kettle",
+        "quantity": 1,
+        "unitRefundAmount": 3200.00,
+        "subtotal": 3200.00
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- 400: Return exchange request is not pending review
+- 400: Order has no customer assigned
+- 404: ReturnExchangeRequest not found
+- 404: User not found
+
+---
+
+### 14. Get Pending Return Exchanges (Admin, Super Admin)
+**GET** `/api/orders/return-exchange/pending`
+
+Retrieves all return exchange requests with PENDING_REVIEW status.
+
+**Access:** ADMIN, SUPER_ADMIN
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Pending return exchanges retrieved",
+  "data": [
+    {
+      "id": "2016c663-...",
+      "orderId": "5058f9c6-...",
+      "orderNumber": "MN-D-20260806-001",
+      "customerName": "Mariya Sebastian",
+      "requestedAmount": 324.00,
+      "status": "PENDING_REVIEW",
+      "reason": "Defective product",
+      "items": [ ... ]
+    }
+  ]
+}
+```
+
+---
+
+### 15. Get Return Exchange by Order ID (Admin, Agent, Super Admin)
+**GET** `/api/orders/{orderId}/return-exchange`
+
+Retrieves the return exchange request for a specific order.
+
+**Access:** ADMIN, AGENT, SUPER_ADMIN
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| orderId | UUID | Order ID |
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Return exchange retrieved",
+  "data": {
+    "id": "2016c663-...",
+    "orderId": "5058f9c6-...",
+    "orderNumber": "MN-D-20260806-001",
+    "status": "APPROVED",
+    "resolutionType": "ADVANCE",
+    "approvedAmount": 324.00,
+    "reviewedByName": "Super Admin",
+    "items": [ ... ]
+  }
+}
+```
+
+**Error Responses:**
+- 404: ReturnExchangeRequest not found for this order
+
+---
+
+### 16. Get Pending Return Exchange Count (Admin, Super Admin)
+**GET** `/api/orders/return-exchange/count`
+
+Returns the count of pending return exchange requests.
+
+**Access:** ADMIN, SUPER_ADMIN
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Pending count retrieved",
+  "data": 3
+}
+```
+
+---
+
+### 17. Use Advance Balance (Admin Only)
+**POST** `/api/orders/{id}/use-advance`
+
+Applies customer advance balance toward an order's outstanding amount.
+
+**Access:** ADMIN only
+
+---
+
 ## Data Models
 
 ### OrderRequest
@@ -604,6 +945,42 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
       "discountValue": "BigDecimal (optional; required if discountType is set; capped by product's maxDiscount)"
     }
   ]
+}
+```
+
+### ReturnOrderItemRequest
+```json
+{
+  "items": [
+    {
+      "orderItemId": "UUID (required — order item ID)",
+      "quantity": "Integer (required, positive — must be <= returnableQuantity)"
+    }
+  ],
+  "refundChoice": "RefundChoice (required — REFUND or CREDIT_ADVANCE)",
+  "notes": "String (optional)"
+}
+```
+
+### InitiateReturnExchangeRequest
+```json
+{
+  "items": [
+    {
+      "orderItemId": "UUID (required — order item ID)",
+      "quantity": "Integer (required, positive — must be <= returnableQuantity)"
+    }
+  ],
+  "reason": "String (required — reason for return exchange)"
+}
+```
+
+### ReviewReturnExchangeRequest
+```json
+{
+  "approvedAmount": "BigDecimal (required, positive)",
+  "resolutionType": "ReturnExchangeResolution (required — ADVANCE, CASH, BANK_TRANSFER, or REJECTED)",
+  "notes": "String (optional)"
 }
 ```
 
@@ -627,7 +1004,7 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
   "customerName": "String or null",
   "customerPhone": "String or null",
   "totalAmount": "BigDecimal",
-  "status": "OrderStatus (PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, RETURNED)",
+  "status": "OrderStatus (PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, RETURNED, RETURN_EXCHANGE)",
   "paymentMethod": "PaymentMethod or null (CASH, COD, BANK_TRANSFER, CREDIT, CARD_PAYMENT)",
   "paymentStatus": "PaymentStatus (UNPAID, PARTIALLY_PAID, PAID, REFUNDED)",
   "paidAmount": "BigDecimal",
@@ -657,13 +1034,46 @@ Cancels an order. Only orders with status `PENDING`, `CONFIRMED`, or `PROCESSING
       "subtotal": "BigDecimal",
       "discountType": "String or null",
       "discountValue": "BigDecimal or null",
-      "costPrice": "BigDecimal or null"
+      "costPrice": "BigDecimal or null",
+      "returnedQuantity": "Integer (default 0 — units already returned)",
+      "returnableQuantity": "Integer (quantity - returnedQuantity — units available for return)"
     }
   ]
 }
 ```
 
-**New field — `costPrice`:** Each `OrderItem` now includes a `costPrice` field capturing the **weighted average cost (COGS)** at the time of sale. This is calculated as `inventory.averageCost × quantity` and is set when the order is created. Use this to compute per-order profit: `subtotal - costPrice = gross profit`.
+**New fields — `returnedQuantity` and `returnableQuantity`:** Each `OrderItem` now tracks how many units have been returned. `returnableQuantity` is computed as `quantity - returnedQuantity`. Use these to show return eligibility in the frontend.
+
+### ReturnExchangeResponse
+```json
+{
+  "id": "UUID",
+  "orderId": "UUID",
+  "orderNumber": "String",
+  "customerId": "UUID or null",
+  "customerName": "String",
+  "requestedAmount": "BigDecimal (sum of item subtotals)",
+  "approvedAmount": "BigDecimal or null (set during review)",
+  "status": "ReturnExchangeStatus (PENDING_REVIEW, APPROVED, REJECTED)",
+  "resolutionType": "ReturnExchangeResolution or null (ADVANCE, CASH, BANK_TRANSFER, REJECTED)",
+  "reason": "String",
+  "notes": "String or null",
+  "reviewedByName": "String or null",
+  "reviewedAt": "LocalDateTime or null",
+  "createdAt": "LocalDateTime",
+  "items": [
+    {
+      "id": "UUID",
+      "orderItemId": "UUID",
+      "productName": "String",
+      "productItemCode": "String or null",
+      "quantity": "Integer",
+      "unitRefundAmount": "BigDecimal",
+      "subtotal": "BigDecimal"
+    }
+  ]
+}
+```
 
 ### ApiResponse (Standard Response Wrapper)
 ```json
@@ -841,18 +1251,24 @@ curl http://localhost:8085/api/orders/my \
 ### Order Status Flow
 
 ```
-PENDING -> CONFIRMED -> PROCESSING -> SHIPPED -> DELIVERED
+PENDING -> CONFIRMED -> PROCESSING -> SHIPPED -> DELIVERED -> RETURNED
     ^                                          |
-    |                                          |
-    +-----------------------------------------> CANCELLED
-    |                                          |
-    +-----------------------------------------> RETURNED
+    |                                          +---> RETURN_EXCHANGE (pending review)
+    |                                                  |
+    |                                                  +---> APPROVED -> RETURNED
+    |                                                  |
+    |                                                  +---> REJECTED -> DELIVERED
+    |
+    +------------------------------------------> CANCELLED
 ```
 
 **Terminal statuses (cannot be changed):**
-- `DELIVERED`
+- `DELIVERED` (unless return exchange initiated)
 - `CANCELLED`
 - `RETURNED`
+
+**Intermediate statuses:**
+- `RETURN_EXCHANGE` — set when a return exchange is initiated; order can still be modified by review
 
 ---
 
@@ -893,3 +1309,7 @@ All errors follow the standard ApiResponse format:
 8. **Cancel Rollback:** Cancelling an order restores stock AND rolls back the associated commission (reverts agent totals if the commission was paid)
 9. **District Derivation:** The `district` field in the response is derived from the customer's address district and is read-only
 10. **OrderSource:** Each order has an `orderSource` field — `AGENT` (created with an agentCode) or `DIRECT` (admin order without an agent). This is set at creation time and cannot be changed.
+11. **Item-Level Returns:** Returns support item-level granularity. Pass `items` in the request body to return specific items/quantities. Omit or pass empty to return all items.
+12. **Return Exchange Workflow:** Agents initiate return exchanges (`POST .../return-exchange`), admins review them (`POST .../return-exchange/review`). All 3 approval types (ADVANCE, CASH, BANK_TRANSFER) credit the customer appropriately. REJECTED requests allow resubmission.
+13. **Partial Returns:** When only some items are returned, the order stays `DELIVERED` and `totalAmount` is reduced. The order becomes `RETURNED` only when all items are fully returned.
+14. **Combo Returns:** Combo items must be returned in full. The system expands combos to constituent products for inventory restoration.

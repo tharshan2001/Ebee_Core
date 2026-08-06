@@ -9,6 +9,7 @@ import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
 import com.ebee.order.dto.PaymentResponse;
 import com.ebee.order.dto.RecordPaymentRequest;
+import com.ebee.order.dto.ReturnOrderItemRequest;
 import com.ebee.order.dto.UseAdvanceRequest;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.enums.PaymentStatus;
@@ -158,7 +159,7 @@ public class OrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<OrderResponse>> returnOrder(
             @PathVariable UUID id,
-            @Valid @RequestBody OrderSettlementRequest request) {
+            @Valid @RequestBody ReturnOrderItemRequest request) {
         OrderResponse response = orderService.returnOrder(id, request);
         return ResponseEntity.ok(ApiResponse.success("Order returned successfully", response));
     }

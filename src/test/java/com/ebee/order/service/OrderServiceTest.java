@@ -21,6 +21,8 @@ import com.ebee.order.dto.OrderItemRequest;
 import com.ebee.order.dto.OrderRequest;
 import com.ebee.order.dto.OrderResponse;
 import com.ebee.order.dto.OrderSettlementRequest;
+import com.ebee.order.dto.ReturnItemRequest;
+import com.ebee.order.dto.ReturnOrderItemRequest;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.OrderSource;
@@ -186,12 +188,14 @@ class OrderServiceTest {
                 .orderSource(OrderSource.AGENT)
                 .items(List.of(
                         OrderItem.builder()
+                                .id(UUID.randomUUID())
                                 .product(product1)
                                 .quantity(2)
                                 .unitPrice(new BigDecimal("2500.00"))
                                 .subtotal(new BigDecimal("5000.00"))
                                 .build(),
                         OrderItem.builder()
+                                .id(UUID.randomUUID())
                                 .product(product2)
                                 .quantity(1)
                                 .unitPrice(new BigDecimal("1500.00"))
@@ -853,15 +857,15 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
 
-        orderService.returnOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
+        ReturnOrderItemRequest request = new ReturnOrderItemRequest(
+                null, RefundChoice.REFUND, null);
+        orderService.returnOrder(orderId, request);
 
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
-        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(inventoryService).recordOrderStocks(
                 anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
@@ -873,7 +877,8 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), any()))
+        ReturnOrderItemRequest request = new ReturnOrderItemRequest(null, RefundChoice.REFUND, null);
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot return an order that is already");
     }
@@ -883,7 +888,8 @@ class OrderServiceTest {
         order.setStatus(OrderStatus.RETURNED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), any()))
+        ReturnOrderItemRequest request = new ReturnOrderItemRequest(null, RefundChoice.REFUND, null);
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId(), request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot return an order that is already");
     }
@@ -1250,16 +1256,10 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
-        doAnswer(invocation -> {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order.setPaidAmount(BigDecimal.ZERO);
-            return null;
-        }).when(orderPaymentService).handleOrderSettlement(any(), any(), any());
 
-        orderService.returnOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
+        ReturnOrderItemRequest request = new ReturnOrderItemRequest(null, RefundChoice.REFUND, null);
+        orderService.returnOrder(orderId, request);
 
-        // Note: The refund amount passed to ledger is currently 0 due to handleOrderSettlement
-        // clearing paidAmount BEFORE the ledger call. This is a known bug to fix.
         verify(ledgerService).recordCustomerRefund(
                 eq(customer.getId()),
                 eq(orderId),

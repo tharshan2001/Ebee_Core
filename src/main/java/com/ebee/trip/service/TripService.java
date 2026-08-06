@@ -418,8 +418,12 @@ public class TripService {
         Set<DeliveryStatus> activeDeliveryStatuses = Set.of(
                 DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED,
                 DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
+        Set<OrderStatus> terminalOrderStatuses = Set.of(
+                OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.RETURN_EXCHANGE);
         List<String> unresolvedOrders = orders.stream()
-                .filter(o -> o.getDeliveryStatus() != null && activeDeliveryStatuses.contains(o.getDeliveryStatus()))
+                .filter(o -> o.getDeliveryStatus() != null
+                        && activeDeliveryStatuses.contains(o.getDeliveryStatus())
+                        && !terminalOrderStatuses.contains(o.getStatus()))
                 .map(Order::getOrderNumber)
                 .toList();
         if (!unresolvedOrders.isEmpty()) {

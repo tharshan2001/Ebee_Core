@@ -40,8 +40,8 @@ Two separate PostgreSQL databases are used (both live on VPS):
 
 | Database | Purpose | `DB_NAME` value | Status |
 |----------|---------|-----------------|--------|
-| `ebee_prod` | Production (live data) | `ebee_prod` | Standby |
-| `ebee_test` | Testing (old `ebee_db` data) | `ebee_test` | **Active** — pointed as of 2026-08-06 |
+| `ebee_prod` | Production (live data) | `ebee_prod` | **Active** |
+| `ebee_test` | Testing (old `ebee_db` data) | `ebee_test` | Standby |
 
 The database name is driven by the `DB_NAME` env var in `.env`. Docker Compose uses it for `POSTGRES_DB`, the JDBC URL, and the healthcheck.
 

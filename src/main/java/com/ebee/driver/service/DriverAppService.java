@@ -685,6 +685,7 @@ public class DriverAppService {
 
     private void assertDriverCanTransition(DeliveryStatus current, DeliveryStatus target) {
         Set<DeliveryStatus> allowed = switch (current) {
+            case PENDING -> Set.of(DeliveryStatus.PICKED_UP, DeliveryStatus.FAILED);
             case ASSIGNED -> Set.of(DeliveryStatus.PICKED_UP, DeliveryStatus.FAILED);
             case PICKED_UP -> Set.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED);
             case IN_TRANSIT -> Set.of(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED);

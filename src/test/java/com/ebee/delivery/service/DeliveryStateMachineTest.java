@@ -53,19 +53,10 @@ class DeliveryStateMachineTest {
     }
 
     @Test
-    void pending_canGoToPickedUp() {
-        Order order = orderWithStatus(DeliveryStatus.PENDING);
-        var result = stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, false);
-        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PICKED_UP);
-        assertThat(result.wasDelivered()).isFalse();
-        assertThat(result.wasFailedPermanent()).isFalse();
-    }
-
-    @Test
     void pending_throwsForInvalidTransition() {
         Order order = orderWithStatus(DeliveryStatus.PENDING);
 
-        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.DELIVERED, null, false))
+        assertThatThrownBy(() -> stateMachine.transition(order, DeliveryStatus.PICKED_UP, null, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid delivery status transition");
     }

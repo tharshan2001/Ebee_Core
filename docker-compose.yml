@@ -8,6 +8,7 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt
       - ./nginx/certbot/www:/var/www/certbot
       - ./frontend/dist:/usr/share/nginx/html:ro
+      - /opt/catalog/dist:/usr/share/nginx/catalog:ro
     depends_on:
       - app
     restart: unless-stopped

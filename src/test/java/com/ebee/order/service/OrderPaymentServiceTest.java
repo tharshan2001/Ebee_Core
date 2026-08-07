@@ -16,6 +16,7 @@ import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,6 +49,11 @@ class OrderPaymentServiceTest {
     @InjectMocks private OrderPaymentService orderPaymentService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
+
+    @BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(orderPaymentService, "customerService", customerService);
+    }
 
     private Customer customer;
 

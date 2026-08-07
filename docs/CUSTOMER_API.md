@@ -91,6 +91,7 @@ Creates a new customer. Phone number must be unique.
     "totalOrders": 0,
     "creditLimit": 50000.00,
     "outstandingBalance": 0.00,
+    "advanceBalance": 0.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "123 Main St",
@@ -151,6 +152,7 @@ If the customer already has an address, it is **updated in place**. If they don'
     "totalOrders": 0,
     "creditLimit": 50000.00,
     "outstandingBalance": 0.00,
+    "advanceBalance": 0.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "456 New Rd",
@@ -196,6 +198,7 @@ If the customer already has an address, it is **updated in place**. If they don'
     "totalOrders": 5,
     "creditLimit": 50000.00,
     "outstandingBalance": 2500.00,
+    "advanceBalance": 0.00,
     "address": {
       "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
       "street": "123 Main St",
@@ -286,6 +289,7 @@ curl "http://localhost:8085/api/customers/search?q=Praveen" \
       "totalOrders": 5,
       "creditLimit": 50000.00,
       "outstandingBalance": 0.00,
+      "advanceBalance": 0.00,
       "address": {
         "id": "uuid",
         "street": "123 Main St",
@@ -344,6 +348,7 @@ curl "http://localhost:8085/api/customers?search=Arun&size=10"
         "totalOrders": 0,
         "creditLimit": 50000.00,
         "outstandingBalance": 0.00,
+        "advanceBalance": 0.00,
         "address": {
           "id": "ae899298-48ef-4bb2-8e92-02d77a8995aa",
           "street": "123 Main St",
@@ -400,6 +405,7 @@ Returns all customers with `outstandingBalance > 0`, sorted by highest balance f
       "totalOrders": 12,
       "creditLimit": 50000.00,
       "outstandingBalance": 25000.00,
+      "advanceBalance": 0.00,
       "address": { ... },
       "createdAt": "2026-01-15T10:30:00",
       "updatedAt": "2026-07-09T14:00:00"
@@ -426,7 +432,7 @@ Returns all customers with `outstandingBalance > 0`, sorted by highest balance f
 
 **PATCH** `/api/customers/{id}/credit-limit`
 
-Updates a customer's credit limit. This is an informational/tracking field — no validation is enforced at order creation.
+Updates a customer's credit limit. When set to a value greater than 0, orders that would cause the customer's projected outstanding balance to exceed this limit will be rejected at creation time.
 
 **Access:** ADMIN only
 
@@ -696,8 +702,9 @@ Manually adjusts a customer's advance balance. Used for corrections or special c
   "phoneNumber": "String",
   "email": "String or null",
   "totalOrders": "Integer",
-  "creditLimit": "BigDecimal (default 0 — max credit allowed)",
-  "outstandingBalance": "BigDecimal (default 0 — current credit owed)",
+  "creditLimit": "BigDecimal (default 0 — max credit allowed; enforced at order creation)",
+  "outstandingBalance": "BigDecimal (default 0 — current credit owed by customer)",
+  "advanceBalance": "BigDecimal (default 0 — prepaid credit on account)",
   "address": "AddressResponse or null",
   "createdAt": "LocalDateTime",
   "updatedAt": "LocalDateTime"

@@ -32,14 +32,14 @@ The ledger service maintains immutable, append-only ledger entries for:
 
 #### Customer Ledger
 ```
-Balance = SUM(credit) - SUM(debit)
+Balance = SUM(debit) - SUM(credit)
 ```
-- **Debit** = Customer owes us (invoice created)
-- **Credit** = Customer payment received
+- **Debit** = Customer owes us (invoice created, manual adjustment)
+- **Credit** = Customer payment received, refund, advance credit
 
 #### Supplier Ledger
 ```
-Balance = SUM(debit) - SUM(credit)
+Balance = SUM(credit) - SUM(debit)
 ```
 - **Credit** = We owe supplier (PO received)
 - **Debit** = We paid supplier

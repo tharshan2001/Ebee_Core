@@ -219,6 +219,7 @@ Admin creates a credit order with a partial upfront payment. The order will be `
 
 **Error Responses:**
 - 400: Agent not active / Product not active / Insufficient stock
+- 400: Order would exceed customer credit limit (when `creditLimit > 0`)
 - 401: Unauthorized (invalid/missing token)
 - 403: Forbidden (role not authorized)
 - 404: Agent not found / Customer not found / Product not found
@@ -921,9 +922,57 @@ Returns the count of pending return exchange requests.
 ### 17. Use Advance Balance (Admin Only)
 **POST** `/api/orders/{id}/use-advance`
 
-Applies customer advance balance toward an order's outstanding amount.
+Applies customer advance balance toward an order's outstanding amount. Deducts from the customer's `advanceBalance` and increases the order's `paidAmount`.
 
 **Access:** ADMIN only
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | UUID | Order ID (must have outstanding balance) |
+
+**Request Body:**
+```json
+{
+  "amount": 5000.00
+}
+```
+
+**Validation:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| amount | BigDecimal | Yes | Must be positive and <= customer's advance balance |
+
+**Behavior:**
+- Deducts `amount` from `customer.advanceBalance`
+- Increases `order.paidAmount` by `amount`
+- If `paidAmount >= totalAmount` → order becomes `PAID`, `outstandingBalance = 0`
+- If `paidAmount < totalAmount` → order becomes `PARTIALLY_PAID`
+- Creates a `Payment` record with method `CREDIT`
+- Creates an `AdvanceTransaction` with type `ADVANCE_USED`
+- Records a `customer_ledger` PAYMENT entry
+- Syncs customer outstanding balance
+- Publishes `CustomerDuesChangedEvent` (type `ADVANCE_USED`)
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Advance applied successfully",
+  "data": {
+    "id": "...",
+    "paymentStatus": "PAID",
+    "paidAmount": 10000.00,
+    "outstandingBalance": 0.00,
+    ...
+  }
+}
+```
+
+**Error Responses:**
+- 400: Insufficient advance balance
+- 400: Advance amount must be positive
+- 404: Order not found
 
 ---
 

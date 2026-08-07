@@ -59,6 +59,7 @@ public class ReturnExchangeService {
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
     private final SecurityService securityService;
+    private final com.ebee.customer.service.CustomerService customerService;
 
     @Transactional
     public ReturnExchangeResponse initiateReturnExchange(UUID orderId, InitiateReturnExchangeRequest request) {
@@ -209,22 +210,15 @@ public class ReturnExchangeService {
 
         if (request.resolutionType() == ReturnExchangeResolution.ADVANCE) {
             if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal newAdvanceBalance = customer.getAdvanceBalance().add(refundAmount);
-                customer.setAdvanceBalance(newAdvanceBalance);
-                customerRepository.save(customer);
+                customerService.creditToAdvance(customer, refundAmount,
+                        com.ebee.customer.enums.AdvanceReferenceType.ORDER_RETURNED,
+                        order.getId(),
+                        "Return exchange credit for Order " + order.getOrderNumber());
 
                 order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
                 if (order.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) {
                     order.setPaidAmount(BigDecimal.ZERO);
                 }
-
-                ledgerService.recordReturnExchangeCredit(
-                        customer.getId(),
-                        order.getId(),
-                        refundAmount,
-                        "Return exchange credit for Order " + order.getOrderNumber(),
-                        reviewedByUserId
-                );
             }
         } else {
             if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {

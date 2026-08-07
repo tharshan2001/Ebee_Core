@@ -27,6 +27,7 @@ import com.ebee.order.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +50,8 @@ public class OrderPaymentService {
     private final SecurityService securityService;
     private final ApplicationEventPublisher eventPublisher;
     private final LedgerService ledgerService;
+    @Lazy
+    private final com.ebee.customer.service.CustomerService customerService;
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
         if (paymentMethod == PaymentMethod.CHEQUE
@@ -107,9 +110,16 @@ public class OrderPaymentService {
                 updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
             }
         }
-        // NOTE: syncCustomerOutstanding is NOT called here because initPayment
-        // runs BEFORE orderRepository.save() in OrderServiceImpl.createOrder().
-        // The sync is called after save in createOrder() instead.
+        if (order.getCustomer() != null
+                && order.getCustomer().getCreditLimit().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal projectedOutstanding = order.getCustomer().getOutstandingBalance()
+                    .add(order.getOutstandingBalance());
+            if (projectedOutstanding.compareTo(order.getCustomer().getCreditLimit()) > 0) {
+                throw new IllegalArgumentException(
+                        "Order would exceed customer credit limit of " + order.getCustomer().getCreditLimit()
+                                + ". Projected outstanding: " + projectedOutstanding);
+            }
+        }
     }
 
     @Transactional
@@ -295,6 +305,14 @@ public class OrderPaymentService {
                 .build();
         paymentRepository.save(payment);
 
+        ledgerService.recordCustomerPayment(
+                customer.getId(),
+                payment.getId(),
+                amount,
+                "Advance payment for Order " + order.getOrderNumber(),
+                currentUserId
+        );
+
         CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
                 .customer(customer)
                 .order(order)
@@ -329,6 +347,14 @@ public class OrderPaymentService {
 
         customer.setAdvanceBalance(newBalance);
         advanceTransactionRepository.save(transaction);
+
+        ledgerService.recordCustomerAdvance(
+                customer.getId(),
+                referenceId,
+                amount,
+                description,
+                securityService.getCurrentUserId()
+        );
     }
 
     private void publishDuesChange(Customer customer, BigDecimal previousOutstanding,
@@ -355,8 +381,7 @@ public class OrderPaymentService {
 
     void syncCustomerOutstanding(Customer customer) {
         if (customer == null) return;
-        BigDecimal actual = orderRepository.sumOutstandingByCustomerId(customer.getId());
-        customer.setOutstandingBalance(actual);
+        customerService.syncCustomerOutstanding(customer);
     }
 
     public List<PaymentResponse> getPaymentsByOrderId(UUID orderId) {

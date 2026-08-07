@@ -56,6 +56,7 @@ class ReturnExchangeServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private SecurityService securityService;
+    @Mock private com.ebee.customer.service.CustomerService customerService;
 
     @InjectMocks private ReturnExchangeService returnExchangeService;
 
@@ -254,6 +255,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("5000.00"),
@@ -267,7 +271,7 @@ class ReturnExchangeServiceTest {
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.APPROVED);
         verify(inventoryService).recordOrderStocks(anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
-        verify(ledgerService).recordReturnExchangeCredit(eq(customer.getId()), eq(order.getId()), any(), any(), eq(adminUserId));
+        verify(customerService).creditToAdvance(eq(customer), any(), any(), eq(order.getId()), any());
         verify(orderNotificationService).sendOrderStatus(any());
         verify(eventPublisher, atLeast(2)).publishEvent(any());
     }
@@ -303,6 +307,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -327,6 +334,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -347,6 +357,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -367,6 +380,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -387,6 +403,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -430,6 +449,9 @@ class ReturnExchangeServiceTest {
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(returnExchangeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerService.creditToAdvance(any(), any(), any(), any(), any()))
+                .thenReturn(com.ebee.customer.entity.CustomerAdvanceTransaction.builder()
+                        .id(UUID.randomUUID()).build());
 
         ReviewReturnExchangeRequest reviewRequest = new ReviewReturnExchangeRequest(
                 new BigDecimal("2500.00"),
@@ -439,8 +461,7 @@ class ReturnExchangeServiceTest {
 
         returnExchangeService.reviewReturnExchange(returnRequest.getId(), reviewRequest, adminUserId);
 
-        verify(ledgerService).recordReturnExchangeCredit(
-                eq(customer.getId()), eq(order.getId()), any(), any(), eq(adminUserId));
+        verify(customerService).creditToAdvance(eq(customer), any(), any(), eq(order.getId()), any());
     }
 
     @Test

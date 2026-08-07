@@ -746,7 +746,10 @@ public class OrderServiceImpl implements OrderService {
                     : DuesChangeType.RETURN_REFUND;
 
             if (request.refundChoice() == RefundChoice.CREDIT_ADVANCE) {
-                customer.setAdvanceBalance(customer.getAdvanceBalance().add(refundAmount));
+                customerService.creditToAdvance(customer, refundAmount,
+                        com.ebee.customer.enums.AdvanceReferenceType.ORDER_RETURNED,
+                        order.getId(),
+                        "Return credit for Order " + order.getOrderNumber());
                 order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
             } else {
                 order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));

@@ -160,6 +160,32 @@ public class LedgerService {
     }
 
     @Transactional
+    public CustomerLedger recordCustomerCreditAdjustment(UUID customerId, UUID orderId, BigDecimal credit, String description, UUID recordedBy) {
+        CustomerLedger entry = CustomerLedger.builder()
+                .customerId(customerId)
+                .orderId(orderId)
+                .transactionType(LedgerTransactionType.ADJUSTMENT.name())
+                .debit(BigDecimal.ZERO)
+                .credit(credit)
+                .description(description)
+                .build();
+        log.info("Recording customer credit adjustment: customer={}, order={}, credit={}, description={}", customerId, orderId, credit, description);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.ADJUSTMENT.name(),
+                BigDecimal.ZERO,
+                credit,
+                orderId,
+                "RETURN_ADJUSTMENT",
+                description,
+                recordedBy
+        );
+
+        return saved;
+    }
+
+    @Transactional
     public CustomerLedger recordReturnExchangeCredit(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)

@@ -26,4 +26,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     @Query("SELECT i.product.category AS category, SUM(i.quantity) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.category")
     List<CategorySalesProjection> findSalesByCategory(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(i.costPrice * i.quantity), 0) FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    java.math.BigDecimal sumCostOfGoodsSold(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

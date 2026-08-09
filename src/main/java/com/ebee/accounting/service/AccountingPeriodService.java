@@ -11,6 +11,8 @@ import com.ebee.accounting.repository.AccountingPeriodTransactionRepository;
 import com.ebee.accounting.repository.FiscalYearRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class AccountingPeriodService {
     private final AccountingPeriodAuditRepository accountingPeriodAuditRepository;
     private final AccountingPeriodTransactionRepository accountingPeriodTransactionRepository;
     private final FiscalYearRepository fiscalYearRepository;
+    private final LedgerService ledgerService;
 
     @Transactional(readOnly = true)
     public List<AccountingPeriod> getAllPeriods() {
@@ -96,6 +99,9 @@ public class AccountingPeriodService {
             throw new IllegalStateException("Can only close OPEN periods");
         }
 
+        // Capture balance snapshot before closing
+        captureBalanceSnapshot(period, closedBy);
+
         PeriodStatus oldStatus = period.getStatus();
         period.setStatus(PeriodStatus.CLOSED);
         period.setClosedAt(LocalDateTime.now());
@@ -105,6 +111,37 @@ public class AccountingPeriodService {
         log.info("Closed period: {} - {}", period.getYear() + "/" + period.getMonth(), reason);
 
         return period;
+    }
+
+    private void captureBalanceSnapshot(AccountingPeriod period, UUID closedBy) {
+        // Record period summary as a snapshot transaction
+        List<AccountingPeriodTransaction> transactions =
+                accountingPeriodTransactionRepository.findByPeriodIdOrderByRecordedAtDesc(period.getId());
+
+        BigDecimal totalDebits = transactions.stream()
+                .map(AccountingPeriodTransaction::getDebit)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalCredits = transactions.stream()
+                .map(AccountingPeriodTransaction::getCredit)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        AccountingPeriodTransaction snapshot = AccountingPeriodTransaction.builder()
+                .periodId(period.getId())
+                .fiscalYear(period.getYear())
+                .month(period.getMonth())
+                .year(period.getYear())
+                .transactionType("PERIOD_SNAPSHOT")
+                .debit(totalDebits)
+                .credit(totalCredits)
+                .description("Period-end snapshot: " + transactions.size() + " transactions, "
+                        + "total debits=" + totalDebits + ", total credits=" + totalCredits)
+                .recordedBy(closedBy)
+                .recordedAt(LocalDateTime.now())
+                .build();
+
+        accountingPeriodTransactionRepository.save(snapshot);
+        log.info("Captured balance snapshot for period {}/{}: {} transactions",
+                period.getYear(), period.getMonth(), transactions.size());
     }
 
     @Transactional
@@ -225,5 +262,41 @@ public class AccountingPeriodService {
     @Transactional(readOnly = true)
     public List<AccountingPeriodTransaction> getTransactionsByPeriod(int fiscalYear, int month) {
         return accountingPeriodTransactionRepository.findByFiscalYearAndMonthOrderByRecordedAtDesc(fiscalYear, month);
+    }
+
+    @Scheduled(cron = "0 0 1 1 * *") // 1st of every month at 1:00 AM
+    @SchedulerLock(name = "autoOpenAccountingPeriod", lockAtMostFor = "PT5M")
+    @Transactional
+    public void autoOpenCurrentMonthPeriod() {
+        LocalDate today = LocalDate.now();
+        int month = today.getMonthValue();
+        int year = today.getYear();
+
+        Optional<AccountingPeriod> existing = accountingPeriodRepository.findByMonthAndYear(month, year);
+        if (existing.isPresent()) {
+            log.info("Period {}/{} already exists (status={}), skipping auto-open",
+                    year, month, existing.get().getStatus());
+            return;
+        }
+
+        // Ensure fiscal year exists
+        Optional<FiscalYear> fiscalYear = fiscalYearRepository.findByFiscalYear(year);
+        if (fiscalYear.isEmpty()) {
+            FiscalYear newFy = FiscalYear.builder()
+                    .fiscalYear(year)
+                    .startDate(LocalDate.of(year, 1, 1))
+                    .endDate(LocalDate.of(year, 12, 31))
+                    .isActive(true)
+                    .build();
+            fiscalYearRepository.save(newFy);
+            log.info("Auto-created fiscal year {}", year);
+        }
+
+        try {
+            openPeriod(month, year, null);
+            log.info("Auto-opened accounting period {}/{}", year, month);
+        } catch (Exception e) {
+            log.error("Failed to auto-open period {}/{}: {}", year, month, e.getMessage());
+        }
     }
 }

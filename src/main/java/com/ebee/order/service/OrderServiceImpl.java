@@ -730,6 +730,14 @@ public class OrderServiceImpl implements OrderService {
 
         order.setTotalAmount(order.getTotalAmount().subtract(totalReturnedSubtotal));
 
+        ledgerService.recordCustomerCreditAdjustment(
+                customer.getId(),
+                order.getId(),
+                totalReturnedSubtotal,
+                "Return adjustment for Order " + order.getOrderNumber(),
+                securityService.getCurrentUserId()
+        );
+
         BigDecimal refundAmount;
         if (order.getPaidAmount().compareTo(totalReturnedSubtotal) > 0) {
             refundAmount = totalReturnedSubtotal;

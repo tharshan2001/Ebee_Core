@@ -43,20 +43,8 @@ public class FinancialReportService {
 
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(start, end);
 
-        // Build product cost map
-        List<Product> allProducts = productRepository.findAllWithInventory();
-        Map<UUID, BigDecimal> costMap = new HashMap<>();
-        for (Product p : allProducts) {
-            costMap.put(p.getId(), p.getCostPrice() != null ? p.getCostPrice() : BigDecimal.ZERO);
-        }
-
-        List<ProductSalesProjection> itemResults = orderItemRepository.findSalesByProduct(start, end);
-        BigDecimal costPrice = BigDecimal.ZERO;
-        for (ProductSalesProjection p : itemResults) {
-            BigDecimal qty = BigDecimal.valueOf(p.getTotalQuantity());
-            BigDecimal unitCost = costMap.getOrDefault(p.getProductId(), BigDecimal.ZERO);
-            costPrice = costPrice.add(unitCost.multiply(qty));
-        }
+        // Use FIFO cost from order_items.costPrice (snapshots WAC at order time)
+        BigDecimal costPrice = orderItemRepository.sumCostOfGoodsSold(start, end);
 
         BigDecimal collectedRevenue = orderRepository.sumCollectedRevenueByDateRange(start, end);
         BigDecimal outstandingRevenue = orderRepository.sumOutstandingByDateRange(start, end);

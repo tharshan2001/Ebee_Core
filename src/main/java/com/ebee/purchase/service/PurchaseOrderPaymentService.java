@@ -1,6 +1,7 @@
 package com.ebee.purchase.service;
 
 import com.ebee.accounting.service.LedgerService;
+import com.ebee.common.security.SecurityService;
 import com.ebee.purchase.dto.RecordPaymentRequest;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
@@ -23,13 +24,16 @@ public class PurchaseOrderPaymentService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
     private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     public PurchaseOrderPaymentService(PurchaseOrderRepository purchaseOrderRepository,
                                        SupplierRepository supplierRepository,
-                                       LedgerService ledgerService) {
+                                       LedgerService ledgerService,
+                                       SecurityService securityService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.supplierRepository = supplierRepository;
         this.ledgerService = ledgerService;
+        this.securityService = securityService;
     }
 
     public void initPayment(PurchaseOrder order, PurchasePaymentMethod paymentMethod, BigDecimal paidAmount) {
@@ -70,7 +74,10 @@ public class PurchaseOrderPaymentService {
         order.setPaymentStatus(PurchasePaymentStatus.UNPAID);
         order.setOutstandingBalance(order.getTotalAmount());
 
-        addSupplierOutstanding(order.getSupplier(), order.getOutstandingBalance());
+        addSupplierOutstandingWithLedger(
+                order.getSupplier(), order.getOutstandingBalance(),
+                order.getId(), order.getPoNumber(),
+                "PO Received: " + order.getPoNumber());
     }
 
     public PurchaseOrder recordPayment(UUID orderId, RecordPaymentRequest request) {
@@ -140,7 +147,8 @@ public class PurchaseOrderPaymentService {
                     amount,
                     description,
                     LocalDate.now(),
-                    "PO Invoice: " + poNumber
+                    "PO Invoice: " + poNumber,
+                    securityService.getCurrentUserId()
             );
         }
         return saved;
@@ -158,7 +166,8 @@ public class PurchaseOrderPaymentService {
                     amount,
                     description,
                     LocalDate.now(),
-                    reference
+                    reference,
+                    securityService.getCurrentUserId()
             );
         }
         return saved;
@@ -176,7 +185,8 @@ public class PurchaseOrderPaymentService {
                     amount,
                     description,
                     LocalDate.now(),
-                    "PO Return: " + poNumber
+                    "PO Return: " + poNumber,
+                    securityService.getCurrentUserId()
             );
         }
         return saved;

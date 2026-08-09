@@ -70,7 +70,6 @@ public class OrderPaymentService {
             order.setPaymentStatus(PaymentStatus.UNPAID);
             order.setPaidAmount(BigDecimal.ZERO);
             order.setOutstandingBalance(order.getTotalAmount());
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
         } else if (paymentMethod == PaymentMethod.CREDIT) {
             order.setPaymentMethod(PaymentMethod.CREDIT);
             BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
@@ -88,7 +87,6 @@ public class OrderPaymentService {
                 order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
                 order.setPaidAt(LocalDateTime.now());
             }
-            updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
         } else {
             BigDecimal paid = paidAmount != null ? paidAmount : BigDecimal.ZERO;
             order.setPaymentMethod(paymentMethod);
@@ -96,7 +94,6 @@ public class OrderPaymentService {
                 order.setPaymentStatus(PaymentStatus.UNPAID);
                 order.setPaidAmount(BigDecimal.ZERO);
                 order.setOutstandingBalance(order.getTotalAmount());
-                updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
             } else if (paid.compareTo(order.getTotalAmount()) >= 0) {
                 order.setPaymentStatus(PaymentStatus.PAID);
                 order.setPaidAmount(order.getTotalAmount());
@@ -107,7 +104,6 @@ public class OrderPaymentService {
                 order.setPaidAmount(paid);
                 order.setOutstandingBalance(order.getTotalAmount().subtract(paid));
                 order.setPaidAt(LocalDateTime.now());
-                updateCustomerOutstandingBalance(order.getCustomer(), order.getOutstandingBalance(), true);
             }
         }
         if (order.getCustomer() != null
@@ -231,6 +227,14 @@ public class OrderPaymentService {
             order.setPaymentStatus(PaymentStatus.REFUNDED);
             order.setPaidAmount(BigDecimal.ZERO);
             order.setOutstandingBalance(BigDecimal.ZERO);
+
+            ledgerService.recordCustomerRefund(
+                    order.getCustomer().getId(),
+                    order.getId(),
+                    refundAmount,
+                    "Refund for Order " + order.getOrderNumber(),
+                    securityService.getCurrentUserId()
+            );
         } else {
             order.setOutstandingBalance(BigDecimal.ZERO);
         }

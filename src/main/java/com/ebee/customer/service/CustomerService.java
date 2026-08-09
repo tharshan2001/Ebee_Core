@@ -384,11 +384,20 @@ public class CustomerService {
 
         customer.setAdvanceBalance(newBalance);
         customerRepository.save(customer);
+        advanceTransactionRepository.save(transaction);
+
+        ledgerService.recordCustomerAdvance(
+                customer.getId(),
+                null,
+                request.amount(),
+                "Manual advance adjustment: " + request.description(),
+                securityService.getCurrentUserId()
+        );
 
         publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
                 DuesChangeType.MANUAL_ADJUSTMENT);
 
-        return advanceTransactionRepository.save(transaction);
+        return transaction;
     }
 
     @Transactional

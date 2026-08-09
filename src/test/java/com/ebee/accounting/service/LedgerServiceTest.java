@@ -143,7 +143,7 @@ class LedgerServiceTest {
         LocalDate effectiveDate = LocalDate.now();
         String reference = "PO Invoice: PO-001";
 
-        SupplierLedger result = ledgerService.recordSupplierInvoice(supplierId, poId, amount, description, effectiveDate, reference);
+        SupplierLedger result = ledgerService.recordSupplierInvoice(supplierId, poId, amount, description, effectiveDate, reference, UUID.randomUUID());
 
         verify(supplierLedgerRepository).save(supplierLedgerCaptor.capture());
         SupplierLedger saved = supplierLedgerCaptor.getValue();
@@ -167,7 +167,7 @@ class LedgerServiceTest {
         LocalDate effectiveDate = LocalDate.now();
         String reference = "PO Payment: PO-001";
 
-        SupplierLedger result = ledgerService.recordSupplierPayment(supplierId, paymentId, amount, description, effectiveDate, reference);
+        SupplierLedger result = ledgerService.recordSupplierPayment(supplierId, paymentId, amount, description, effectiveDate, reference, UUID.randomUUID());
 
         verify(supplierLedgerRepository).save(supplierLedgerCaptor.capture());
         SupplierLedger saved = supplierLedgerCaptor.getValue();
@@ -189,7 +189,7 @@ class LedgerServiceTest {
         BigDecimal amount = new BigDecimal("500.00");
         String description = "Commission for ORD-001";
 
-        AgentLedger result = ledgerService.recordAgentCommission(agentId, commissionId, amount, description);
+        AgentLedger result = ledgerService.recordAgentCommission(agentId, commissionId, amount, description, UUID.randomUUID());
 
         verify(agentLedgerRepository).save(agentLedgerCaptor.capture());
         AgentLedger saved = agentLedgerCaptor.getValue();
@@ -209,7 +209,7 @@ class LedgerServiceTest {
         BigDecimal amount = new BigDecimal("1000.00");
         String description = "Payout to agent";
 
-        AgentLedger result = ledgerService.recordAgentPayout(agentId, payoutId, amount, description);
+        AgentLedger result = ledgerService.recordAgentPayout(agentId, payoutId, amount, description, UUID.randomUUID());
 
         verify(agentLedgerRepository).save(agentLedgerCaptor.capture());
         AgentLedger saved = agentLedgerCaptor.getValue();

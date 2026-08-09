@@ -10,6 +10,7 @@ import com.ebee.accounting.enums.LedgerType;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.security.SecurityService;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -61,7 +62,7 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordCustomerInvoice(
             @PathVariable UUID customerId,
             @RequestParam UUID orderId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description) {
         CustomerLedger entry = ledgerService.recordCustomerInvoice(customerId, orderId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
@@ -74,7 +75,7 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordCustomerPayment(
             @PathVariable UUID customerId,
             @RequestParam UUID paymentId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description) {
         CustomerLedger entry = ledgerService.recordCustomerPayment(customerId, paymentId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
@@ -87,7 +88,7 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordCustomerRefund(
             @PathVariable UUID customerId,
             @RequestParam UUID returnId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description) {
         CustomerLedger entry = ledgerService.recordCustomerRefund(customerId, returnId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getCustomerBalance(customerId);
@@ -100,14 +101,15 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordSupplierInvoice(
             @PathVariable UUID supplierId,
             @RequestParam UUID purchaseOrderId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) LocalDate effectiveDate,
             @RequestParam(required = false) String reference) {
         SupplierLedger entry = ledgerService.recordSupplierInvoice(
                 supplierId, purchaseOrderId, amount, description,
                 effectiveDate != null ? effectiveDate : LocalDate.now(),
-                reference);
+                reference,
+                securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
         LedgerEntryResponse response = toResponseSupplier(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Supplier invoice recorded", response));
@@ -118,14 +120,15 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordSupplierPayment(
             @PathVariable UUID supplierId,
             @RequestParam UUID supplierPaymentId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) LocalDate effectiveDate,
             @RequestParam(required = false) String reference) {
         SupplierLedger entry = ledgerService.recordSupplierPayment(
                 supplierId, supplierPaymentId, amount, description,
                 effectiveDate != null ? effectiveDate : LocalDate.now(),
-                reference);
+                reference,
+                securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getSupplierBalance(supplierId);
         LedgerEntryResponse response = toResponseSupplier(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Supplier payment recorded", response));
@@ -136,9 +139,9 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordAgentCommission(
             @PathVariable UUID agentId,
             @RequestParam UUID commissionId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description) {
-        AgentLedger entry = ledgerService.recordAgentCommission(agentId, commissionId, amount, description);
+        AgentLedger entry = ledgerService.recordAgentCommission(agentId, commissionId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getAgentBalance(agentId);
         LedgerEntryResponse response = toResponseAgent(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Agent commission recorded", response));
@@ -149,9 +152,9 @@ public class LedgerController {
     public ResponseEntity<ApiResponse<LedgerEntryResponse>> recordAgentPayout(
             @PathVariable UUID agentId,
             @RequestParam UUID payoutId,
-            @RequestParam BigDecimal amount,
+            @RequestParam @Positive BigDecimal amount,
             @RequestParam(required = false) String description) {
-        AgentLedger entry = ledgerService.recordAgentPayout(agentId, payoutId, amount, description);
+        AgentLedger entry = ledgerService.recordAgentPayout(agentId, payoutId, amount, description, securityService.getCurrentUserId());
         BigDecimal balance = ledgerService.getAgentBalance(agentId);
         LedgerEntryResponse response = toResponseAgent(entry, balance);
         return ResponseEntity.ok(ApiResponse.success("Agent payout recorded", response));

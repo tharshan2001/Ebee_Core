@@ -144,7 +144,19 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording customer adjustment: customer={}, debit={}, effectiveDate={}, description={}", customerId, debit, effectiveDate, description);
-        return customerLedgerRepository.save(entry);
+        CustomerLedger saved = customerLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.ADJUSTMENT.name(),
+                debit,
+                BigDecimal.ZERO,
+                null,
+                "ADJUSTMENT",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
@@ -179,7 +191,7 @@ public class LedgerService {
     }
 
     @Transactional
-    public SupplierLedger recordSupplierInvoice(UUID supplierId, UUID purchaseOrderId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
+    public SupplierLedger recordSupplierInvoice(UUID supplierId, UUID purchaseOrderId, BigDecimal amount, String description, LocalDate effectiveDate, String reference, UUID recordedBy) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .purchaseOrderId(purchaseOrderId)
@@ -191,11 +203,23 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier invoice: supplier={}, po={}, amount={}", supplierId, purchaseOrderId, amount);
-        return supplierLedgerRepository.save(entry);
+        SupplierLedger saved = supplierLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.INVOICE.name(),
+                BigDecimal.ZERO,
+                amount,
+                purchaseOrderId,
+                "SUPPLIER_INVOICE",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public SupplierLedger recordSupplierPayment(UUID supplierId, UUID supplierPaymentId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
+    public SupplierLedger recordSupplierPayment(UUID supplierId, UUID supplierPaymentId, BigDecimal amount, String description, LocalDate effectiveDate, String reference, UUID recordedBy) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .supplierPaymentId(supplierPaymentId)
@@ -207,11 +231,23 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier payment: supplier={}, payment={}, amount={}", supplierId, supplierPaymentId, amount);
-        return supplierLedgerRepository.save(entry);
+        SupplierLedger saved = supplierLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.PAYMENT.name(),
+                amount,
+                BigDecimal.ZERO,
+                supplierPaymentId,
+                "SUPPLIER_PAYMENT",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public SupplierLedger recordSupplierExpense(UUID supplierId, UUID expenseId, BigDecimal amount, String description, LocalDate effectiveDate, String reference) {
+    public SupplierLedger recordSupplierExpense(UUID supplierId, UUID expenseId, BigDecimal amount, String description, LocalDate effectiveDate, String reference, UUID recordedBy) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .expenseId(expenseId)
@@ -223,11 +259,23 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier expense: supplier={}, expense={}, amount={}", supplierId, expenseId, amount);
-        return supplierLedgerRepository.save(entry);
+        SupplierLedger saved = supplierLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.DEBIT.name(),
+                amount,
+                BigDecimal.ZERO,
+                expenseId,
+                "SUPPLIER_EXPENSE",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public SupplierLedger recordSupplierAdjustment(UUID supplierId, BigDecimal debit, LocalDate effectiveDate, String description, String reference) {
+    public SupplierLedger recordSupplierAdjustment(UUID supplierId, BigDecimal debit, LocalDate effectiveDate, String description, String reference, UUID recordedBy) {
         SupplierLedger entry = SupplierLedger.builder()
                 .supplierId(supplierId)
                 .transactionType(LedgerTransactionType.ADJUSTMENT.name())
@@ -238,7 +286,19 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier adjustment: supplier={}, debit={}, effectiveDate={}, description={}", supplierId, debit, effectiveDate, description);
-        return supplierLedgerRepository.save(entry);
+        SupplierLedger saved = supplierLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.ADJUSTMENT.name(),
+                debit,
+                BigDecimal.ZERO,
+                null,
+                "SUPPLIER_ADJUSTMENT",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -252,7 +312,7 @@ public class LedgerService {
     }
 
     @Transactional
-    public AgentLedger recordAgentCommission(UUID agentId, UUID commissionId, BigDecimal amount, String description) {
+    public AgentLedger recordAgentCommission(UUID agentId, UUID commissionId, BigDecimal amount, String description, UUID recordedBy) {
         AgentLedger entry = AgentLedger.builder()
                 .agentId(agentId)
                 .commissionId(commissionId)
@@ -262,11 +322,23 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording agent commission: agent={}, commission={}, amount={}", agentId, commissionId, amount);
-        return agentLedgerRepository.save(entry);
+        AgentLedger saved = agentLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.CREDIT.name(),
+                BigDecimal.ZERO,
+                amount,
+                commissionId,
+                "AGENT_COMMISSION",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional
-    public AgentLedger recordAgentPayout(UUID agentId, UUID payoutId, BigDecimal amount, String description) {
+    public AgentLedger recordAgentPayout(UUID agentId, UUID payoutId, BigDecimal amount, String description, UUID recordedBy) {
         AgentLedger entry = AgentLedger.builder()
                 .agentId(agentId)
                 .payoutId(payoutId)
@@ -276,7 +348,19 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording agent payout: agent={}, payout={}, amount={}", agentId, payoutId, amount);
-        return agentLedgerRepository.save(entry);
+        AgentLedger saved = agentLedgerRepository.save(entry);
+
+        accountingPeriodService.recordPeriodTransaction(
+                LedgerTransactionType.DEBIT.name(),
+                amount,
+                BigDecimal.ZERO,
+                payoutId,
+                "AGENT_PAYOUT",
+                description,
+                recordedBy
+        );
+
+        return saved;
     }
 
     @Transactional(readOnly = true)

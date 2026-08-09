@@ -227,6 +227,14 @@ public class ReturnExchangeService {
                     order.setPaymentStatus(com.ebee.order.enums.PaymentStatus.REFUNDED);
                     order.setPaidAmount(BigDecimal.ZERO);
                 }
+
+                ledgerService.recordCustomerRefund(
+                        customer.getId(),
+                        order.getId(),
+                        refundAmount,
+                        "Return exchange refund for Order " + order.getOrderNumber(),
+                        reviewedByUserId
+                );
             }
         }
 

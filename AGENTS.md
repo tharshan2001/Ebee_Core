@@ -174,6 +174,43 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - Edge: exceeds returnable qty → "Cannot return 5...Returnable: 1" ✓
 - Edge: return exchange on RETURNED order → "Can only initiate...DELIVERED" ✓
 
+### Accounting Integrity Fixes (August 9, 2026)
+
+**Money Leak Fixes (Phase 1):**
+- `OrderPaymentService.handlePaymentRefund()` now records `customer_ledger` REFUND entry when refunding
+- `ReturnExchangeService.reviewReturnExchange()` now records REFUND entry for CASH/BANK_TRANSFER resolutions (ADVANCE path already handled)
+- `PurchaseOrderPaymentService.initPaymentOnReceipt()` now uses `addSupplierOutstandingWithLedger()` instead of bare `addSupplierOutstanding()` — supplier ledger entry created on PO receipt
+- `CustomerService.manualAdjustAdvance()` now records `customer_ledger` ADVANCE entry
+- `CommissionPaymentService.markAsPaid()` and `payBatch()` now record `agent_ledger` DEBIT entries
+- `CommissionLifecycleService.cancelCommissionForOrder()` now records reversing `agent_ledger` DEBIT entry when cancelling a PAID commission
+
+**Period Transaction Coverage (Phase 2):**
+- `LedgerService.recordCustomerAdjustment()` now calls `accountingPeriodService.recordPeriodTransaction()`
+- All 4 supplier ledger methods (`recordSupplierInvoice`, `recordSupplierPayment`, `recordSupplierExpense`, `recordSupplierAdjustment`) now accept `UUID recordedBy` and call `recordPeriodTransaction()`
+- Both agent ledger methods (`recordAgentCommission`, `recordAgentPayout`) now accept `UUID recordedBy` and call `recordPeriodTransaction()`
+
+**Data Integrity (Phase 3):**
+- Removed `updateCustomerOutstandingBalance()` arithmetic from `initPayment()` — `customer.outstandingBalance` is now ONLY set by `syncCustomerOutstanding()` which reads from ledger (single source of truth)
+- V122 migration adds unique index `idx_customer_ledger_order_invoice` on `(customer_id, order_id, transaction_type)` for idempotency
+- V122 migration adds indexes on `effective_date` columns and `accounting_period_transactions(period_id, transaction_type)`
+- `@Positive` validation added to all ledger amount parameters in `LedgerController`
+
+**Method Signature Changes:**
+- `LedgerService.recordSupplierInvoice()` — added `UUID recordedBy` parameter
+- `LedgerService.recordSupplierPayment()` — added `UUID recordedBy` parameter
+- `LedgerService.recordSupplierExpense()` — added `UUID recordedBy` parameter
+- `LedgerService.recordSupplierAdjustment()` — added `UUID recordedBy` parameter
+- `LedgerService.recordAgentCommission()` — added `UUID recordedBy` parameter
+- `LedgerService.recordAgentPayout()` — added `UUID recordedBy` parameter
+
+**New Dependencies Injected:**
+- `CommissionPaymentService` — now depends on `LedgerService`
+- `CommissionLifecycleService` — now depends on `LedgerService`
+- `SupplierServiceImpl` — now depends on `SecurityService`
+- `PurchaseOrderPaymentService` — now depends on `SecurityService`
+
+**Tests:** 440 pass (2 pre-existing CommissionLockTest failures need DB)
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

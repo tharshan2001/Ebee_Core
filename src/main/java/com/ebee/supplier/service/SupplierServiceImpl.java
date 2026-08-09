@@ -3,6 +3,7 @@ package com.ebee.supplier.service;
 import com.ebee.accounting.repository.SupplierLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
 import com.ebee.purchase.enums.PurchasePaymentStatus;
@@ -30,17 +31,20 @@ public class SupplierServiceImpl implements SupplierService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierLedgerRepository supplierLedgerRepository;
     private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     public SupplierServiceImpl(SupplierRepository supplierRepository,
                                SupplierMapper supplierMapper,
                                PurchaseOrderRepository purchaseOrderRepository,
                                SupplierLedgerRepository supplierLedgerRepository,
-                               LedgerService ledgerService) {
+                               LedgerService ledgerService,
+                               SecurityService securityService) {
         this.supplierRepository = supplierRepository;
         this.supplierMapper = supplierMapper;
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.supplierLedgerRepository = supplierLedgerRepository;
         this.ledgerService = ledgerService;
+        this.securityService = securityService;
     }
 
     @Override
@@ -154,7 +158,8 @@ public class SupplierServiceImpl implements SupplierService {
                         payment,
                         description != null ? description : "Payment for outstanding via " + paymentMethod,
                         java.time.LocalDate.now(),
-                        "Supplier Payment"
+                        "Supplier Payment",
+                        securityService.getCurrentUserId()
                 );
                 amount = amount.subtract(payment);
             }
@@ -175,7 +180,8 @@ public class SupplierServiceImpl implements SupplierService {
                     payAmount,
                     "Payment for PO " + order.getPoNumber() + " via " + paymentMethod,
                     java.time.LocalDate.now(),
-                    "PO Payment: " + order.getPoNumber()
+                    "PO Payment: " + order.getPoNumber(),
+                    securityService.getCurrentUserId()
             );
             remaining = remaining.subtract(payAmount);
             settledCount++;
@@ -207,7 +213,8 @@ public class SupplierServiceImpl implements SupplierService {
                 request.amount(),
                 request.date(),
                 request.description(),
-                "Outstanding Adjustment"
+                "Outstanding Adjustment",
+                securityService.getCurrentUserId()
         );
 
         syncSupplierOutstanding(supplier);

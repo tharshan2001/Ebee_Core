@@ -1,5 +1,6 @@
 package com.ebee.commission.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
@@ -32,6 +33,7 @@ public class CommissionPaymentService {
     private final CommissionMapper mapper;
     private final CommissionNotificationService commissionNotificationService;
     private final AuditLogService auditLogService;
+    private final LedgerService ledgerService;
 
     @Transactional
     public CommissionResponse markAsPaid(UUID commissionId) {
@@ -57,6 +59,14 @@ public class CommissionPaymentService {
         Agent agent = commission.getAgent();
         agent.setTotalCommission(agent.getTotalCommission().add(commission.getCommissionAmount()));
         agent.setTotalSales(agent.getTotalSales().add(commission.getOrderAmount()));
+
+        ledgerService.recordAgentPayout(
+                agent.getId(),
+                null,
+                commission.getCommissionAmount(),
+                "Commission paid for Order " + commission.getOrder().getOrderNumber(),
+                null
+        );
 
         commissionNotificationService.sendCommissionNotification(commission, "Paid",
                 "It has been paid. Total earnings to date: LKR "
@@ -106,6 +116,14 @@ public class CommissionPaymentService {
             Agent agent = c.getAgent();
             agent.setTotalCommission(agent.getTotalCommission() != null ? agent.getTotalCommission().add(c.getCommissionAmount()) : c.getCommissionAmount());
             agent.setTotalSales(agent.getTotalSales() != null ? agent.getTotalSales().add(c.getOrderAmount()) : c.getOrderAmount());
+
+            ledgerService.recordAgentPayout(
+                    agent.getId(),
+                    null,
+                    c.getCommissionAmount(),
+                    "Commission paid (batch) for Order " + c.getOrder().getOrderNumber(),
+                    null
+            );
 
             commissionRepository.save(c);
             auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", c.getId(),

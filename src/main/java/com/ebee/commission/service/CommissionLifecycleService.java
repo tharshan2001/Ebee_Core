@@ -1,5 +1,6 @@
 package com.ebee.commission.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
@@ -30,6 +31,7 @@ public class CommissionLifecycleService {
     private final CommissionNotificationService commissionNotificationService;
     private final CommissionPaymentService commissionPaymentService;
     private final AuditLogService auditLogService;
+    private final LedgerService ledgerService;
 
     @Transactional
     public CommissionResponse approveCommission(UUID commissionId) {
@@ -118,6 +120,14 @@ public class CommissionLifecycleService {
                 Agent agent = commission.getAgent();
                 agent.setTotalCommission(agent.getTotalCommission().subtract(commission.getCommissionAmount()));
                 agent.setTotalSales(agent.getTotalSales().subtract(commission.getOrderAmount()));
+
+                ledgerService.recordAgentPayout(
+                        agent.getId(),
+                        null,
+                        commission.getCommissionAmount(),
+                        "Commission reversed for Order " + commission.getOrder().getOrderNumber() + " (cancelled)",
+                        null
+                );
             }
 
             commission.setStatus(CommissionStatus.CANCELLED);

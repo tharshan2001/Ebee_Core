@@ -32,8 +32,13 @@ public class AccountingPeriodService {
     private final AccountingPeriodAuditRepository accountingPeriodAuditRepository;
     private final AccountingPeriodTransactionRepository accountingPeriodTransactionRepository;
     private final FiscalYearRepository fiscalYearRepository;
+    private LedgerService ledgerService;
+
+    @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
-    private final LedgerService ledgerService;
+    public void setLedgerService(LedgerService ledgerService) {
+        this.ledgerService = ledgerService;
+    }
 
     @Transactional(readOnly = true)
     public List<AccountingPeriod> getAllPeriods() {

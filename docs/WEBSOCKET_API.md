@@ -58,9 +58,12 @@ The `/ws/**` path is included in the CORS configuration alongside REST endpoints
 | `/topic/orders` | `ADMIN`, `SUPER_ADMIN` | Order creation and status changes |
 | `/topic/deliveries` | `ADMIN`, `SUPER_ADMIN`, `AGENT`, `DRIVER` | Delivery assignment and status changes |
 | `/topic/trips` | `ADMIN`, `SUPER_ADMIN`, `DRIVER` | Trip status changes (start, complete, cancel) |
-| `/topic/driver-locations` | _open_ (any authenticated) | Live driver GPS pings from the mobile app |
+| `/topic/trip-orders/{driverId}` | `ADMIN`, `SUPER_ADMIN`, `DRIVER` | Trip order markers pushed to a driver (DRIVER scoped to their own `driverId`) |
+| `/topic/driver-locations` | `ADMIN`, `SUPER_ADMIN` | Live driver GPS pings from the mobile app |
 
-Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/topic/driver-locations`, `/user/queue/...`) are open to all authenticated users.
+Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/user/queue/...`) are open to all authenticated users.
+
+**DRIVER scoping:** on `/topic/trip-orders/{driverId}`, a DRIVER may only subscribe to their own driver id — the id in the topic is resolved from the JWT principal (email → user → driver) and a mismatch is rejected with a `MessageDeliveryException`. ADMIN/SUPER_ADMIN may subscribe to any driver id.
 
 ---
 
@@ -161,7 +164,7 @@ Broadcast when a trip changes status (started, completed, or cancelled).
 {
   "tripId": "uuid",
   "tripName": "Morning Route Colombo",
-  "previousStatus": "PLANNING",
+  "previousStatus": "PLANNED",
   "newStatus": "IN_PROGRESS",
   "driverId": "uuid",
   "driverName": "Driver One",
@@ -183,15 +186,59 @@ Broadcast when a trip changes status (started, completed, or cancelled).
 
 ### Status values
 
-`PLANNING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
+`PLANNED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
 
 ### Events broadcast
 
 | Trigger | `previousStatus` | `newStatus` |
 |---------|------------------|-------------|
-| Driver starts trip | `PLANNING` | `IN_PROGRESS` |
+| Admin starts trip | `PLANNED` | `IN_PROGRESS` |
+| Driver starts trip | `PLANNED` | `IN_PROGRESS` |
 | Driver completes trip | `IN_PROGRESS` | `COMPLETED` |
-| Admin cancels trip | `PLANNING` or `IN_PROGRESS` | `CANCELLED` |
+| Admin completes trip | `IN_PROGRESS` | `COMPLETED` |
+| Admin cancels trip | `PLANNED` or `IN_PROGRESS` | `CANCELLED` |
+
+---
+
+## Trip Orders Feed — `/topic/trip-orders/{driverId}`
+
+Broadcast when orders are added to or removed from a trip assigned to that driver, so the driver app can refresh its delivery list/route in real time. Subscribing DRIVERs are scoped to their own `driverId` (mismatched subscriptions are rejected).
+
+### Payload
+
+```json
+{
+  "tripId": "uuid",
+  "driverId": "uuid",
+  "orderMarkers": [
+    {
+      "orderId": "uuid",
+      "orderNumber": "ORD-000123",
+      "customerName": "Kumar Perera",
+      "customerPhone": "0771234567",
+      "street": "123 Galle Rd",
+      "addressLine2": null,
+      "city": "Colombo 03",
+      "postalCode": "00300",
+      "district": "Colombo",
+      "country": "LK",
+      "deliveryStatus": "PENDING",
+      "orderStatus": "SHIPPED",
+      "totalAmount": 15000.00,
+      "formattedAddress": "123 Galle Rd, Colombo 03, 00300",
+      "status": "PENDING"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tripId` | UUID | Trip ID |
+| `driverId` | UUID | Assigned driver's ID |
+| `orderMarkers` | List<TripOrderMarkerDto> | Current order markers for the trip (see `GET /api/trips/{id}/order-markers`) |
+
+Each marker contains the order id/number, customer contact, address fields, `formattedAddress`, `deliveryStatus`, `orderStatus`, `totalAmount`, and a `status` alias mirroring `deliveryStatus`. Sent whenever a trip's orders are changed or the trip is started.
 
 ---
 

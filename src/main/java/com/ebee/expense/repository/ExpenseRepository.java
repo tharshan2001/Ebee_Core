@@ -38,6 +38,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     List<Expense> findByTripId(UUID tripId);
 
+    long countByTripId(UUID tripId);
+
     @Query(value = "SELECT e FROM Expense e LEFT JOIN FETCH e.createdBy LEFT JOIN FETCH e.driver d LEFT JOIN FETCH d.user LEFT JOIN FETCH e.approvedBy LEFT JOIN FETCH e.trip WHERE e.trip.id = :tripId")
     List<Expense> findByTripIdWithRelations(@Param("tripId") UUID tripId);
 }

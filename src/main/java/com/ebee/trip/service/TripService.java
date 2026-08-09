@@ -7,12 +7,14 @@ import com.ebee.common.response.PageResponse;
 import com.ebee.common.security.SecurityService;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.delivery.event.DeliveryStatusChangedEvent;
+import com.ebee.delivery.service.DeliveryService;
 import com.ebee.delivery.service.DeliveryStateTransition;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.dto.ExpenseResponse;
 import com.ebee.expense.entity.Expense;
 import com.ebee.expense.enums.ExpenseCategory;
+import com.ebee.expense.enums.ExpenseStatus;
 import com.ebee.expense.mapper.ExpenseMapper;
 import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.order.entity.Order;
@@ -63,11 +65,19 @@ public class TripService {
     private final ApplicationEventPublisher eventPublisher;
     private final SecurityService securityService;
     private final DeliveryStateTransition deliveryStateTransition;
+    private final DeliveryService deliveryService;
+    private final TripOrderLifecycle tripOrderLifecycle;
+
+    private static final Set<OrderStatus> EXCLUDED_FROM_SETTLEMENT = Set.of(
+            OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.RETURN_EXCHANGE);
 
     @Transactional
     public TripResponse createTrip(CreateTripRequest request) {
         if (tripRepository.existsByName(request.getName())) {
             throw new IllegalStateException("Trip with name '" + request.getName() + "' already exists");
+        }
+        if (request.getEndDate().isBefore(request.getStartDate())) {
+            throw new IllegalStateException("End date cannot be before start date");
         }
 
         Trip.TripBuilder builder = Trip.builder()
@@ -126,6 +136,10 @@ public class TripService {
             trip.setNotes(request.getNotes());
         }
 
+        if (trip.getEndDate().isBefore(trip.getStartDate())) {
+            throw new IllegalStateException("End date cannot be before start date");
+        }
+
         if (request.getDriverId() != null && trip.getDriver() == null) {
             Driver driver = driverRepository.findById(request.getDriverId())
                     .orElseThrow(() -> new ResourceNotFoundException("Driver", "id", request.getDriverId()));
@@ -144,6 +158,9 @@ public class TripService {
         trip = tripRepository.save(trip);
 
         if (request.getMileageKm() != null) {
+            if (request.getMileageKm().signum() < 0) {
+                throw new IllegalStateException("Mileage cannot be negative");
+            }
             trip.setMileageKm(request.getMileageKm());
             trip = tripRepository.save(trip);
         }
@@ -158,66 +175,31 @@ public class TripService {
     public TripResponse getTripById(UUID tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+        requireDriverOwnsTripForNonAdmin(trip);
         return toTripResponse(trip);
     }
 
     @Transactional(readOnly = true)
     public List<TripResponse> getAllTrips(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
-        List<Trip> trips;
-
-        if (status != null && driverId != null) {
-            trips = tripRepository.findByDriverIdAndStatusIn(driverId, List.of(status));
-        } else if (status != null) {
-            trips = tripRepository.findByStatusNotIn(List.of());
-            trips = trips.stream().filter(t -> t.getStatus() == status).collect(Collectors.toList());
-        } else if (driverId != null) {
-            trips = tripRepository.findByDriverId(driverId);
-        } else {
-            trips = tripRepository.findAll();
-        }
-
-        if (dateFrom != null) {
-            trips = trips.stream().filter(t -> !t.getStartDate().isBefore(dateFrom)).collect(Collectors.toList());
-        }
-        if (dateTo != null) {
-            trips = trips.stream().filter(t -> !t.getEndDate().isAfter(dateTo)).collect(Collectors.toList());
-        }
-
+        List<Trip> trips = tripRepository.search(status, driverId, dateFrom, dateTo);
         return trips.stream().map(this::toTripResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public PageResponse<TripResponse> getAllTripsPaginated(
             TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
-        Page<Trip> tripsPage;
-
-        if (status != null && driverId != null) {
-            tripsPage = tripRepository.findByDriverIdAndStatus(driverId, status, pageable);
-        } else if (status != null) {
-            tripsPage = tripRepository.findByStatus(status, pageable);
-        } else if (driverId != null) {
-            tripsPage = tripRepository.findByDriverId(driverId, pageable);
-        } else {
-            tripsPage = tripRepository.findAll(pageable);
-        }
-
-        if (dateFrom != null || dateTo != null) {
-            List<Trip> filtered = tripsPage.getContent().stream()
-                    .filter(t -> (dateFrom == null || !t.getStartDate().isBefore(dateFrom)))
-                    .filter(t -> (dateTo == null || !t.getEndDate().isAfter(dateTo)))
-                    .collect(Collectors.toList());
-            long total = tripsPage.getTotalElements();
-            return new PageResponse<>(filtered.stream().map(this::toTripResponse).collect(Collectors.toList()),
-                    tripsPage.getNumber(), tripsPage.getSize(), total,
-                    tripsPage.getTotalPages(), tripsPage.isFirst(), tripsPage.isLast());
-        }
-
+        Page<Trip> tripsPage = tripRepository.search(status, driverId, dateFrom, dateTo, pageable);
         return PageResponse.from(tripsPage.map(this::toTripResponse));
     }
 
     @Transactional(readOnly = true)
     public List<TripOrderMarkerDto> getActiveTripOrderMarkers(UUID driverId) {
-        return tripRepository.findByDriverIdAndStatus(driverId, TripStatus.IN_PROGRESS)
+        UUID effectiveDriverId = driverId;
+        if (!securityService.isAdmin()) {
+            Driver currentDriver = resolveCurrentDriver();
+            effectiveDriverId = currentDriver.getId();
+        }
+        return tripRepository.findByDriverIdAndStatus(effectiveDriverId, TripStatus.IN_PROGRESS)
                 .map(trip -> {
                     List<Order> orders = orderRepository.findByTripId(trip.getId());
                     trip.setOrders(orders);
@@ -230,9 +212,26 @@ public class TripService {
     public List<TripOrderMarkerDto> getTripOrderMarkers(UUID tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+        requireDriverOwnsTripForNonAdmin(trip);
         List<Order> orders = orderRepository.findByTripId(tripId);
         trip.setOrders(orders);
         return buildOrderMarkers(trip);
+    }
+
+    private Driver resolveCurrentDriver() {
+        UUID currentUserId = securityService.getCurrentUserId();
+        return driverRepository.findByUserId(currentUserId)
+                .orElseThrow(() -> new AccessDeniedException("Only drivers can access their own trip data"));
+    }
+
+    private void requireDriverOwnsTripForNonAdmin(Trip trip) {
+        if (securityService.isAdmin()) {
+            return;
+        }
+        Driver currentDriver = resolveCurrentDriver();
+        if (trip.getDriver() == null || !trip.getDriver().getId().equals(currentDriver.getId())) {
+            throw new AccessDeniedException("This trip is not assigned to you");
+        }
     }
 
     @Transactional
@@ -243,25 +242,36 @@ public class TripService {
         if (trip.getStatus() == TripStatus.CANCELLED) {
             throw new IllegalStateException("Trip is already cancelled");
         }
+        if (trip.getStatus() == TripStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot cancel a COMPLETED trip");
+        }
 
         TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.CANCELLED);
         trip = tripRepository.save(trip);
 
-        for (Order order : trip.getOrders()) {
-            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
-            order.setTrip(null);
-            order.setDeliveryStatus(DeliveryStatus.PENDING);
-            orderRepository.save(order);
+        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
+        List<Order> unresolved = orders.stream()
+                .filter(tripOrderLifecycle::isUnresolved)
+                .toList();
 
+        UUID driverUserId = trip.getDriver() != null ? trip.getDriver().getUser().getId() : null;
+
+        for (Order order : unresolved) {
+            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+            tripOrderLifecycle.detachAndReset(order);
             eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
                     this, order, previousDeliveryStatus, "Trip cancelled — order returned to pending", LocalDateTime.now()));
+        }
+
+        if (driverUserId != null) {
+            deliveryService.recalculateDriverAvailability(driverUserId);
         }
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' cancelled");
 
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
 
         return toTripResponse(trip);
@@ -275,8 +285,11 @@ public class TripService {
         if (trip.getStatus() != TripStatus.PLANNED) {
             throw new IllegalStateException("Only PLANNING trips can be deleted");
         }
-        if (!trip.getOrders().isEmpty()) {
+        if (orderRepository.countByTripId(trip.getId()) > 0) {
             throw new IllegalStateException("Cannot delete a trip that has orders assigned");
+        }
+        if (expenseRepository.countByTripId(trip.getId()) > 0) {
+            throw new IllegalStateException("Cannot delete a trip that has expenses");
         }
 
         tripRepository.delete(trip);
@@ -310,8 +323,9 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' started");
 
-        for (Order order : trip.getOrders()) {
-            if (order.getDeliveryStatus() == DeliveryStatus.PENDING) {
+        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
+        for (Order order : orders) {
+            if (tripOrderLifecycle.isPendingForAssignment(order)) {
                 DeliveryStateTransition.TransitionResult result =
                         deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", true);
                 orderRepository.save(order);
@@ -320,7 +334,9 @@ public class TripService {
             }
         }
 
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
+        deliveryService.recalculateDriverAvailability(trip.getDriver().getUser().getId());
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
 
         return toTripResponse(trip);
@@ -347,8 +363,8 @@ public class TripService {
                     continue;
                 }
 
-                if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.FAILED) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED or FAILED status to add to a trip");
+                if (order.getStatus() != OrderStatus.SHIPPED) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED status to add to a trip");
                 }
 
                 if (order.getDeliveryAssignedTo() != null
@@ -357,8 +373,8 @@ public class TripService {
                 }
 
                 if (order.getTrip() != null) {
-                    order.setTrip(null);
-                    order.setDeliveryAssignedTo(null);
+                    throw new IllegalStateException("Order " + order.getOrderNumber()
+                            + " is already on trip '" + order.getTrip().getName() + "'");
                 }
 
                 order.setTrip(trip);
@@ -376,8 +392,15 @@ public class TripService {
                     throw new IllegalStateException("Order " + order.getOrderNumber() + " is not on this trip");
                 }
 
-                order.setTrip(null);
-                orderRepository.save(order);
+                if (tripOrderLifecycle.isUnresolved(order)) {
+                    DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+                    tripOrderLifecycle.detachAndReset(order);
+                    eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                            this, order, previousDeliveryStatus, "Order removed from trip", LocalDateTime.now()));
+                } else {
+                    order.setTrip(null);
+                    orderRepository.save(order);
+                }
             }
         }
 
@@ -395,6 +418,10 @@ public class TripService {
     public TripResponse updateMileage(UUID tripId, BigDecimal mileageKm) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
+
+        if (mileageKm != null && mileageKm.signum() < 0) {
+            throw new IllegalStateException("Mileage cannot be negative");
+        }
 
         trip.setMileageKm(mileageKm);
         trip = tripRepository.save(trip);
@@ -414,23 +441,22 @@ public class TripService {
             throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
         }
 
-        List<Order> orders = orderRepository.findByTripId(trip.getId());
-        Set<DeliveryStatus> activeDeliveryStatuses = Set.of(
-                DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED,
-                DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
-        Set<OrderStatus> terminalOrderStatuses = Set.of(
-                OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.RETURN_EXCHANGE);
+        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
+        List<Order> unresolved = orders.stream()
+                .filter(tripOrderLifecycle::isUnresolved)
+                .toList();
 
-        for (Order order : orders) {
-            boolean isUnresolved = order.getDeliveryStatus() != null
-                    && activeDeliveryStatuses.contains(order.getDeliveryStatus())
-                    && !terminalOrderStatuses.contains(order.getStatus());
-            if (isUnresolved) {
-                order.setTrip(null);
-                order.setDeliveryAssignedTo(null);
-                order.setDeliveryStatus(DeliveryStatus.PENDING);
-                orderRepository.save(order);
-            }
+        UUID driverUserId = trip.getDriver() != null ? trip.getDriver().getUser().getId() : null;
+
+        for (Order order : unresolved) {
+            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+            tripOrderLifecycle.detachAndReset(order);
+            eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                    this, order, previousDeliveryStatus, "Trip completed — order returned to pending", LocalDateTime.now()));
+        }
+
+        if (driverUserId != null) {
+            deliveryService.recalculateDriverAvailability(driverUserId);
         }
 
         TripStatus previousStatus = trip.getStatus();
@@ -440,14 +466,14 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' completed");
 
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus));
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
 
         return toTripResponse(trip);
     }
 
     private void syncOrdersDriver(Trip trip) {
-        for (Order order : trip.getOrders()) {
+        for (Order order : tripOrderLifecycle.getTripOrders(trip.getId())) {
             if (trip.getDriver() != null) {
                 order.setDeliveryAssignedTo(trip.getDriver().getUser());
             }
@@ -550,6 +576,11 @@ public class TripService {
         BigDecimal collected = BigDecimal.ZERO;
 
         for (Order order : orders) {
+            boolean saleable = !EXCLUDED_FROM_SETTLEMENT.contains(order.getStatus())
+                    && order.getDeliveryStatus() != DeliveryStatus.FAILED_PERMANENT;
+            if (!saleable) {
+                continue;
+            }
             expected = expected.add(order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO);
             collected = collected.add(order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO);
 
@@ -578,7 +609,7 @@ public class TripService {
 
         BigDecimal totalExpenses = BigDecimal.ZERO;
         for (Expense expense : expenseList) {
-            if (expense.getAmount() != null) {
+            if (expense.getStatus() == ExpenseStatus.APPROVED && expense.getAmount() != null) {
                 totalExpenses = totalExpenses.add(expense.getAmount());
             }
         }

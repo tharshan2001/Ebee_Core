@@ -37,6 +37,7 @@ import com.ebee.order.repository.PaymentRepository;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
 import com.ebee.stock.enums.StockMovementType;
+import com.ebee.trip.entity.Trip;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -50,6 +51,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -711,6 +713,56 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.SHIPPED);
         assertThat(orderCaptor.getValue().getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+    }
+
+    @Test
+    void updateOrderStatus_shipped_resetsFailedPermanentDelivery() {
+        UUID orderId = order.getId();
+        order.setStatus(OrderStatus.CONFIRMED);
+        order.setDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
+        order.setDeliveryFailureReason("Customer refused");
+        order.setDeliveryScheduledDate(LocalDate.of(2026, 7, 30));
+        order.setDeliveryNotes("Some notes");
+        Trip trip = Trip.builder().id(UUID.randomUUID()).name("Route").build();
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(adminUser);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(saved.getDeliveryFailureReason()).isNull();
+        assertThat(saved.getDeliveryScheduledDate()).isNull();
+        assertThat(saved.getDeliveryNotes()).isNull();
+        assertThat(saved.getTrip()).isNull();
+        assertThat(saved.getDeliveryAssignedTo()).isNull();
+    }
+
+    @Test
+    void updateOrderStatus_shipped_keepsInFlightDelivery() {
+        UUID orderId = order.getId();
+        order.setStatus(OrderStatus.CONFIRMED);
+        order.setDeliveryStatus(DeliveryStatus.IN_TRANSIT);
+        Trip trip = Trip.builder().id(UUID.randomUUID()).name("Route").build();
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(adminUser);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getDeliveryStatus()).isEqualTo(DeliveryStatus.IN_TRANSIT);
+        assertThat(saved.getTrip()).isEqualTo(trip);
+        assertThat(saved.getDeliveryAssignedTo()).isEqualTo(adminUser);
     }
 
     @Test

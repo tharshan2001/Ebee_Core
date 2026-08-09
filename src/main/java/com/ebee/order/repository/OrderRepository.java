@@ -128,6 +128,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByTripId(UUID tripId);
 
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.trip.id = :tripId")
+    long countByTripId(@Param("tripId") UUID tripId);
+
     @Query("SELECT o FROM Order o WHERE o.trip IS NULL AND o.status = :status")
     List<Order> findByTripIsNullAndStatus(@Param("status") com.ebee.order.enums.OrderStatus status);
 

@@ -569,8 +569,16 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
-        if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
+        if (status == OrderStatus.SHIPPED
+                && (order.getDeliveryStatus() == null || order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT)) {
             order.setDeliveryStatus(DeliveryStatus.PENDING);
+            order.setDeliveryFailureReason(null);
+            order.setDeliveryPhotoUrl(null);
+            order.setDeliverySignatureUrl(null);
+            order.setDeliveryScheduledDate(null);
+            order.setDeliveryNotes(null);
+            order.setTrip(null);
+            order.setDeliveryAssignedTo(null);
         }
         Order updatedOrder = orderRepository.save(order);
 

@@ -98,6 +98,14 @@ public class ArchitectureTest {
             com.ebee.auth.service.JwtService.class
         )
         .ignoreDependency(
+            com.ebee.driver.config.WebSocketAuthInterceptor.class,
+            com.ebee.user.repository.UserRepository.class
+        )
+        .ignoreDependency(
+            com.ebee.driver.config.WebSocketAuthInterceptor.class,
+            com.ebee.driver.repository.DriverRepository.class
+        )
+        .ignoreDependency(
             resideInAPackage("..report.."),
             resideInAPackage("..report.service..")
         )

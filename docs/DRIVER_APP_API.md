@@ -342,13 +342,7 @@ Returns all trips assigned to the current driver.
             "collectedAmount": 10000.00,
             "outstandingAmount": 5000.00,
             "netAmount": 8500.00,
-            "totalExpenses": 1500.00,
-            "petrolCost": 1000.00,
-            "parkingCost": 200.00,
-            "tollCost": 0,
-            "travelCost": 0,
-            "maintenanceCost": 0,
-            "otherCost": 300.00
+            "totalExpenses": 1500.00
         }
     ]
 }
@@ -374,12 +368,14 @@ PATCH /api/driver/trips/{tripId}/start
 Auth: DRIVER
 ```
 
-Transitions trip from PLANNING to IN_PROGRESS.
+Transitions trip from PLANNED to IN_PROGRESS.
 
 **Rules:**
-- Trip must be in PLANNING status
+- Trip must be in PLANNED status
 - Driver must be assigned to the trip
 - Driver cannot have another active (IN_PROGRESS) trip
+
+Starting the trip assigns all PENDING orders on the trip (delivery → `ASSIGNED`) and marks the driver ON_TRIP.
 
 **Response:** `TripResponse`
 
@@ -400,7 +396,9 @@ Content-Type: application/json
 }
 ```
 
-**Note:** Typically admin adds orders, but driver can also add/remove orders while in PLANNING status.
+**Note:** Typically admin adds orders, but driver can also add/remove orders. Adds require the order to be `SHIPPED` and not already on another trip (orders on another trip are rejected, not silently reassigned). Removed unresolved orders are fully detached (delivery reset to PENDING); DELIVERED/FAILED_PERMANENT orders only lose the trip reference.
+
+**Response:** `TripResponse`
 
 ---
 
@@ -426,6 +424,8 @@ Transitions trip from IN_PROGRESS to COMPLETED.
 
 **Rules:**
 - Trip must be in IN_PROGRESS status
+
+Unresolved orders (PENDING/ASSIGNED/PICKED_UP/IN_TRANSIT/FAILED) are detached and reset to PENDING; DELIVERED and FAILED_PERMANENT orders keep the trip reference.
 
 **Response:** `TripResponse`
 

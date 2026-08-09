@@ -1,7 +1,9 @@
 package com.ebee.driver.config;
 
 import com.ebee.auth.service.JwtService;
+import com.ebee.driver.repository.DriverRepository;
 import com.ebee.user.enums.RoleType;
+import com.ebee.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -16,6 +18,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Intercepts inbound STOMP frames on the {@code /ws} endpoint and enforces
@@ -42,6 +45,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final JwtService jwtService;
     private final TopicAuthorizationRegistry authorizationRegistry;
+    private final UserRepository userRepository;
+    private final DriverRepository driverRepository;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -124,8 +129,44 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             if (role == null || !allowedRoles.contains(role)) {
                 throw new MessageDeliveryException((Message<?>) null, "Insufficient privileges to subscribe to " + destination);
             }
+            if (role == RoleType.DRIVER && isDriverTripOrdersDestination(destination)) {
+                UUID subscribedDriverId = parseDriverId(destination);
+                UUID ownDriverId = resolveCurrentDriverId(accessor);
+                if (subscribedDriverId == null || !subscribedDriverId.equals(ownDriverId)) {
+                    throw new MessageDeliveryException((Message<?>) null, "Insufficient privileges to subscribe to " + destination);
+                }
+            }
             log.info("WebSocket SUBSCRIBE OK: destination={} role={}", destination, role);
         });
+    }
+
+    private static final String TRIP_ORDERS_PREFIX = "/topic/trip-orders/";
+
+    private boolean isDriverTripOrdersDestination(String destination) {
+        return destination.startsWith(TRIP_ORDERS_PREFIX);
+    }
+
+    private UUID parseDriverId(String destination) {
+        String suffix = destination.substring(TRIP_ORDERS_PREFIX.length());
+        if (suffix.isEmpty() || suffix.contains("/")) {
+            return null;
+        }
+        try {
+            return UUID.fromString(suffix);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private UUID resolveCurrentDriverId(StompHeaderAccessor accessor) {
+        String email = accessor.getUser() != null ? accessor.getUser().getName() : null;
+        if (email == null) {
+            return null;
+        }
+        return userRepository.findByEmail(email)
+                .flatMap(user -> driverRepository.findByUserId(user.getId()))
+                .map(driver -> driver.getId())
+                .orElse(null);
     }
 
     /**

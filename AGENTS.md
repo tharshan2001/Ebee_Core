@@ -233,6 +233,44 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 
 **Tests:** 440 pass (2 pre-existing CommissionLockTest failures need DB)
 
+## Current State (August 10, 2026)
+
+### Trip Module Fixes (F1–F16)
+
+**WebSocket ownership scoping:**
+- `/topic/trip-orders/{driverId}` is now subscribable by ADMIN/SUPER_ADMIN/DRIVER; DRIVER is restricted to their own `driverId` (email → user → driver lookup) in `WebSocketAuthInterceptor.authorizeSubscribe`, mismatches throw `MessageDeliveryException`
+
+**Trip lifecycle hardening:**
+- `TripOrderLifecycle` (new component in `trip/service`) centralizes order-state rules: `RESETTABLE_DELIVERY_STATUSES` (PENDING, ASSIGNED, PICKED_UP, IN_TRANSIT, FAILED) and `TERMINAL_ORDER_STATUSES` (CANCELLED, RETURNED, RETURN_EXCHANGE); `detachAndReset()` clears trip/assignee and returns order to PENDING
+- `TripService.cancelTrip()` refuses to cancel CANCELLED/COMPLETED trips; detaches+resets only unresolved orders (DELIVERED/FAILED_PERMANENT keep the trip reference), publishes per-order `DeliveryStatusChangedEvent` + `TripStatusChangedEvent`, recalculates driver availability
+- `TripService.completeTrip()` and driver `DriverAppService.completeTrip()` now mirror each other: reset unresolved orders, publish events, recalc availability
+- `TripStatusChangedEvent` carries an explicit `orderCount` (from `findByTripId`) instead of the lazy inverse collection
+- `DeliveryService.recalculateDriverAvailability()` made public (was private `updateDriverAvailability`) so trip completion/cancellation refreshes availability
+
+**Settlement accuracy:**
+- `toTripResponse()` excludes orders whose status is CANCELLED/RETURNED/RETURN_EXCHANGE OR whose deliveryStatus is FAILED_PERMANENT from expected/collected/paid/partial/unpaid totals; only APPROVED expenses count toward `totalExpenses`/`netAmount`
+
+**Driver PII scoping:**
+- `getTripById()`/`getTripOrderMarkers()` enforce driver ownership for non-admins; `getActiveTripOrderMarkers()` forces caller's own driverId for DRIVER role
+
+**Validation & guards:**
+- `createTrip`/`updateTrip` reject `endDate < startDate`; `updateMileage` rejects negative mileage
+- `addOrdersToTrip()` throws `IllegalStateException("Order X is already on trip Y")` when the order belongs to a different trip (no more silent re-assignment)
+- `deleteTrip()` blocks deletion when orders OR expenses reference the trip (`countByTripId`)
+
+**Filtering & re-ship (F7):**
+- `getAllTrips()`/`getAllTripsPaginated()` use a single `search(status, driverId, dateFrom, dateTo)` query (list + paged, nullable params)
+- `OrderServiceImpl.updateOrderStatus()` re-shipping an order with null/FAILED_PERMANENT delivery resets delivery to PENDING and clears failure fields, trip, assignee (unblocks re-shipping stuck FAILED_PERMANENT orders)
+
+**Cleanup:**
+- Removed unused `TripRepository` methods (`findByName`, `findByDriverId`, `findByStatusNotIn`, `findByDriverIdAndStatusNotIn`, paged `findAll`/`findByStatus`/`findByDriverId`/`findByDriverIdAndStatus`)
+- `TopicAuthorizationRegistry` allows DRIVER on `/topic/trip-orders`; `WebSocketAuthInterceptor` gained the ownership check
+- `addOrdersToTrip()` now requires `OrderStatus.SHIPPED` (dead `FAILED` order-status acceptance removed) in both `TripService` and `DriverAppService`
+- `removeOrdersFromTrip()` now fully detaches unresolved orders via `TripOrderLifecycle.detachAndReset()` (clears trip + assignee, resets to PENDING, clears failure reason, publishes `DeliveryStatusChangedEvent`); DELIVERED/FAILED_PERMANENT orders only lose the trip reference
+- `TripService.startTrip()` and `DriverAppService.startTrip()` now call `deliveryService.recalculateDriverAvailability()` so the driver is marked ON_TRIP when a trip is started
+
+**Tests:** 469 pass (2 pre-existing CommissionLockTest failures need running DB)
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

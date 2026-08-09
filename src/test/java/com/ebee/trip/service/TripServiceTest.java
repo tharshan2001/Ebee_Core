@@ -3,11 +3,14 @@ package com.ebee.trip.service;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.security.SecurityService;
 import com.ebee.delivery.enums.DeliveryStatus;
+import com.ebee.delivery.event.DeliveryStatusChangedEvent;
+import com.ebee.delivery.service.DeliveryService;
 import com.ebee.delivery.service.DeliveryStateTransition;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.repository.DriverRepository;
 import com.ebee.expense.entity.Expense;
 import com.ebee.expense.enums.ExpenseCategory;
+import com.ebee.expense.enums.ExpenseStatus;
 import com.ebee.expense.mapper.ExpenseMapper;
 import com.ebee.expense.repository.ExpenseRepository;
 import com.ebee.order.entity.Order;
@@ -29,6 +32,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -55,6 +60,7 @@ class TripServiceTest {
     @Mock private SecurityService securityService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private DeliveryStateTransition deliveryStateTransition;
+    @Mock private DeliveryService deliveryService;
 
     @InjectMocks private TripService tripService;
 
@@ -111,6 +117,9 @@ class TripServiceTest {
         tripResponse.setId(tripId);
         tripResponse.setName("Jaffna Morning Route");
         tripResponse.setStatus(TripStatus.PLANNED);
+
+        ReflectionTestUtils.setField(tripService, "tripOrderLifecycle",
+                new TripOrderLifecycle(orderRepository));
     }
 
     // ----- createTrip -----
@@ -236,6 +245,7 @@ class TripServiceTest {
 
         assertThat(result).isNotNull();
         verify(tripRepository).save(trip);
+        verify(deliveryService).recalculateDriverAvailability(driverId);
         assertThat(trip.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
     }
 
@@ -331,7 +341,7 @@ class TripServiceTest {
     }
 
     @Test
-    void addOrdersToTrip_orderNotShippedOrFailed_throws() {
+    void addOrdersToTrip_orderNotShipped_throws() {
         order.setStatus(OrderStatus.CONFIRMED);
 
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
@@ -342,7 +352,7 @@ class TripServiceTest {
 
         assertThatThrownBy(() -> tripService.addOrdersToTrip(tripId, request))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("must be in SHIPPED or FAILED status");
+                .hasMessageContaining("must be in SHIPPED status");
     }
 
     @Test
@@ -361,14 +371,15 @@ class TripServiceTest {
     // ----- removeOrdersFromTrip -----
 
     @Test
-    void removeOrdersFromTrip_clearsTripId() {
+    void removeOrdersFromTrip_fullyDetachesUnresolvedOrder() {
         order.setTrip(trip);
+        order.setDeliveryAssignedTo(driverUser);
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
-        when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         AddOrdersToTripRequest request = new AddOrdersToTripRequest();
         request.setOrderIdsToRemove(List.of(orderId));
@@ -376,7 +387,33 @@ class TripServiceTest {
         tripService.addOrdersToTrip(tripId, request);
 
         assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryAssignedTo()).isNull();
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
         verify(orderRepository).save(order);
+        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
+    }
+
+    @Test
+    void removeOrdersFromTrip_deliveredKeepsDelivery() {
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(driverUser);
+        order.setDeliveryStatus(DeliveryStatus.DELIVERED);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AddOrdersToTripRequest request = new AddOrdersToTripRequest();
+        request.setOrderIdsToRemove(List.of(orderId));
+
+        tripService.addOrdersToTrip(tripId, request);
+
+        assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(order.getDeliveryAssignedTo()).isEqualTo(driverUser);
+        verify(eventPublisher, never()).publishEvent(any(DeliveryStatusChangedEvent.class));
     }
 
     // ----- cancelTrip -----
@@ -390,7 +427,7 @@ class TripServiceTest {
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
-        when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         var result = tripService.cancelTrip(tripId);
@@ -398,7 +435,53 @@ class TripServiceTest {
         assertThat(trip.getStatus()).isEqualTo(TripStatus.CANCELLED);
         verify(orderRepository).save(order);
         assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryAssignedTo()).isNull();
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        verify(deliveryService).recalculateDriverAvailability(driverId);
+    }
+
+    @Test
+    void cancelTrip_deliveredOrdersKeepTrip() {
+        order.setTrip(trip);
+        order.setDeliveryStatus(DeliveryStatus.DELIVERED);
+        Order failedOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .status(OrderStatus.SHIPPED)
+                .deliveryStatus(DeliveryStatus.IN_TRANSIT)
+                .build();
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order, failedOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        tripService.cancelTrip(tripId);
+
+        assertThat(order.getTrip()).isEqualTo(trip);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(failedOrder.getTrip()).isNull();
+        assertThat(failedOrder.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+    }
+
+    @Test
+    void cancelTrip_alreadyCancelled_throws() {
+        trip.setStatus(TripStatus.CANCELLED);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.cancelTrip(tripId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Trip is already cancelled");
+    }
+
+    @Test
+    void cancelTrip_completed_throws() {
+        trip.setStatus(TripStatus.COMPLETED);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.cancelTrip(tripId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot cancel a COMPLETED trip");
     }
 
     // ----- completeTrip -----
@@ -430,12 +513,34 @@ class TripServiceTest {
 
     @Test
     void deleteTrip_withOrders_throws() {
-        trip.setOrders(new ArrayList<>(List.of(order)));
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.countByTripId(tripId)).thenReturn(1L);
 
         assertThatThrownBy(() -> tripService.deleteTrip(tripId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot delete a trip that has orders assigned");
+    }
+
+    @Test
+    void deleteTrip_withExpenses_throws() {
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.countByTripId(tripId)).thenReturn(0L);
+        when(expenseRepository.countByTripId(tripId)).thenReturn(2L);
+
+        assertThatThrownBy(() -> tripService.deleteTrip(tripId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot delete a trip that has expenses");
+    }
+
+    @Test
+    void deleteTrip_success() {
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.countByTripId(tripId)).thenReturn(0L);
+        when(expenseRepository.countByTripId(tripId)).thenReturn(0L);
+
+        tripService.deleteTrip(tripId);
+
+        verify(tripRepository).delete(trip);
     }
 
     @Test
@@ -460,5 +565,232 @@ class TripServiceTest {
         var result = tripService.updateMileage(tripId, new BigDecimal("150.5"));
 
         assertThat(trip.getMileageKm()).isEqualByComparingTo(new BigDecimal("150.5"));
+    }
+
+    @Test
+    void updateMileage_negative_throws() {
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.updateMileage(tripId, new BigDecimal("-10")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Mileage cannot be negative");
+    }
+
+    // ----- date validation -----
+
+    @Test
+    void createTrip_endDateBeforeStart_throws() {
+        CreateTripRequest request = new CreateTripRequest();
+        request.setName("Jaffna Morning Route");
+        request.setStartDate(LocalDate.of(2026, 7, 30));
+        request.setEndDate(LocalDate.of(2026, 7, 29));
+        request.setDriverId(driverId);
+
+        assertThatThrownBy(() -> tripService.createTrip(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("End date cannot be before start date");
+    }
+
+    @Test
+    void updateTrip_endDateBeforeStart_throws() {
+        UpdateTripRequest request = new UpdateTripRequest();
+        request.setStartDate(LocalDate.of(2026, 8, 5));
+        request.setEndDate(LocalDate.of(2026, 8, 1));
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.updateTrip(tripId, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("End date cannot be before start date");
+    }
+
+    // ----- F8: cross-trip add -----
+
+    @Test
+    void addOrdersToTrip_orderOnAnotherTrip_throws() {
+        Trip otherTrip = Trip.builder()
+                .id(UUID.randomUUID())
+                .name("Other Trip")
+                .build();
+        order.setTrip(otherTrip);
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        AddOrdersToTripRequest request = new AddOrdersToTripRequest();
+        request.setOrderIdsToAdd(List.of(orderId));
+
+        assertThatThrownBy(() -> tripService.addOrdersToTrip(tripId, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already on trip");
+    }
+
+    // ----- F5: driver PII scoping -----
+
+    @Test
+    void getTripById_adminCanViewAnyTrip() {
+        when(securityService.isAdmin()).thenReturn(true);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
+        when(expenseRepository.findByTripIdWithRelations(tripId)).thenReturn(List.of());
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+
+        var result = tripService.getTripById(tripId);
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void getTripById_driverOwned_passes() {
+        when(securityService.isAdmin()).thenReturn(false);
+        when(securityService.getCurrentUserId()).thenReturn(driverId);
+        when(driverRepository.findByUserId(driverId)).thenReturn(Optional.of(driver));
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of());
+        when(expenseRepository.findByTripIdWithRelations(tripId)).thenReturn(List.of());
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+
+        var result = tripService.getTripById(tripId);
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void getTripById_driverNotOwned_throws() {
+        UUID otherUserId = UUID.randomUUID();
+        User otherUser = User.builder().id(otherUserId).build();
+        Driver otherDriver = Driver.builder().id(UUID.randomUUID()).user(otherUser).build();
+
+        when(securityService.isAdmin()).thenReturn(false);
+        when(securityService.getCurrentUserId()).thenReturn(otherUserId);
+        when(driverRepository.findByUserId(otherUserId)).thenReturn(Optional.of(otherDriver));
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.getTripById(tripId))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void getTripById_driverWithNoDriverRecord_throws() {
+        when(securityService.isAdmin()).thenReturn(false);
+        when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(driverRepository.findByUserId(any(UUID.class))).thenReturn(Optional.empty());
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> tripService.getTripById(tripId))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    // ----- F4: settlement excludes cancelled / FAILED_PERMANENT, only APPROVED expenses -----
+
+    @Test
+    void toTripResponse_excludesNonSettledOrdersAndNonApprovedExpenses() {
+        Order saleOrder = order;
+        saleOrder.setDeliveryStatus(DeliveryStatus.DELIVERED);
+
+        Order cancelledOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .status(OrderStatus.CANCELLED)
+                .totalAmount(new BigDecimal("3000.00"))
+                .paidAmount(new BigDecimal("0.00"))
+                .outstandingBalance(new BigDecimal("3000.00"))
+                .deliveryStatus(DeliveryStatus.IN_TRANSIT)
+                .build();
+
+        Order failedPermanentOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .status(OrderStatus.SHIPPED)
+                .totalAmount(new BigDecimal("2000.00"))
+                .paidAmount(new BigDecimal("0.00"))
+                .outstandingBalance(new BigDecimal("2000.00"))
+                .deliveryStatus(DeliveryStatus.FAILED_PERMANENT)
+                .build();
+
+        Expense approved = Expense.builder()
+                .id(UUID.randomUUID())
+                .amount(new BigDecimal("100.00"))
+                .status(ExpenseStatus.APPROVED)
+                .category(ExpenseCategory.PETROL)
+                .build();
+        Expense pending = Expense.builder()
+                .id(UUID.randomUUID())
+                .amount(new BigDecimal("50.00"))
+                .status(ExpenseStatus.PENDING)
+                .category(ExpenseCategory.PETROL)
+                .build();
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(saleOrder, cancelledOrder, failedPermanentOrder));
+        when(expenseRepository.findByTripIdWithRelations(tripId)).thenReturn(List.of(approved, pending));
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+
+        tripService.getTripById(tripId);
+
+        assertThat(tripResponse.getExpectedAmount()).isEqualByComparingTo(new BigDecimal("5000.00"));
+        assertThat(tripResponse.getCollectedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(tripResponse.getOutstandingAmount()).isEqualByComparingTo(new BigDecimal("5000.00"));
+        assertThat(tripResponse.getUnpaidOrderCount()).isEqualTo(1);
+        assertThat(tripResponse.getPaidOrderCount()).isZero();
+        assertThat(tripResponse.getPartialOrderCount()).isZero();
+        assertThat(tripResponse.getTotalExpenses()).isEqualByComparingTo(new BigDecimal("100.00"));
+        assertThat(tripResponse.getNetAmount()).isEqualByComparingTo(new BigDecimal("-100.00"));
+    }
+
+    @Test
+    void toTripResponse_paidOrdersCountTowardsCollected() {
+        order.setDeliveryStatus(DeliveryStatus.DELIVERED);
+        order.setPaidAmount(new BigDecimal("5000.00"));
+        order.setOutstandingBalance(BigDecimal.ZERO);
+
+        when(securityService.isAdmin()).thenReturn(true);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
+        when(expenseRepository.findByTripIdWithRelations(tripId)).thenReturn(List.of());
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+
+        tripService.getTripById(tripId);
+
+        assertThat(tripResponse.getCollectedAmount()).isEqualByComparingTo(new BigDecimal("5000.00"));
+        assertThat(tripResponse.getOutstandingAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // ----- F11: completeTrip resets retryable FAILED orders -----
+
+    @Test
+    void completeTrip_resetsFailedOrders() {
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        order.setDeliveryStatus(DeliveryStatus.FAILED);
+        order.setDeliveryFailureReason("Customer not available");
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        tripService.completeTrip(tripId);
+
+        assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(order.getDeliveryFailureReason()).isNull();
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.COMPLETED);
+    }
+
+    @Test
+    void completeTrip_deliveredOrderKeepsTrip() {
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        order.setTrip(trip);
+        order.setDeliveryStatus(DeliveryStatus.DELIVERED);
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
+
+        tripService.completeTrip(tripId);
+
+        assertThat(order.getTrip()).isEqualTo(trip);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 }

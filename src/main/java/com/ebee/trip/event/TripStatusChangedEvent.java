@@ -20,7 +20,7 @@ public class TripStatusChangedEvent extends ApplicationEvent {
     private final int orderCount;
     private final LocalDateTime occurredAt;
 
-    public TripStatusChangedEvent(Object source, Trip trip, TripStatus previousStatus) {
+    public TripStatusChangedEvent(Object source, Trip trip, TripStatus previousStatus, int orderCount) {
         super(source);
         this.tripId = trip.getId();
         this.tripName = trip.getName();
@@ -30,7 +30,7 @@ public class TripStatusChangedEvent extends ApplicationEvent {
         this.driverName = trip.getDriver() != null
                 ? trip.getDriver().getUser().getFirstName() + " " + trip.getDriver().getUser().getLastName()
                 : null;
-        this.orderCount = trip.getOrders() != null ? trip.getOrders().size() : 0;
+        this.orderCount = orderCount;
         this.occurredAt = LocalDateTime.now();
     }
 }

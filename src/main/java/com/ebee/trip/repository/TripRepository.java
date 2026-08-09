@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,26 +21,29 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     boolean existsByNameAndIdNot(String name, UUID id);
 
-    Optional<Trip> findByName(String name);
-
-    List<Trip> findByDriverId(UUID driverId);
-
     List<Trip> findByDriverIdAndStatusIn(UUID driverId, List<TripStatus> statuses);
-
-    List<Trip> findByDriverIdAndStatusNotIn(UUID driverId, List<TripStatus> excluded);
-
-    List<Trip> findByStatusNotIn(List<TripStatus> excluded);
 
     @Query("SELECT t FROM Trip t WHERE t.driver.id = :driverId AND t.status = :status")
     Optional<Trip> findByDriverIdAndStatus(@Param("driverId") UUID driverId, @Param("status") TripStatus status);
 
     Optional<Trip> findById(UUID id);
 
-    Page<Trip> findAll(Pageable pageable);
+    @Query("SELECT t FROM Trip t WHERE (:status IS NULL OR t.status = :status) " +
+            "AND (:driverId IS NULL OR t.driver.id = :driverId) " +
+            "AND (:dateFrom IS NULL OR t.startDate >= :dateFrom) " +
+            "AND (:dateTo IS NULL OR t.endDate <= :dateTo)")
+    List<Trip> search(@Param("status") TripStatus status,
+                      @Param("driverId") UUID driverId,
+                      @Param("dateFrom") LocalDate dateFrom,
+                      @Param("dateTo") LocalDate dateTo);
 
-    Page<Trip> findByStatus(TripStatus status, Pageable pageable);
-
-    Page<Trip> findByDriverId(UUID driverId, Pageable pageable);
-
-    Page<Trip> findByDriverIdAndStatus(UUID driverId, TripStatus status, Pageable pageable);
+    @Query("SELECT t FROM Trip t WHERE (:status IS NULL OR t.status = :status) " +
+            "AND (:driverId IS NULL OR t.driver.id = :driverId) " +
+            "AND (:dateFrom IS NULL OR t.startDate >= :dateFrom) " +
+            "AND (:dateTo IS NULL OR t.endDate <= :dateTo)")
+    Page<Trip> search(@Param("status") TripStatus status,
+                      @Param("driverId") UUID driverId,
+                      @Param("dateFrom") LocalDate dateFrom,
+                      @Param("dateTo") LocalDate dateTo,
+                      Pageable pageable);
 }

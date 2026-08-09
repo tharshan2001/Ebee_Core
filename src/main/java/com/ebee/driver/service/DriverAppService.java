@@ -36,8 +36,10 @@ import com.ebee.trip.dto.TripResponse;
 import com.ebee.trip.entity.Trip;
 import com.ebee.trip.enums.TripStatus;
 import com.ebee.trip.event.TripOrdersChangedEvent;
+import com.ebee.trip.event.TripStatusChangedEvent;
 import com.ebee.trip.mapper.TripMapper;
 import com.ebee.trip.repository.TripRepository;
+import com.ebee.trip.service.TripOrderLifecycle;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
@@ -82,6 +84,7 @@ public class DriverAppService {
     private final ApplicationEventPublisher eventPublisher;
     private final TripRepository tripRepository;
     private final TripMapper tripMapper;
+    private final TripOrderLifecycle tripOrderLifecycle;
 
     public Driver getCurrentDriver() {
         UUID userId = securityService.getCurrentUserId();
@@ -486,8 +489,9 @@ public class DriverAppService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Driver started trip '" + trip.getName() + "'");
 
-        for (Order order : trip.getOrders()) {
-            if (order.getDeliveryStatus() == DeliveryStatus.PENDING) {
+        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
+        for (Order order : orders) {
+            if (tripOrderLifecycle.isPendingForAssignment(order)) {
                 DeliveryStateTransition.TransitionResult result =
                         deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", false);
                 orderRepository.save(order);
@@ -495,6 +499,10 @@ public class DriverAppService {
                         this, order, result.previousStatus(), "Trip started", LocalDateTime.now()));
             }
         }
+
+        deliveryService.recalculateDriverAvailability(driver.getUser().getId());
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, TripStatus.PLANNED, orders.size()));
 
         return tripMapper.toResponse(trip);
     }
@@ -528,8 +536,8 @@ public class DriverAppService {
                     throw new IllegalStateException("Order " + order.getOrderNumber() + " is already on trip '" + order.getTrip().getName() + "'");
                 }
 
-                if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.FAILED) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED or FAILED status to add to a trip");
+                if (order.getStatus() != OrderStatus.SHIPPED) {
+                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED status to add to a trip");
                 }
 
                 order.setTrip(trip);
@@ -547,8 +555,15 @@ public class DriverAppService {
                     throw new IllegalStateException("Order " + order.getOrderNumber() + " is not on this trip");
                 }
 
-                order.setTrip(null);
-                orderRepository.save(order);
+                if (tripOrderLifecycle.isUnresolved(order)) {
+                    DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+                    tripOrderLifecycle.detachAndReset(order);
+                    eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                            this, order, previousDeliveryStatus, "Order removed from trip", LocalDateTime.now()));
+                } else {
+                    order.setTrip(null);
+                    orderRepository.save(order);
+                }
             }
         }
 
@@ -594,11 +609,29 @@ public class DriverAppService {
             throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
         }
 
+        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
+        List<Order> unresolved = orders.stream()
+                .filter(tripOrderLifecycle::isUnresolved)
+                .toList();
+
+        for (Order order : unresolved) {
+            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+            tripOrderLifecycle.detachAndReset(order);
+            eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                    this, order, previousDeliveryStatus, "Trip completed by driver", LocalDateTime.now()));
+        }
+
+        deliveryService.recalculateDriverAvailability(driver.getUser().getId());
+
+        TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.COMPLETED);
         trip = tripRepository.save(trip);
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' completed by driver");
+
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
+        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
 
         return tripMapper.toResponse(trip);
     }

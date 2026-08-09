@@ -94,12 +94,12 @@ public class DeliveryService {
 
         if ((newStatus == DeliveryStatus.FAILED || newStatus == DeliveryStatus.FAILED_PERMANENT)
                 && previousDriver != null) {
-            updateDriverAvailability(previousDriver.getId());
+            recalculateDriverAvailability(previousDriver.getId());
         }
 
         if (result.wasDelivered()) {
             if (previousDriver != null) {
-                updateDriverAvailability(previousDriver.getId());
+                recalculateDriverAvailability(previousDriver.getId());
             }
             commissionLifecycleService.approveCommissionForOrder(order.getId());
         }
@@ -253,8 +253,12 @@ public class DeliveryService {
      * Rules (see DRIVER_ASSIGNMENT.md):
      * AVAILABLE — 0 orders with status ASSIGNED / PICKED_UP / IN_TRANSIT
      * ON_TRIP   — ≥1 orders with status ASSIGNED / PICKED_UP / IN_TRANSIT
+     * <p>
+     * Public so that trip completion/cancellation can refresh availability
+     * after detaching unresolved orders (which never pass through
+     * {@link #updateDeliveryStatus}).
      */
-    private void updateDriverAvailability(UUID driverUserId) {
+    public void recalculateDriverAvailability(UUID driverUserId) {
         List<DeliveryStatus> activeStatuses = List.of(
                 DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
         long activeCount = deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(

@@ -1,8 +1,10 @@
 package com.ebee.commission.service;
 
+import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.enums.AgentCommissionType;
 import com.ebee.alert.enums.AlertType;
+import com.ebee.common.security.SecurityService;
 import com.ebee.commission.dto.CommissionCalculateRequest;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -37,6 +39,8 @@ public class CommissionCalculationService {
     private final OrderRepository orderRepository;
     private final CommissionMapper mapper;
     private final NotificationPort notificationPort;
+    private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     @Transactional
     public CommissionResponse calculateCommission(CommissionCalculateRequest request) {
@@ -110,7 +114,17 @@ public class CommissionCalculationService {
                 .calculatedAt(LocalDateTime.now())
                 .build();
 
-        return commissionRepository.save(commission);
+        Commission saved = commissionRepository.save(commission);
+
+        ledgerService.recordAgentCommission(
+                agent.getId(),
+                saved.getId(),
+                commissionAmount,
+                "Commission calculated for Order " + order.getOrderNumber(),
+                securityService.getCurrentUserId()
+        );
+
+        return saved;
     }
 
     private CommissionConfig findApplicableConfig(Agent agent) {

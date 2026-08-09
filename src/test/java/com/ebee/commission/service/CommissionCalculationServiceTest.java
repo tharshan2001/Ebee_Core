@@ -42,6 +42,8 @@ class CommissionCalculationServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private CommissionMapper mapper;
     @Mock private NotificationPort notificationPort;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
+    @Mock private com.ebee.common.security.SecurityService securityService;
 
     @InjectMocks private CommissionCalculationService commissionCalculationService;
 

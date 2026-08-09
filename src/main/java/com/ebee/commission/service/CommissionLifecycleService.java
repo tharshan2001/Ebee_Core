@@ -2,6 +2,7 @@ package com.ebee.commission.service;
 
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
+import com.ebee.agent.repository.AgentRepository;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.security.SecurityService;
@@ -34,6 +35,7 @@ public class CommissionLifecycleService {
     private final AuditLogService auditLogService;
     private final LedgerService ledgerService;
     private final SecurityService securityService;
+    private final AgentRepository agentRepository;
 
     @Transactional
     public CommissionResponse approveCommission(UUID commissionId) {
@@ -122,12 +124,14 @@ public class CommissionLifecycleService {
                 Agent agent = commission.getAgent();
                 agent.setTotalCommission(agent.getTotalCommission().subtract(commission.getCommissionAmount()));
                 agent.setTotalSales(agent.getTotalSales().subtract(commission.getOrderAmount()));
-
-                ledgerService.recordAgentCommission(
-                        agent.getId(),
-                        commission.getId(),
+                // No ledger entry needed — the CREDIT (calculation) and DEBIT (payment) already balance to 0
+            } else {
+                // Commission was CALCULATED/APPROVED/PROCESSING — reverse the CREDIT with a DEBIT
+                ledgerService.recordAgentPayout(
+                        commission.getAgent().getId(),
+                        null,
                         commission.getCommissionAmount(),
-                        "Commission reversed for Order " + commission.getOrder().getOrderNumber() + " (cancelled)",
+                        "Commission cancelled for Order " + commission.getOrder().getOrderNumber() + " (reversal)",
                         securityService.getCurrentUserId()
                 );
             }
@@ -160,6 +164,16 @@ public class CommissionLifecycleService {
     @Transactional
     public BatchPaymentResponse payBatch(List<UUID> commissionIds) {
         return commissionPaymentService.payBatch(commissionIds);
+    }
+
+    public void syncAgentTotalCommission(UUID agentId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + agentId));
+        BigDecimal totalPaid = commissionRepository.sumCommissionAmountByAgentIdAndStatus(agentId, CommissionStatus.PAID);
+        BigDecimal totalSales = commissionRepository.sumSalesByAgentId(agentId);
+        agent.setTotalCommission(totalPaid != null ? totalPaid : BigDecimal.ZERO);
+        agent.setTotalSales(totalSales != null ? totalSales : BigDecimal.ZERO);
+        agentRepository.save(agent);
     }
 
     private Commission getCommissionEntity(UUID id) {

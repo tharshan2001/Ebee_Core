@@ -72,24 +72,31 @@ public class AccountingPeriodService {
         FiscalYear fiscalYear = fiscalYearRepository.findByFiscalYear(year)
                 .orElseThrow(() -> new IllegalArgumentException("Fiscal year not found: " + year));
 
-        AccountingPeriod period = accountingPeriodRepository.findByMonthAndYear(month, year)
-                .orElseGet(() -> AccountingPeriod.builder()
-                        .fiscalYear(fiscalYear)
-                        .month(month)
-                        .year(year)
-                        .status(PeriodStatus.OPEN)
-                        .openedAt(LocalDateTime.now())
-                        .build());
+        Optional<AccountingPeriod> existing = accountingPeriodRepository.findByMonthAndYear(month, year);
 
-        if (period.getStatus() == PeriodStatus.OPEN) {
-            log.warn("Period {}/{} is already open", month, year);
+        if (existing.isPresent()) {
+            AccountingPeriod period = existing.get();
+            if (period.getStatus() == PeriodStatus.OPEN) {
+                log.warn("Period {}/{} is already open", month, year);
+                return period;
+            }
+            period.setStatus(PeriodStatus.OPEN);
+            period.setOpenedAt(LocalDateTime.now());
+            period = accountingPeriodRepository.save(period);
+            auditPeriodChange(period.getId(), null, PeriodStatus.OPEN, openedBy, "Period reopened");
+            log.info("Reopened period: {}/{}", month, year);
             return period;
         }
 
-        period.setStatus(PeriodStatus.OPEN);
-        period.setOpenedAt(LocalDateTime.now());
-        period = accountingPeriodRepository.save(period);
+        AccountingPeriod period = AccountingPeriod.builder()
+                .fiscalYear(fiscalYear)
+                .month(month)
+                .year(year)
+                .status(PeriodStatus.OPEN)
+                .openedAt(LocalDateTime.now())
+                .build();
 
+        period = accountingPeriodRepository.save(period);
         auditPeriodChange(period.getId(), null, PeriodStatus.OPEN, openedBy, "Period opened");
         log.info("Opened period: {}/{}", month, year);
 

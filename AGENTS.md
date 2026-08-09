@@ -195,6 +195,12 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - V122 migration adds indexes on `effective_date` columns and `accounting_period_transactions(period_id, transaction_type)`
 - `@Positive` validation added to all ledger amount parameters in `LedgerController`
 
+**Critical Bug Fixes (August 9, 2026):**
+- `handleOrderSettlement()` REFUND path now records `customer_ledger` REFUND entry — previously left original invoice DEBIT unreversed
+- `cancelCommissionForOrder()` now records CREDIT (reversal) instead of DEBIT — was creating negative agent ledger balance
+- Commission payment/cancellation flows now pass `securityService.getCurrentUserId()` instead of `null` for `recordedBy` — was causing DB NOT NULL constraint violation
+- Added `syncAdvanceBalance()` and `syncAllBalances()` to `CustomerService` — recalculates `advanceBalance` from `customer_advance_transactions` table
+
 **Method Signature Changes:**
 - `LedgerService.recordSupplierInvoice()` — added `UUID recordedBy` parameter
 - `LedgerService.recordSupplierPayment()` — added `UUID recordedBy` parameter
@@ -204,8 +210,8 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `LedgerService.recordAgentPayout()` — added `UUID recordedBy` parameter
 
 **New Dependencies Injected:**
-- `CommissionPaymentService` — now depends on `LedgerService`
-- `CommissionLifecycleService` — now depends on `LedgerService`
+- `CommissionPaymentService` — now depends on `LedgerService`, `SecurityService`
+- `CommissionLifecycleService` — now depends on `LedgerService`, `SecurityService`
 - `SupplierServiceImpl` — now depends on `SecurityService`
 - `PurchaseOrderPaymentService` — now depends on `SecurityService`
 

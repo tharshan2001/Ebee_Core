@@ -201,6 +201,15 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - Commission payment/cancellation flows now pass `securityService.getCurrentUserId()` instead of `null` for `recordedBy` — was causing DB NOT NULL constraint violation
 - Added `syncAdvanceBalance()` and `syncAllBalances()` to `CustomerService` — recalculates `advanceBalance` from `customer_advance_transactions` table
 
+**Accounting Completeness (August 9, 2026):**
+- Partial returns now record `customer_ledger` CREDIT adjustment entry when `order.totalAmount` is reduced — eliminates permanent discrepancy between ledger and order outstanding
+- New `LedgerService.recordCustomerCreditAdjustment()` method for return adjustments
+- `FinancialReportService.getProfitLoss()` now uses FIFO cost from `order_items.costPrice` instead of `product.costPrice` — accurate COGS
+- New `OrderItemRepository.sumCostOfGoodsSold()` query
+- `AccountingPeriodService.closePeriod()` captures balance snapshot before closing (PERIOD_SNAPSHOT transaction)
+- `AccountingPeriodService.autoOpenCurrentMonthPeriod()` scheduled job runs 1st of every month at 1:00 AM — auto-creates fiscal year if missing
+- Aging report already existed at `GET /api/reports/aging` with 30/60/90/120+ day bucketing
+
 **Method Signature Changes:**
 - `LedgerService.recordSupplierInvoice()` — added `UUID recordedBy` parameter
 - `LedgerService.recordSupplierPayment()` — added `UUID recordedBy` parameter

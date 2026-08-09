@@ -32,6 +32,7 @@ public class AccountingPeriodService {
     private final AccountingPeriodAuditRepository accountingPeriodAuditRepository;
     private final AccountingPeriodTransactionRepository accountingPeriodTransactionRepository;
     private final FiscalYearRepository fiscalYearRepository;
+    @org.springframework.context.annotation.Lazy
     private final LedgerService ledgerService;
 
     @Transactional(readOnly = true)

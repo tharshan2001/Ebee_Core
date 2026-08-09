@@ -210,6 +210,13 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `AccountingPeriodService.autoOpenCurrentMonthPeriod()` scheduled job runs 1st of every month at 1:00 AM — auto-creates fiscal year if missing
 - Aging report already existed at `GET /api/reports/aging` with 30/60/90/120+ day bucketing
 
+**Agent Commission Ledger Tracking (August 9, 2026):**
+- Commission lifecycle now fully tracked in `agent_ledger`: CREDIT on CALCULATED, DEBIT on PAID
+- `cancelCommissionForOrder()` now correctly handles both PAID (no entry needed) and APPROVED/PROCESSING (DEBIT reversal) states
+- `CommissionCalculationService.calculateCommissionForOrder()` now records CREDIT entry via `ledgerService.recordAgentCommission()`
+- Added `syncAgentTotalCommission(UUID agentId)` to `CommissionLifecycleService` — recalculates `agent.totalCommission` and `agent.totalSales` from commissions table
+- Agent ledger balance now accurately reflects current commission liability: positive = owed, zero = settled
+
 **Method Signature Changes:**
 - `LedgerService.recordSupplierInvoice()` — added `UUID recordedBy` parameter
 - `LedgerService.recordSupplierPayment()` — added `UUID recordedBy` parameter

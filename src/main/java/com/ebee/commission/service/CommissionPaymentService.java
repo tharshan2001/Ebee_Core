@@ -4,6 +4,7 @@ import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
+import com.ebee.common.security.SecurityService;
 import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -34,6 +35,7 @@ public class CommissionPaymentService {
     private final CommissionNotificationService commissionNotificationService;
     private final AuditLogService auditLogService;
     private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     @Transactional
     public CommissionResponse markAsPaid(UUID commissionId) {
@@ -65,7 +67,7 @@ public class CommissionPaymentService {
                 null,
                 commission.getCommissionAmount(),
                 "Commission paid for Order " + commission.getOrder().getOrderNumber(),
-                null
+                securityService.getCurrentUserId()
         );
 
         commissionNotificationService.sendCommissionNotification(commission, "Paid",
@@ -122,7 +124,7 @@ public class CommissionPaymentService {
                     null,
                     c.getCommissionAmount(),
                     "Commission paid (batch) for Order " + c.getOrder().getOrderNumber(),
-                    null
+                    securityService.getCurrentUserId()
             );
 
             commissionRepository.save(c);

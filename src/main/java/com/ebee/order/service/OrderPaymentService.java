@@ -256,6 +256,17 @@ public class OrderPaymentService {
                             : AdvanceReferenceType.ORDER_RETURNED,
                     order.getId(), description);
         } else if (choice == RefundChoice.REFUND) {
+            if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.recordCustomerRefund(
+                        order.getCustomer().getId(),
+                        order.getId(),
+                        paidAmount,
+                        "Refund on " + (changeType == DuesChangeType.CANCEL_REFUND
+                                ? "order cancellation" : "order return")
+                                + " - Order #" + order.getOrderNumber(),
+                        securityService.getCurrentUserId()
+                );
+            }
             order.setPaymentStatus(PaymentStatus.REFUNDED);
             order.setPaidAmount(BigDecimal.ZERO);
         }

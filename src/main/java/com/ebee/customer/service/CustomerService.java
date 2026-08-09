@@ -234,6 +234,16 @@ public class CustomerService {
         customer.setOutstandingBalance(actual);
     }
 
+    public void syncAdvanceBalance(Customer customer) {
+        BigDecimal actual = advanceTransactionRepository.sumAdvanceByCustomerId(customer.getId());
+        customer.setAdvanceBalance(actual);
+    }
+
+    public void syncAllBalances(Customer customer) {
+        syncCustomerOutstanding(customer);
+        syncAdvanceBalance(customer);
+    }
+
     public void syncAndPublishDuesChange(Customer customer, DuesChangeType changeType) {
         BigDecimal previousOutstanding = customer.getOutstandingBalance();
         BigDecimal previousAdvance = customer.getAdvanceBalance();

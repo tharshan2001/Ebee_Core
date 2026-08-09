@@ -4,6 +4,7 @@ import com.ebee.accounting.service.LedgerService;
 import com.ebee.agent.entity.Agent;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
+import com.ebee.common.security.SecurityService;
 import com.ebee.commission.dto.BatchPaymentResponse;
 import com.ebee.commission.dto.CommissionResponse;
 import com.ebee.commission.entity.Commission;
@@ -32,6 +33,7 @@ public class CommissionLifecycleService {
     private final CommissionPaymentService commissionPaymentService;
     private final AuditLogService auditLogService;
     private final LedgerService ledgerService;
+    private final SecurityService securityService;
 
     @Transactional
     public CommissionResponse approveCommission(UUID commissionId) {
@@ -121,12 +123,12 @@ public class CommissionLifecycleService {
                 agent.setTotalCommission(agent.getTotalCommission().subtract(commission.getCommissionAmount()));
                 agent.setTotalSales(agent.getTotalSales().subtract(commission.getOrderAmount()));
 
-                ledgerService.recordAgentPayout(
+                ledgerService.recordAgentCommission(
                         agent.getId(),
-                        null,
+                        commission.getId(),
                         commission.getCommissionAmount(),
                         "Commission reversed for Order " + commission.getOrder().getOrderNumber() + " (cancelled)",
-                        null
+                        securityService.getCurrentUserId()
                 );
             }
 

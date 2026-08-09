@@ -26,6 +26,7 @@ import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -50,8 +51,13 @@ public class OrderPaymentService {
     private final SecurityService securityService;
     private final ApplicationEventPublisher eventPublisher;
     private final LedgerService ledgerService;
+    private com.ebee.customer.service.CustomerService customerService;
+
+    @Autowired
     @Lazy
-    private final com.ebee.customer.service.CustomerService customerService;
+    public void setCustomerService(com.ebee.customer.service.CustomerService customerService) {
+        this.customerService = customerService;
+    }
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
         if (paymentMethod == PaymentMethod.CHEQUE

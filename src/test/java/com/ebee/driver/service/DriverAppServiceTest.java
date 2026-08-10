@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -128,21 +129,22 @@ class DriverAppServiceTest {
     }
 
     @Test
-    void completeTrip_resetsUnresolvedOrdersAndPublishesEvents() {
+    void completeTrip_nonTerminalOrder_blocksCompletion() {
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
-        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        driverAppService.completeTrip(tripId);
+        assertThatThrownBy(() -> driverAppService.completeTrip(tripId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot complete trip")
+                .hasMessageContaining("DELIVERED or FAILED_PERMANENT");
 
         assertThat(order.getTrip()).isNull();
         assertThat(order.getDeliveryAssignedTo()).isNull();
-        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(trip.getStatus()).isEqualTo(TripStatus.COMPLETED);
-        verify(deliveryService).recalculateDriverAvailability(userId);
-        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
-        verify(eventPublisher).publishEvent(any(TripStatusChangedEvent.class));
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.ASSIGNED);
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
+        verify(deliveryService, never()).recalculateDriverAvailability(userId);
+        verify(eventPublisher, never()).publishEvent(any(DeliveryStatusChangedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(TripStatusChangedEvent.class));
     }
 
     @Test
@@ -159,6 +161,18 @@ class DriverAppServiceTest {
         assertThat(order.getTrip()).isEqualTo(trip);
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
         verify(eventPublisher, never()).publishEvent(any(DeliveryStatusChangedEvent.class));
+    }
+
+    @Test
+    void updateMileage_negative_throws() {
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        assertThatThrownBy(() -> driverAppService.updateMileage(tripId, new BigDecimal("-10.0")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Mileage cannot be negative");
+
+        assertThat(trip.getMileageKm()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(tripRepository, never()).save(any(Trip.class));
     }
 
     @Test

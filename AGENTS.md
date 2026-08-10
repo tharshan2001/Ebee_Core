@@ -243,7 +243,8 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 **Trip lifecycle hardening:**
 - `TripOrderLifecycle` (new component in `trip/service`) centralizes order-state rules: `RESETTABLE_DELIVERY_STATUSES` (PENDING, ASSIGNED, PICKED_UP, IN_TRANSIT, FAILED) and `TERMINAL_ORDER_STATUSES` (CANCELLED, RETURNED, RETURN_EXCHANGE); `detachAndReset()` clears trip/assignee and returns order to PENDING
 - `TripService.cancelTrip()` refuses to cancel CANCELLED/COMPLETED trips; detaches+resets only unresolved orders (DELIVERED/FAILED_PERMANENT keep the trip reference), publishes per-order `DeliveryStatusChangedEvent` + `TripStatusChangedEvent`, recalculates driver availability
-- `TripService.completeTrip()` and driver `DriverAppService.completeTrip()` now mirror each other: reset unresolved orders, publish events, recalc availability
+- `TripService.completeTrip()` and driver `DriverAppService.completeTrip()` now mirror each other: require every order to be terminal (`DELIVERED`, `FAILED_PERMANENT`, or CANCELLED/RETURNED/RETURN_EXCHANGE order status), otherwise reject with `IllegalStateException` listing the offending order numbers (no auto-detach/reset); on success publish events + recalc availability
+- `TripOrderLifecycle.isTerminalForTrip()` — shared terminal check used by the completion guard (orders in PENDING/ASSIGNED/PICKED_UP/IN_TRANSIT/FAILED or with null delivery status block completion)
 - `TripStatusChangedEvent` carries an explicit `orderCount` (from `findByTripId`) instead of the lazy inverse collection
 - `DeliveryService.recalculateDriverAvailability()` made public (was private `updateDriverAvailability`) so trip completion/cancellation refreshes availability
 

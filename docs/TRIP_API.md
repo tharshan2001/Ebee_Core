@@ -209,8 +209,9 @@ Auth: ADMIN
 
 **Rules:**
 - Trip must be IN_PROGRESS.
-
-Unresolved orders (PENDING/ASSIGNED/PICKED_UP/IN_TRANSIT/FAILED) are detached and reset to `PENDING` (trip/assignee/failure reason cleared) and broadcast on `/topic/deliveries`. DELIVERED and FAILED_PERMANENT orders keep the trip reference. Driver availability is recalculated.
+- **Every order must be terminal:** delivery status `DELIVERED` or `FAILED_PERMANENT`, or order status `CANCELLED`/`RETURNED`/`RETURN_EXCHANGE`.
+- If any order is still `PENDING`/`ASSIGNED`/`PICKED_UP`/`IN_TRANSIT`/`FAILED` (or has no delivery status), completion is **rejected** with `400` listing the offending order numbers — nothing is detached or reset. The driver must resolve those orders first (deliver them or mark them permanently failed).
+- On success the driver's availability is recalculated.
 
 **Response:** `TripResponse`
 

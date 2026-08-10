@@ -30,8 +30,8 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     @Query("SELECT t FROM Trip t WHERE (:status IS NULL OR t.status = :status) " +
             "AND (:driverId IS NULL OR t.driver.id = :driverId) " +
-            "AND (:dateFrom IS NULL OR t.startDate >= :dateFrom) " +
-            "AND (:dateTo IS NULL OR t.endDate <= :dateTo)")
+            "AND t.startDate >= COALESCE(:dateFrom, CAST('0001-01-01' AS date)) " +
+            "AND t.endDate <= COALESCE(:dateTo, CAST('9999-12-31' AS date))")
     List<Trip> search(@Param("status") TripStatus status,
                       @Param("driverId") UUID driverId,
                       @Param("dateFrom") LocalDate dateFrom,
@@ -39,8 +39,8 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     @Query("SELECT t FROM Trip t WHERE (:status IS NULL OR t.status = :status) " +
             "AND (:driverId IS NULL OR t.driver.id = :driverId) " +
-            "AND (:dateFrom IS NULL OR t.startDate >= :dateFrom) " +
-            "AND (:dateTo IS NULL OR t.endDate <= :dateTo)")
+            "AND t.startDate >= COALESCE(:dateFrom, CAST('0001-01-01' AS date)) " +
+            "AND t.endDate <= COALESCE(:dateTo, CAST('9999-12-31' AS date))")
     Page<Trip> search(@Param("status") TripStatus status,
                       @Param("driverId") UUID driverId,
                       @Param("dateFrom") LocalDate dateFrom,

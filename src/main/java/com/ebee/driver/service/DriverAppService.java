@@ -60,6 +60,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -586,6 +587,9 @@ public class DriverAppService {
         if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
             throw new AccessDeniedException("This trip is not assigned to you");
         }
+        if (mileageKm == null || mileageKm.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("Mileage cannot be negative");
+        }
 
         trip.setMileageKm(mileageKm);
         trip = tripRepository.save(trip);
@@ -610,15 +614,17 @@ public class DriverAppService {
         }
 
         List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
-        List<Order> unresolved = orders.stream()
-                .filter(tripOrderLifecycle::isUnresolved)
+        List<Order> notTerminal = orders.stream()
+                .filter(order -> !tripOrderLifecycle.isTerminalForTrip(order))
                 .toList();
 
-        for (Order order : unresolved) {
-            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
-            tripOrderLifecycle.detachAndReset(order);
-            eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                    this, order, previousDeliveryStatus, "Trip completed by driver", LocalDateTime.now()));
+        if (!notTerminal.isEmpty()) {
+            String orderNumbers = notTerminal.stream()
+                    .map(Order::getOrderNumber)
+                    .collect(Collectors.joining(", "));
+            throw new IllegalStateException("Cannot complete trip '" + trip.getName() + "': " + notTerminal.size()
+                    + " order(s) not yet delivered (" + orderNumbers
+                    + "). All orders must be DELIVERED or FAILED_PERMANENT.");
         }
 
         deliveryService.recalculateDriverAvailability(driver.getUser().getId());

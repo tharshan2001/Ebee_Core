@@ -55,6 +55,19 @@ public class TripOrderLifecycle {
     }
 
     /**
+     * Whether an order is in a state that allows the trip to complete:
+     * delivered, permanently failed, or its sale was already closed out
+     * (cancelled/returned). Orders in any resettable delivery state, or with
+     * no delivery state at all, are considered non-terminal and block
+     * completion.
+     */
+    public boolean isTerminalForTrip(Order order) {
+        DeliveryStatus deliveryStatus = order.getDeliveryStatus();
+        return (deliveryStatus == DeliveryStatus.DELIVERED || deliveryStatus == DeliveryStatus.FAILED_PERMANENT)
+                || TERMINAL_ORDER_STATUSES.contains(order.getStatus());
+    }
+
+    /**
      * Detach an order from its trip and reset its delivery to a fresh,
      * unassigned PENDING state so it can be retried or re-assigned.
      */

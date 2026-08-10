@@ -424,8 +424,8 @@ Transitions trip from IN_PROGRESS to COMPLETED.
 
 **Rules:**
 - Trip must be in IN_PROGRESS status
-
-Unresolved orders (PENDING/ASSIGNED/PICKED_UP/IN_TRANSIT/FAILED) are detached and reset to PENDING; DELIVERED and FAILED_PERMANENT orders keep the trip reference.
+- **Every order must be terminal:** delivery status `DELIVERED` or `FAILED_PERMANENT`, or order status `CANCELLED`/`RETURNED`/`RETURN_EXCHANGE`
+- If any order is still `PENDING`/`ASSIGNED`/`PICKED_UP`/`IN_TRANSIT`/`FAILED`, completion is rejected with an error listing those order numbers — orders are not detached or reset
 
 **Response:** `TripResponse`
 

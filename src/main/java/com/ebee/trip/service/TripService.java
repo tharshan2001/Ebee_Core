@@ -442,18 +442,20 @@ public class TripService {
         }
 
         List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
-        List<Order> unresolved = orders.stream()
-                .filter(tripOrderLifecycle::isUnresolved)
+        List<Order> notTerminal = orders.stream()
+                .filter(order -> !tripOrderLifecycle.isTerminalForTrip(order))
                 .toList();
 
-        UUID driverUserId = trip.getDriver() != null ? trip.getDriver().getUser().getId() : null;
-
-        for (Order order : unresolved) {
-            DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
-            tripOrderLifecycle.detachAndReset(order);
-            eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                    this, order, previousDeliveryStatus, "Trip completed — order returned to pending", LocalDateTime.now()));
+        if (!notTerminal.isEmpty()) {
+            String orderNumbers = notTerminal.stream()
+                    .map(Order::getOrderNumber)
+                    .collect(Collectors.joining(", "));
+            throw new IllegalStateException("Cannot complete trip '" + trip.getName() + "': " + notTerminal.size()
+                    + " order(s) not yet delivered (" + orderNumbers
+                    + "). All orders must be DELIVERED or FAILED_PERMANENT.");
         }
+
+        UUID driverUserId = trip.getDriver() != null ? trip.getDriver().getUser().getId() : null;
 
         if (driverUserId != null) {
             deliveryService.recalculateDriverAvailability(driverUserId);

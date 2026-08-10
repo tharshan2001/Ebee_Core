@@ -16,6 +16,7 @@ import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
@@ -53,6 +54,13 @@ class WebSocketAuthInterceptorTest {
         accessor.setDestination(destination);
         accessor.setUser(new UsernamePasswordAuthenticationToken(
                 email, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
+    private Message<byte[]> connectMessage(String authHeader) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setLeaveMutable(true);
+        accessor.setNativeHeader("Authorization", authHeader);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
@@ -109,5 +117,37 @@ class WebSocketAuthInterceptorTest {
                 subscribeMessage("/topic/trip-orders/" + anyDriverId, "ADMIN"), null);
 
         assertThat(result).isNotNull();
+    }
+
+    @Test
+    void connectWithStandardPaddedBearerHeader_authenticates() {
+        when(jwtService.extractEmail("token123")).thenReturn(email);
+        when(jwtService.extractRole("token123"))
+                .thenReturn(com.ebee.user.enums.RoleType.DRIVER);
+
+        Message<?> result = interceptor.preSend(connectMessage(" Bearer token123"), null);
+
+        StompHeaderAccessor accessor =
+                MessageHeaderAccessor.getAccessor(result, StompHeaderAccessor.class);
+        assertThat(accessor.getUser()).isInstanceOf(UsernamePasswordAuthenticationToken.class);
+        assertThat(accessor.getUser().getName()).isEqualTo(email);
+    }
+
+    @Test
+    void connectWithCompactBearerHeader_authenticates() {
+        when(jwtService.extractEmail("token123")).thenReturn(email);
+        when(jwtService.extractRole("token123"))
+                .thenReturn(com.ebee.user.enums.RoleType.DRIVER);
+
+        Message<?> result = interceptor.preSend(connectMessage("Bearer token123"), null);
+
+        assertThat(MessageHeaderAccessor.getAccessor(result, StompHeaderAccessor.class)
+                .getUser()).isNotNull();
+    }
+
+    @Test
+    void connectWithWhitespaceOnlyHeader_rejected() {
+        assertThatThrownBy(() -> interceptor.preSend(connectMessage("   "), null))
+                .isInstanceOf(MessageDeliveryException.class);
     }
 }

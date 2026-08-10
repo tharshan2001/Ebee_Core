@@ -733,6 +733,8 @@ class TripServiceTest {
         assertThat(tripResponse.getUnpaidOrderCount()).isEqualTo(1);
         assertThat(tripResponse.getPaidOrderCount()).isZero();
         assertThat(tripResponse.getPartialOrderCount()).isZero();
+        assertThat(tripResponse.getDeliveredOrderCount()).isEqualTo(1);
+        assertThat(tripResponse.getFailedOrderCount()).isEqualTo(1);
         assertThat(tripResponse.getTotalExpenses()).isEqualByComparingTo(new BigDecimal("100.00"));
         assertThat(tripResponse.getNetAmount()).isEqualByComparingTo(new BigDecimal("-100.00"));
     }

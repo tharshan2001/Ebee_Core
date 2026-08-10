@@ -3,6 +3,7 @@ package com.ebee.order.repository;
 import com.ebee.delivery.enums.DeliveryStatus;
 import com.ebee.order.entity.Order;
 import com.ebee.order.enums.PaymentStatus;
+import com.ebee.trip.enums.TripStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -145,4 +146,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.address LEFT JOIN FETCH o.deliveryAssignedTo LEFT JOIN FETCH o.trip WHERE o.trip IS NULL AND o.deliveryAssignedTo IS NULL AND o.status IN ('SHIPPED', 'FAILED')")
     Page<Order> findUnassignedOrdersPaged(Pageable pageable);
+
+    @Query("SELECT o.trip.status FROM Order o WHERE o.id = :orderId")
+    TripStatus findTripStatusByOrderId(@Param("orderId") UUID orderId);
 }

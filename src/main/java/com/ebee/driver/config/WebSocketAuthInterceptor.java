@@ -82,11 +82,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      */
     private void authenticate(StompHeaderAccessor accessor) {
         String authHeader = accessor.getFirstNativeHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.trim().startsWith("Bearer ")) {
             log.warn("WebSocket CONNECT rejected: missing or invalid Authorization header");
             throw new MessageDeliveryException((Message<?>) null, "Missing or invalid Authorization header");
         }
-        String token = authHeader.substring(7);
+        String token = authHeader.trim().substring(7);
         try {
             String email = jwtService.extractEmail(token);
             RoleType role = jwtService.extractRole(token);

@@ -574,10 +574,17 @@ public class TripService {
         int paidCount = 0;
         int partialCount = 0;
         int unpaidCount = 0;
+        int deliveredCount = 0;
+        int failedCount = 0;
         BigDecimal expected = BigDecimal.ZERO;
         BigDecimal collected = BigDecimal.ZERO;
 
         for (Order order : orders) {
+            if (order.getDeliveryStatus() == DeliveryStatus.DELIVERED) {
+                deliveredCount++;
+            } else if (order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT) {
+                failedCount++;
+            }
             boolean saleable = !EXCLUDED_FROM_SETTLEMENT.contains(order.getStatus())
                     && order.getDeliveryStatus() != DeliveryStatus.FAILED_PERMANENT;
             if (!saleable) {
@@ -602,6 +609,8 @@ public class TripService {
         response.setPaidOrderCount(paidCount);
         response.setPartialOrderCount(partialCount);
         response.setUnpaidOrderCount(unpaidCount);
+        response.setDeliveredOrderCount(deliveredCount);
+        response.setFailedOrderCount(failedCount);
 
         response.setExpectedAmount(expected);
         response.setCollectedAmount(collected);

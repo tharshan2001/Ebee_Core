@@ -59,6 +59,7 @@ The `/ws/**` path is included in the CORS configuration alongside REST endpoints
 | `/topic/deliveries` | `ADMIN`, `SUPER_ADMIN`, `AGENT`, `DRIVER` | Delivery assignment and status changes |
 | `/topic/trips` | `ADMIN`, `SUPER_ADMIN`, `DRIVER` | Trip status changes (start, complete, cancel) |
 | `/topic/trip-orders/{driverId}` | `ADMIN`, `SUPER_ADMIN`, `DRIVER` | Trip order markers pushed to a driver (DRIVER scoped to their own `driverId`) |
+| `/topic/active-trips` | `ADMIN`, `SUPER_ADMIN` | Full snapshot of all IN_PROGRESS trips (dashboard widget) |
 | `/topic/driver-locations` | `ADMIN`, `SUPER_ADMIN` | Live driver GPS pings from the mobile app |
 
 Subscribing with a role that is not in the allowed set results in an immediate DISCONNECT with an error message. Destinations not registered in the authorization registry (e.g. `/user/queue/...`) are open to all authenticated users.
@@ -197,6 +198,52 @@ Broadcast when a trip changes status (started, completed, or cancelled).
 | Driver completes trip | `IN_PROGRESS` | `COMPLETED` |
 | Admin completes trip | `IN_PROGRESS` | `COMPLETED` |
 | Admin cancels trip | `PLANNED` or `IN_PROGRESS` | `CANCELLED` |
+
+---
+
+## Active Trips Feed — `/topic/active-trips`
+
+Broadcast whenever trip-related state commits while trips are running, so an admin dashboard can render a live "active trips" widget. The payload is a **replace-style snapshot** of every IN_PROGRESS trip — subscribers simply overwrite their state with the latest message (no diffing).
+
+### Payload
+
+```json
+{
+  "activeTrips": [
+    {
+      "id": "uuid",
+      "name": "Morning Route Colombo",
+      "status": "IN_PROGRESS",
+      "driverName": "Driver One",
+      "orderCount": 5,
+      "deliveredOrderCount": 2,
+      "failedOrderCount": 0,
+      "expectedAmount": 25000.00,
+      "collectedAmount": 12000.00,
+      "netAmount": 11500.00
+    }
+  ],
+  "activeTripsCount": 1
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `activeTrips` | `TripResponse[]` | Full list of IN_PROGRESS trips (same shape as `GET /api/trips?status=IN_PROGRESS`) |
+| `activeTripsCount` | long | Number of IN_PROGRESS trips |
+
+### When the snapshot is broadcast
+
+| Trigger | Notes |
+|---------|-------|
+| Trip started (`PLANNED` → `IN_PROGRESS`) | Trip joins the snapshot |
+| Trip completed or cancelled (`IN_PROGRESS` → `COMPLETED`/`CANCELLED`) | Trip leaves the snapshot |
+| Orders added to / removed from a trip | Totals and counts change |
+| Delivery status change on an IN_PROGRESS trip | `deliveredOrderCount`/`failedOrderCount` update. Delivery events for orders **not** on an IN_PROGRESS trip are filtered out before the rebuild |
+
+### Rebuilding
+
+The snapshot is rebuilt by re-querying all trips with status `IN_PROGRESS` after the originating transaction commits, so the broadcast always reflects durable state. An empty `activeTrips` array means no trips are currently running.
 
 ---
 

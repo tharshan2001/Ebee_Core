@@ -39,7 +39,9 @@ public class TopicAuthorizationRegistry {
             new TopicAuthorization("/topic/trips",
                     Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.DRIVER)),
             new TopicAuthorization("/topic/trip-orders",
-                    Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.DRIVER))
+                    Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN, RoleType.DRIVER)),
+            new TopicAuthorization("/topic/active-trips",
+                    Set.of(RoleType.ADMIN, RoleType.SUPER_ADMIN))
     );
 
     /**

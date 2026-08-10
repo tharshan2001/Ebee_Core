@@ -76,8 +76,10 @@ DashboardResponse
 │                        averageOrderValue, totalCommission }
 ├── today:             { ordersToday, ordersYesterday,            — today vs yesterday KPIs
 │                        deliveriesToday, deliveriesYesterday }
-└── previousPeriod:    { totalRevenue, totalOrders,               — same-length prior period
-                         totalCommission }
+├── previousPeriod:    { totalRevenue, totalOrders,               — same-length prior period
+│                        totalCommission }
+└── activeTrips:       [ TripResponse, ... ]                      — IN_PROGRESS trips (live widget)
+└── activeTripsCount:  long                                       — number of IN_PROGRESS trips
 ```
 
 **Response Fields Detail:**
@@ -97,6 +99,8 @@ DashboardResponse
 | `previousPeriod.totalRevenue` | `BigDecimal` | Revenue in the prior period |
 | `previousPeriod.totalOrders` | `Long` | Order count in the prior period |
 | `previousPeriod.totalCommission` | `BigDecimal` | Commission locked in the prior period |
+| `activeTrips` | `TripResponse[]` | All trips with status `IN_PROGRESS` (see `docs/TRIPS_API.md` for the full shape); `deliveredOrderCount`/`failedOrderCount` give live progress |
+| `activeTripsCount` | `long` | Number of IN_PROGRESS trips |
 
 **Example curl:**
 ```bash

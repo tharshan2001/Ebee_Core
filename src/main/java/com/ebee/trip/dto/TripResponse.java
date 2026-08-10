@@ -29,6 +29,8 @@ public class TripResponse {
     private int paidOrderCount;
     private int partialOrderCount;
     private int unpaidOrderCount;
+    private int deliveredOrderCount;
+    private int failedOrderCount;
 
     private BigDecimal expectedAmount;
     private BigDecimal collectedAmount;

@@ -125,5 +125,13 @@ public class ArchitectureTest {
         .ignoreDependency(
             com.ebee.driver.websocket.DriverLocationWebSocketHandler.class,
             com.ebee.driver.service.DriverLocationService.class
+        )
+        .ignoreDependency(
+            com.ebee.trip.event.ActiveTripsSnapshotListener.class,
+            com.ebee.order.repository.OrderRepository.class
+        )
+        .ignoreDependency(
+            com.ebee.trip.event.ActiveTripsSnapshotListener.class,
+            com.ebee.trip.service.TripService.class
         );
 }

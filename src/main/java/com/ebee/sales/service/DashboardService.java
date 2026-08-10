@@ -8,6 +8,9 @@ import com.ebee.sales.dto.DashboardPreviousPeriod;
 import com.ebee.sales.dto.DashboardResponse;
 import com.ebee.sales.dto.DashboardSummary;
 import com.ebee.sales.dto.DashboardToday;
+import com.ebee.trip.dto.TripResponse;
+import com.ebee.trip.enums.TripStatus;
+import com.ebee.trip.service.TripService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +30,7 @@ public class DashboardService {
 
     private final OrderRepository orderRepository;
     private final CommissionRepository commissionRepository;
+    private final TripService tripService;
 
     public DashboardResponse getDashboard(LocalDate startDate, LocalDate endDate) {
         if (startDate == null && endDate == null) {
@@ -68,6 +73,8 @@ public class DashboardService {
         Long deliveriesToday = orderRepository.countDeliveredByDateRange(todayStart, todayEnd);
         Long deliveriesYesterday = orderRepository.countDeliveredByDateRange(yesterdayStart, yesterdayEnd);
 
+        List<TripResponse> activeTrips = tripService.getAllTrips(TripStatus.IN_PROGRESS, null, null, null);
+
         return DashboardResponse.builder()
                 .period(DashboardPeriod.builder().start(startDate).end(endDate).build())
                 .summary(DashboardSummary.builder()
@@ -87,6 +94,8 @@ public class DashboardService {
                         .totalOrders(prevCount)
                         .totalCommission(prevCommission)
                         .build())
+                .activeTrips(activeTrips)
+                .activeTripsCount(activeTrips.size())
                 .build();
     }
 }

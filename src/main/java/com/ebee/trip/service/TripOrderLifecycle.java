@@ -68,6 +68,25 @@ public class TripOrderLifecycle {
     }
 
     /**
+     * Whether an order is a retryable FAILED delivery that is released from
+     * its trip when the trip completes. Its sale is still open (not
+     * cancelled/returned) and the delivery can be retried on another trip.
+     */
+    public boolean isRetryableFailed(Order order) {
+        return order.getDeliveryStatus() == DeliveryStatus.FAILED
+                && !TERMINAL_ORDER_STATUSES.contains(order.getStatus());
+    }
+
+    /**
+     * Whether an order is in a state that allows the trip to complete:
+     * terminal for the trip (delivered / permanently failed / closed sale) or
+     * a retryable FAILED delivery that will be released on completion.
+     */
+    public boolean isCompletableForTrip(Order order) {
+        return isTerminalForTrip(order) || isRetryableFailed(order);
+    }
+
+    /**
      * Detach an order from its trip and reset its delivery to a fresh,
      * unassigned PENDING state so it can be retried or re-assigned.
      */

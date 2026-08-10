@@ -136,7 +136,7 @@ class DriverAppServiceTest {
         assertThatThrownBy(() -> driverAppService.completeTrip(tripId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot complete trip")
-                .hasMessageContaining("DELIVERED or FAILED_PERMANENT");
+                .hasMessageContaining("DELIVERED, FAILED_PERMANENT, or FAILED");
 
         assertThat(order.getTrip()).isNull();
         assertThat(order.getDeliveryAssignedTo()).isNull();
@@ -161,6 +161,28 @@ class DriverAppServiceTest {
         assertThat(order.getTrip()).isEqualTo(trip);
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
         verify(eventPublisher, never()).publishEvent(any(DeliveryStatusChangedEvent.class));
+    }
+
+    @Test
+    void completeTrip_failedOrder_releasesAndResets() {
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(user);
+        order.setDeliveryStatus(DeliveryStatus.FAILED);
+        order.setDeliveryFailureReason("Customer not available");
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
+
+        driverAppService.completeTrip(tripId);
+
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.COMPLETED);
+        assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryAssignedTo()).isNull();
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(order.getDeliveryFailureReason()).isNull();
+        verify(orderRepository).save(order);
+        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
     }
 
     @Test

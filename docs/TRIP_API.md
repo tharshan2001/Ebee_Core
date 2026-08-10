@@ -209,8 +209,9 @@ Auth: ADMIN
 
 **Rules:**
 - Trip must be IN_PROGRESS.
-- **Every order must be terminal:** delivery status `DELIVERED` or `FAILED_PERMANENT`, or order status `CANCELLED`/`RETURNED`/`RETURN_EXCHANGE`.
-- If any order is still `PENDING`/`ASSIGNED`/`PICKED_UP`/`IN_TRANSIT`/`FAILED` (or has no delivery status), completion is **rejected** with `400` listing the offending order numbers — nothing is detached or reset. The driver must resolve those orders first (deliver them or mark them permanently failed).
+- **Every order must be complete-able:** delivery status `DELIVERED`, `FAILED_PERMANENT`, or retryable `FAILED`, or order status `CANCELLED`/`RETURNED`/`RETURN_EXCHANGE`.
+- If any order is still `PENDING`/`ASSIGNED`/`PICKED_UP`/`IN_TRANSIT` (or has no delivery status), completion is **rejected** with `400` listing the offending order numbers — nothing is detached or reset. The driver must resolve those orders first (deliver them or mark them permanently failed).
+- On success, retryable `FAILED` orders are **released**: `trip` and `deliveryAssignedTo` cleared, delivery reset to `PENDING`, failure reason cleared, and a `DeliveryStatusChangedEvent` broadcast — they become eligible for assignment to another trip.
 - On success the driver's availability is recalculated.
 
 **Response:** `TripResponse`

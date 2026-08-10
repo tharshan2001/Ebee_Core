@@ -762,8 +762,7 @@ class TripServiceTest {
     @Test
     void completeTrip_nonTerminalOrder_blocksCompletion() {
         trip.setStatus(TripStatus.IN_PROGRESS);
-        order.setDeliveryStatus(DeliveryStatus.FAILED);
-        order.setDeliveryFailureReason("Customer not available");
+        order.setDeliveryStatus(DeliveryStatus.ASSIGNED);
 
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
@@ -772,12 +771,10 @@ class TripServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot complete trip")
                 .hasMessageContaining("JF-A-20250614-001")
-                .hasMessageContaining("DELIVERED or FAILED_PERMANENT");
+                .hasMessageContaining("DELIVERED, FAILED_PERMANENT, or FAILED");
 
         assertThat(trip.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
-        assertThat(order.getTrip()).isNull();
-        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.FAILED);
-        assertThat(order.getDeliveryFailureReason()).isEqualTo("Customer not available");
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.ASSIGNED);
         verify(tripRepository, never()).save(any(Trip.class));
     }
 
@@ -785,7 +782,7 @@ class TripServiceTest {
     void completeTrip_anyNonTerminalDeliveryStatus_blocksCompletion() {
         for (DeliveryStatus status : List.of(
                 DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED,
-                DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED)) {
+                DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT)) {
             trip.setStatus(TripStatus.IN_PROGRESS);
             order.setDeliveryStatus(status);
 
@@ -839,5 +836,30 @@ class TripServiceTest {
 
         assertThat(order.getTrip()).isEqualTo(trip);
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+    }
+
+    @Test
+    void completeTrip_failedOrder_releasesAndResets() {
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(driverUser);
+        order.setDeliveryStatus(DeliveryStatus.FAILED);
+        order.setDeliveryFailureReason("Customer not available");
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
+
+        var result = tripService.completeTrip(tripId);
+
+        assertThat(result).isEqualTo(tripResponse);
+        assertThat(trip.getStatus()).isEqualTo(TripStatus.COMPLETED);
+        assertThat(order.getTrip()).isNull();
+        assertThat(order.getDeliveryAssignedTo()).isNull();
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(order.getDeliveryFailureReason()).isNull();
+        verify(orderRepository).save(order);
+        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
     }
 }

@@ -614,17 +614,17 @@ public class DriverAppService {
         }
 
         List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
-        List<Order> notTerminal = orders.stream()
-                .filter(order -> !tripOrderLifecycle.isTerminalForTrip(order))
+        List<Order> notCompletable = orders.stream()
+                .filter(order -> !tripOrderLifecycle.isCompletableForTrip(order))
                 .toList();
 
-        if (!notTerminal.isEmpty()) {
-            String orderNumbers = notTerminal.stream()
+        if (!notCompletable.isEmpty()) {
+            String orderNumbers = notCompletable.stream()
                     .map(Order::getOrderNumber)
                     .collect(Collectors.joining(", "));
-            throw new IllegalStateException("Cannot complete trip '" + trip.getName() + "': " + notTerminal.size()
+            throw new IllegalStateException("Cannot complete trip '" + trip.getName() + "': " + notCompletable.size()
                     + " order(s) not yet delivered (" + orderNumbers
-                    + "). All orders must be DELIVERED or FAILED_PERMANENT.");
+                    + "). All orders must be DELIVERED, FAILED_PERMANENT, or FAILED.");
         }
 
         deliveryService.recalculateDriverAvailability(driver.getUser().getId());
@@ -632,6 +632,16 @@ public class DriverAppService {
         TripStatus previousStatus = trip.getStatus();
         trip.setStatus(TripStatus.COMPLETED);
         trip = tripRepository.save(trip);
+
+        for (Order order : orders) {
+            if (tripOrderLifecycle.isRetryableFailed(order)) {
+                DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
+                tripOrderLifecycle.detachAndReset(order);
+                eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                        this, order, previousDeliveryStatus,
+                        "Trip completed — order released for retry", LocalDateTime.now()));
+            }
+        }
 
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' completed by driver");

@@ -92,7 +92,7 @@ class DeliveryStateMachine implements DeliveryStateTransition {
         }
 
         if (wasFailedPermanent) {
-            order.setStatus(OrderStatus.PENDING);
+            order.setStatus(OrderStatus.CANCELLED);
             order.setDeliveryAssignedTo(null);
             order.setDeliveryScheduledDate(null);
             order.setDeliveryNotes(null);

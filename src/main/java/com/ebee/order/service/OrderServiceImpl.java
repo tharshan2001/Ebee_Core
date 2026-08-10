@@ -512,12 +512,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<OrderResponse> getUnassignedOrdersIncludingFailed() {
         List<Order> shipped = orderRepository.findByTripIsNullAndStatus(OrderStatus.SHIPPED);
-        List<Order> failed = orderRepository.findByTripIsNullAndDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
-        List<Order> combined = new java.util.ArrayList<>(shipped);
-        for (Order o : failed) {
-            if (!combined.contains(o)) combined.add(o);
-        }
-        return orderMapper.toResponseList(combined);
+        return orderMapper.toResponseList(shipped);
     }
 
     @Transactional(readOnly = true)
@@ -569,8 +564,7 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
-        if (status == OrderStatus.SHIPPED
-                && (order.getDeliveryStatus() == null || order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT)) {
+        if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
             order.setDeliveryStatus(DeliveryStatus.PENDING);
             order.setDeliveryFailureReason(null);
             order.setDeliveryPhotoUrl(null);

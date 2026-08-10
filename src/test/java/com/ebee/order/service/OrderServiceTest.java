@@ -716,31 +716,16 @@ class OrderServiceTest {
     }
 
     @Test
-    void updateOrderStatus_shipped_resetsFailedPermanentDelivery() {
+    void updateOrderStatus_shipped_failedPermanentOrder_throws() {
         UUID orderId = order.getId();
-        order.setStatus(OrderStatus.CONFIRMED);
+        order.setStatus(OrderStatus.CANCELLED);
         order.setDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
-        order.setDeliveryFailureReason("Customer refused");
-        order.setDeliveryScheduledDate(LocalDate.of(2026, 7, 30));
-        order.setDeliveryNotes("Some notes");
-        Trip trip = Trip.builder().id(UUID.randomUUID()).name("Route").build();
-        order.setTrip(trip);
-        order.setDeliveryAssignedTo(adminUser);
 
         when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
-
-        verify(orderRepository).save(orderCaptor.capture());
-        Order saved = orderCaptor.getValue();
-        assertThat(saved.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(saved.getDeliveryFailureReason()).isNull();
-        assertThat(saved.getDeliveryScheduledDate()).isNull();
-        assertThat(saved.getDeliveryNotes()).isNull();
-        assertThat(saved.getTrip()).isNull();
-        assertThat(saved.getDeliveryAssignedTo()).isNull();
+        assertThatThrownBy(() -> orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot update status of a cancelled order");
     }
 
     @Test
@@ -818,24 +803,16 @@ class OrderServiceTest {
     }
 
     @Test
-    void cancelOrder_deliveryFailedPermanent_skipsStockRestore() {
-        // If the delivery was already marked FAILED_PERMANENT, DeliveryService
-        // already restored the stock. Cancelling the order must not restore it
-        // a second time (double-restore = customer can inflate inventory).
-        order.setStatus(OrderStatus.PENDING);
+    void cancelOrder_deliveryFailedPermanent_alreadyCancelled() {
+        // When delivery becomes FAILED_PERMANENT, the state machine sets order
+        // status to CANCELLED. Calling cancelOrder again is a no-op (already cancelled).
+        order.setStatus(OrderStatus.CANCELLED);
         order.setDeliveryStatus(DeliveryStatus.FAILED_PERMANENT);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
-        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(order.getId(), any());
-
-        verify(orderRepository).save(orderCaptor.capture());
-        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        // Stock is NOT restored again -- only commission is cancelled.
-        verify(inventoryService, never()).recordOrderStocks(
-                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
-        verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+        assertThatThrownBy(() -> orderService.cancelOrder(order.getId(), any()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Order is already cancelled");
     }
 
     @Test

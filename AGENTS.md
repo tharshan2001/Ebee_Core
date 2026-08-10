@@ -261,7 +261,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 
 **Filtering & re-ship (F7):**
 - `getAllTrips()`/`getAllTripsPaginated()` use a single `search(status, driverId, dateFrom, dateTo)` query (list + paged, nullable params)
-- `OrderServiceImpl.updateOrderStatus()` re-shipping an order with null/FAILED_PERMANENT delivery resets delivery to PENDING and clears failure fields, trip, assignee (unblocks re-shipping stuck FAILED_PERMANENT orders)
+- `OrderServiceImpl.updateOrderStatus()` re-shipping an order with null delivery resets delivery to PENDING and clears failure fields, trip, assignee (unblocks re-shipping stuck orders)
 
 **Cleanup:**
 - Removed unused `TripRepository` methods (`findByName`, `findByDriverId`, `findByStatusNotIn`, `findByDriverIdAndStatusNotIn`, paged `findAll`/`findByStatus`/`findByDriverId`/`findByDriverIdAndStatus`)
@@ -270,7 +270,7 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 - `removeOrdersFromTrip()` now fully detaches unresolved orders via `TripOrderLifecycle.detachAndReset()` (clears trip + assignee, resets to PENDING, clears failure reason, publishes `DeliveryStatusChangedEvent`); DELIVERED/FAILED_PERMANENT orders only lose the trip reference
 - `TripService.startTrip()` and `DriverAppService.startTrip()` now call `deliveryService.recalculateDriverAvailability()` so the driver is marked ON_TRIP when a trip is started
 
-**Tests:** 469 pass (2 pre-existing CommissionLockTest failures need running DB)
+**Tests:** 487 pass
 
 ## Agent Workflow
 

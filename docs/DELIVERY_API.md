@@ -73,7 +73,7 @@ Drivers can have multiple active deliveries. Admin manages availability via `PAT
 - **Driver availability**: managed by trip system — driver is AVAILABLE when no active trips, ON_TRIP when trip is IN_PROGRESS.
 - **deliveryFailureReason**: set when delivery status is updated to `FAILED`; cleared on retry (`FAILED` → `PENDING`).
 - **Commission auto-approve**: when delivery status is updated to `DELIVERED`, the associated commission (if any) is auto-approved. Direct orders have no commission and are unaffected.
-- **Stock rollback on FAILED_PERMANENT**: when delivery status is updated to `FAILED_PERMANENT`, stock is returned for each order item and the order is reset to `PENDING` status with `deliveryAssignedTo` and delivery dates cleared. The associated commission (if any) is cancelled to `CANCELLED` status. `deliveryFailureReason` is preserved for audit.
+- **Stock rollback on FAILED_PERMANENT**: when delivery status is updated to `FAILED_PERMANENT`, stock is returned for each order item and the order status is set to `CANCELLED`. `deliveryAssignedTo` and delivery dates are cleared. The associated commission (if any) is cancelled to `CANCELLED` status. `deliveryFailureReason` is preserved for audit.
 
 ---
 

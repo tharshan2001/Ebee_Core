@@ -172,7 +172,7 @@ class DeliveryStateMachineTest {
         Order order = orderWithStatus(DeliveryStatus.FAILED);
         var result = stateMachine.transition(order, DeliveryStatus.FAILED_PERMANENT, "Unreachable after 3 tries", true);
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.FAILED_PERMANENT);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getDeliveryFailureReason()).isEqualTo("Unreachable after 3 tries");
         assertThat(result.wasFailedPermanent()).isTrue();
     }

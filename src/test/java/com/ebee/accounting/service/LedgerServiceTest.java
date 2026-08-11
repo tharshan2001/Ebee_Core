@@ -116,18 +116,18 @@ class LedgerServiceTest {
     @Test
     void recordCustomerAdvance_createsAdvanceEntry() {
         UUID customerId = UUID.randomUUID();
-        UUID paymentId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
         UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("1000.00");
         String description = "Advance payment";
 
-        CustomerLedger result = ledgerService.recordCustomerAdvance(customerId, paymentId, amount, description, recordedBy);
+        CustomerLedger result = ledgerService.recordCustomerAdvance(customerId, orderId, amount, description, recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();
 
         assertThat(saved.getCustomerId()).isEqualTo(customerId);
-        assertThat(saved.getPaymentId()).isEqualTo(paymentId);
+        assertThat(saved.getOrderId()).isEqualTo(orderId);
         assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.ADVANCE.name());
         assertThat(saved.getDebit()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getCredit()).isEqualTo(amount);

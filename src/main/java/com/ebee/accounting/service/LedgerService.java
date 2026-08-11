@@ -107,23 +107,23 @@ public class LedgerService {
     }
 
     @Transactional
-    public CustomerLedger recordCustomerAdvance(UUID customerId, UUID paymentId, BigDecimal amount, String description, UUID recordedBy) {
+    public CustomerLedger recordCustomerAdvance(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
-                .paymentId(paymentId)
+                .orderId(orderId)
                 .transactionType(LedgerTransactionType.ADVANCE.name())
                 .debit(BigDecimal.ZERO)
                 .credit(amount)
                 .description(description)
                 .build();
-        log.info("Recording customer advance: customer={}, payment={}, amount={}", customerId, paymentId, amount);
+        log.info("Recording customer advance: customer={}, order={}, amount={}", customerId, orderId, amount);
         CustomerLedger saved = customerLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
                 LedgerTransactionType.ADVANCE.name(),
                 BigDecimal.ZERO,
                 amount,
-                paymentId,
+                orderId,
                 "ADVANCE",
                 description,
                 recordedBy

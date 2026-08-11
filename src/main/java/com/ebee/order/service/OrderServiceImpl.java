@@ -732,14 +732,6 @@ public class OrderServiceImpl implements OrderService {
 
         order.setTotalAmount(order.getTotalAmount().subtract(totalReturnedSubtotal));
 
-        ledgerService.recordCustomerCreditAdjustment(
-                customer.getId(),
-                order.getId(),
-                totalReturnedSubtotal,
-                "Return adjustment for Order " + order.getOrderNumber(),
-                securityService.getCurrentUserId()
-        );
-
         BigDecimal refundAmount;
         if (order.getPaidAmount().compareTo(totalReturnedSubtotal) > 0) {
             refundAmount = totalReturnedSubtotal;
@@ -772,6 +764,17 @@ public class OrderServiceImpl implements OrderService {
             changeType = DuesChangeType.CANCEL_UNPAID;
         }
 
+        BigDecimal adjustmentAmount = totalReturnedSubtotal.subtract(refundAmount);
+        if (adjustmentAmount.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.recordCustomerCreditAdjustment(
+                    customer.getId(),
+                    order.getId(),
+                    adjustmentAmount,
+                    "Return adjustment for Order " + order.getOrderNumber(),
+                    securityService.getCurrentUserId()
+            );
+        }
+
         order.setOutstandingBalance(order.getTotalAmount().subtract(order.getPaidAmount()));
         if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
             order.setOutstandingBalance(BigDecimal.ZERO);
@@ -785,7 +788,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order updatedOrder = orderRepository.save(order);
 
-        if (hasPaidAmount) {
+        if (hasPaidAmount && request.refundChoice() == RefundChoice.REFUND) {
             ledgerService.recordCustomerRefund(
                     customer.getId(),
                     updatedOrder.getId(),

@@ -201,14 +201,6 @@ public class ReturnExchangeService {
 
         order.setTotalAmount(order.getTotalAmount().subtract(totalReturnedSubtotal));
 
-        ledgerService.recordCustomerCreditAdjustment(
-                customer.getId(),
-                order.getId(),
-                totalReturnedSubtotal,
-                "Return exchange adjustment for Order " + order.getOrderNumber(),
-                reviewedByUserId
-        );
-
         BigDecimal refundAmount;
         if (order.getPaidAmount().compareTo(totalReturnedSubtotal) > 0) {
             refundAmount = totalReturnedSubtotal;
@@ -244,6 +236,17 @@ public class ReturnExchangeService {
                         reviewedByUserId
                 );
             }
+        }
+
+        BigDecimal adjustmentAmount = totalReturnedSubtotal.subtract(refundAmount);
+        if (adjustmentAmount.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.recordCustomerCreditAdjustment(
+                    customer.getId(),
+                    order.getId(),
+                    adjustmentAmount,
+                    "Return exchange adjustment for Order " + order.getOrderNumber(),
+                    reviewedByUserId
+            );
         }
 
         order.setOutstandingBalance(order.getTotalAmount().subtract(order.getPaidAmount()));

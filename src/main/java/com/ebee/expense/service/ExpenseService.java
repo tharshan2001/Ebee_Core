@@ -45,6 +45,7 @@ public class ExpenseService {
     private final AuditLogService auditLogService;
     private final StoragePort storagePort;
     private final TripRepository tripRepository;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request, MultipartFile receipt) {
@@ -154,6 +155,8 @@ public class ExpenseService {
         expense.setApprovedBy(admin);
         expense.setApprovedAt(LocalDateTime.now());
         expense = expenseRepository.save(expense);
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, expense.getAmount(), "EXPENSE", null,
+                com.ebee.finance.entity.AccountTransaction.Type.EXPENSE, "EXPENSE", expense.getId(), "Expense " + expense.getCategory());
 
         auditLogService.record(AuditAction.EXPENSE_APPROVE, "Expense", expense.getId(),
                 "Expense " + expense.getCategory() + " LKR " + expense.getAmount() + " approved by " + admin.getEmail());

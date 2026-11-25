@@ -32,19 +32,22 @@ public class SupplierServiceImpl implements SupplierService {
     private final SupplierLedgerRepository supplierLedgerRepository;
     private final LedgerService ledgerService;
     private final SecurityService securityService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     public SupplierServiceImpl(SupplierRepository supplierRepository,
                                SupplierMapper supplierMapper,
                                PurchaseOrderRepository purchaseOrderRepository,
                                SupplierLedgerRepository supplierLedgerRepository,
                                LedgerService ledgerService,
-                               SecurityService securityService) {
+                               SecurityService securityService,
+                               com.ebee.finance.service.MoneyAccountService moneyAccountService) {
         this.supplierRepository = supplierRepository;
         this.supplierMapper = supplierMapper;
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.supplierLedgerRepository = supplierLedgerRepository;
         this.ledgerService = ledgerService;
         this.securityService = securityService;
+        this.moneyAccountService = moneyAccountService;
     }
 
     @Override
@@ -145,6 +148,7 @@ public class SupplierServiceImpl implements SupplierService {
         Supplier supplier = supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", supplierId));
 
+        BigDecimal requested = amount;
         List<PurchaseOrder> unpaidOrders = purchaseOrderRepository.findBySupplierIdAndPaymentStatusInOrderByReceivedAtAsc(
                 supplierId, List.of(PurchasePaymentStatus.UNPAID, PurchasePaymentStatus.PARTIALLY_PAID));
 
@@ -189,6 +193,10 @@ public class SupplierServiceImpl implements SupplierService {
 
         syncSupplierOutstanding(supplier);
         supplier = supplierRepository.save(supplier);
+        // Only the part actually applied left the account.
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, requested.subtract(remaining.max(BigDecimal.ZERO)),
+                paymentMethod.name(), null, com.ebee.finance.entity.AccountTransaction.Type.SUPPLIER_PAYMENT, "SUPPLIER", supplierId,
+                "Supplier payment to " + supplier.getName());
 
         return new SupplierPaymentResponse(
                 supplierId,

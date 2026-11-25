@@ -46,6 +46,7 @@ class OrderPaymentServiceTest {
     @Mock private com.ebee.accounting.service.LedgerService ledgerService;
     @Mock private CustomerService customerService;
 
+    @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @InjectMocks private OrderPaymentService orderPaymentService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -260,6 +261,11 @@ class OrderPaymentServiceTest {
 
         RecordPaymentRequest request = new RecordPaymentRequest(new BigDecimal("1000.00"), PaymentMethod.CASH, null, null);
         orderPaymentService.recordPayment(order.getId(), request);
+
+        // The cash goes into the default account for CASH.
+        verify(moneyAccountService).recordMovement(eq(com.ebee.finance.entity.AccountTransaction.Direction.IN),
+                eq(new BigDecimal("1000.00")), eq("CASH"), isNull(),
+                eq(com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_RECEIPT), eq("PAYMENT"), any(), anyString());
 
         verify(ledgerService).recordCustomerPayment(
                 eq(customer.getId()),

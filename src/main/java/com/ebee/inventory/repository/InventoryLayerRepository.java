@@ -24,4 +24,9 @@ public interface InventoryLayerRepository extends JpaRepository<InventoryLayer, 
     List<InventoryLayer> findByInventoryIdIn(List<UUID> inventoryIds);
 
     List<InventoryLayer> findByInventoryIdInAndRemainingQuantityGreaterThan(List<UUID> inventoryIds, int remainingQuantity);
+
+    /** Value of stock on hand at cost: Σ remaining × unit cost (current, not as of a past date). */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(l.remainingQuantity * l.unitCost), 0) FROM InventoryLayer l WHERE l.remainingQuantity > 0")
+    java.math.BigDecimal currentStockValue();
 }

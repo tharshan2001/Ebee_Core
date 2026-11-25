@@ -75,7 +75,7 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         org.springframework.test.util.ReflectionTestUtils.setField(deliveryService, "orderSettlementService",
-                new com.ebee.order.service.OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class)));
+                new com.ebee.order.service.OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class)));
         orderId = UUID.randomUUID();
         driverUserId = UUID.randomUUID();
 

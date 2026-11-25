@@ -88,6 +88,7 @@ class OrderServiceTest {
 
     @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
+    @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -265,7 +266,7 @@ class OrderServiceTest {
 
         // Real settlement logic on top of the mocks, so cancel/return tests exercise the actual rules.
         org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderSettlementService",
-                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class)));
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class)));
     }
 
     @Test

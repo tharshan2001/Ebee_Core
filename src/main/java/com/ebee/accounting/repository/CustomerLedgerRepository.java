@@ -49,4 +49,9 @@ public interface CustomerLedgerRepository extends JpaRepository<CustomerLedger, 
     /** Legacy ADVANCE entries (wallet credits that the old rules posted into the receivable ledger). */
     @Query("SELECT l.customerId, COUNT(l) FROM CustomerLedger l WHERE l.transactionType = 'ADVANCE' GROUP BY l.customerId")
     List<Object[]> countLegacyAdvanceByCustomer();
+
+    /** Rows: [customerId, debit − credit] for entries before the cutoff (positive = customer owes us). */
+    @Query("SELECT l.customerId, COALESCE(SUM(l.debit) - SUM(l.credit), 0) FROM CustomerLedger l "
+            + "WHERE l.createdAt < :before GROUP BY l.customerId")
+    List<Object[]> balancesBefore(@Param("before") LocalDateTime before);
 }

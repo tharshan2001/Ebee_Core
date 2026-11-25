@@ -76,6 +76,7 @@ class OrderDiscountIntegrationTest {
 
     @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
+    @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;

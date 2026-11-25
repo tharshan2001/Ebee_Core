@@ -33,5 +33,8 @@ public class OrderRequest {
 
     private String chequeNumber;
 
+    /** Account an upfront payment went into; null = default for the payment method. */
+    private java.util.UUID accountId;
+
     private String proofFileUrl;
 }

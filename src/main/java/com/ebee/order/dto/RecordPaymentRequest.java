@@ -16,5 +16,12 @@ public record RecordPaymentRequest(
 
         String chequeNumber,
 
-        String proofFileUrl
-) {}
+        String proofFileUrl,
+
+        /** Bank/cash account the money went into; null = default account for the payment method. */
+        java.util.UUID accountId
+) {
+    public RecordPaymentRequest(BigDecimal amount, PaymentMethod paymentMethod, String chequeNumber, String proofFileUrl) {
+        this(amount, paymentMethod, chequeNumber, proofFileUrl, null);
+    }
+}

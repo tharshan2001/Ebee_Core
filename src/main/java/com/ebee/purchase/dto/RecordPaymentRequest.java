@@ -11,5 +11,12 @@ public record RecordPaymentRequest(
         BigDecimal amount,
 
         @NotNull(message = "Payment method is required")
-        PurchasePaymentMethod paymentMethod
-) {}
+        PurchasePaymentMethod paymentMethod,
+
+        /** Bank/cash account the money was paid from; null = default account for the payment method. */
+        java.util.UUID accountId
+) {
+    public RecordPaymentRequest(BigDecimal amount, PurchasePaymentMethod paymentMethod) {
+        this(amount, paymentMethod, null);
+    }
+}

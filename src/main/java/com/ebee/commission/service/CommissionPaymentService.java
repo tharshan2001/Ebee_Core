@@ -36,6 +36,7 @@ public class CommissionPaymentService {
     private final AuditLogService auditLogService;
     private final LedgerService ledgerService;
     private final SecurityService securityService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     @Transactional
     public CommissionResponse markAsPaid(UUID commissionId) {
@@ -83,6 +84,8 @@ public class CommissionPaymentService {
         commission.setPaidAmount(cash);
         if (cash.signum() > 0) {
             ledgerService.recordAgentPayout(agent.getId(), null, cash, description, securityService.getCurrentUserId());
+            moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, cash, "COMMISSION_PAYOUT", null,
+                    com.ebee.finance.entity.AccountTransaction.Type.COMMISSION_PAYOUT, "COMMISSION", commission.getId(), description);
         }
         if (recovered.signum() > 0) {
             auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", commission.getId(),

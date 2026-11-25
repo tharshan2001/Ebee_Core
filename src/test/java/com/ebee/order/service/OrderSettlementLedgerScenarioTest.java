@@ -46,6 +46,7 @@ class OrderSettlementLedgerScenarioTest {
     private OrderSettlementService settlement;
     private LedgerService ledgerService;
     private com.ebee.tax.service.VatService vatService;
+    private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     private Customer customer;
 
     @BeforeEach
@@ -78,7 +79,8 @@ class OrderSettlementLedgerScenarioTest {
         inventoryService = mock(InventoryService.class);
 
         vatService = mock(com.ebee.tax.service.VatService.class);
-        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, vatService);
+        moneyAccountService = mock(com.ebee.finance.service.MoneyAccountService.class);
+        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, vatService, moneyAccountService);
     }
 
     // ── helpers ────────────────────────────────────────────────────────
@@ -149,6 +151,10 @@ class OrderSettlementLedgerScenarioTest {
         var result = settlement.cancel(order, RefundChoice.REFUND, true, "Order cancelled");
 
         assertThat(result.refunded()).isEqualByComparingTo("10000");
+        // Cash leaves the account the order was paid through (the payout falls back to REFUND default).
+        verify(moneyAccountService).recordPayout(org.mockito.ArgumentMatchers.argThat(x -> x.compareTo(new BigDecimal("10000")) == 0),
+                any(), org.mockito.ArgumentMatchers.isNull(), eq(com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_REFUND),
+                eq("ORDER"), eq(order.getId()), any());
         assertThat(ledgerBalance()).isZero();
         assertLedgerMatchesOrder(order);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);

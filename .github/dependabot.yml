@@ -1,0 +1,32 @@
+# Weekly dependency updates and security fixes. Security PRs open as soon as an advisory lands,
+# regardless of this schedule. Spring Boot's managed dependencies are grouped so a Boot upgrade
+# arrives as one PR instead of dozens.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      spring-boot:
+        patterns: ["org.springframework.boot*", "org.springframework*"]
+      test:
+        patterns: ["org.testcontainers*", "org.junit*", "org.mockito*", "org.assertj*", "com.tngtech.archunit*"]
+    ignore:
+      # Major Spring Boot / Java upgrades are planned work, not a weekly PR.
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

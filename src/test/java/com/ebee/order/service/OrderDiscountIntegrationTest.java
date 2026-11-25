@@ -83,6 +83,15 @@ class OrderDiscountIntegrationTest {
     @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     @org.mockito.Mock private com.ebee.pricing.service.PricingService pricingService;
     @InjectMocks private OrderServiceImpl orderService;
+    @InjectMocks private OrderLifecycleService orderLifecycleService;
+    @InjectMocks private OrderQueryService orderQueryService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void wireSplitOrderServices() {
+        // OrderServiceImpl delegates status changes and lookups to these (same mocks underneath).
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderLifecycleService", orderLifecycleService);
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderQueryService", orderQueryService);
+    }
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
     @Captor private ArgumentCaptor<Commission> commissionCaptor;

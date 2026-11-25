@@ -1,4 +1,4 @@
-package com.ebee.reporting.service;
+package com.ebee.report.service;
 
 import com.ebee.accounting.entity.AgentLedger;
 import com.ebee.accounting.entity.CustomerLedger;
@@ -17,12 +17,12 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.product.repository.ProductRepository;
-import com.ebee.reporting.dto.AgingReportResponse;
-import com.ebee.reporting.dto.ReportSummaryResponse;
-import com.ebee.reporting.dto.TrialBalanceResponse;
-import com.ebee.reporting.dto.TrialBalanceResponse.*;
-import com.ebee.reporting.dto.AgingReportResponse.*;
-import com.ebee.reporting.dto.ReportSummaryResponse.*;
+import com.ebee.report.dto.AgingReportResponse;
+import com.ebee.report.dto.ReportSummaryResponse;
+import com.ebee.report.dto.TrialBalanceResponse;
+import com.ebee.report.dto.TrialBalanceResponse.*;
+import com.ebee.report.dto.AgingReportResponse.*;
+import com.ebee.report.dto.ReportSummaryResponse.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

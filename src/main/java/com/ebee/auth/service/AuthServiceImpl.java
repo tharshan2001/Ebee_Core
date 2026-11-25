@@ -8,6 +8,7 @@ import com.ebee.auth.dto.RegisterRequest;
 import com.ebee.auth.event.PasswordChangedEvent;
 import com.ebee.auth.security.UserPrincipal;
 import com.ebee.auth.security.RateLimitingService;
+import com.ebee.common.exception.RateLimitException;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.util.PhoneUtils;
 import com.ebee.driver.entity.Driver;
@@ -296,7 +297,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Transactional
     @Override
-    public void forgotPassword(String email) {
+    public void forgotPassword(String email, String clientIp) {
+        // Checked before the user lookup so the response is the same whether or not the email exists.
+        if (!rateLimitingService.isPasswordResetAllowed(email, clientIp)) {
+            log.warn("Forgot-password rate limit exceeded for ip={}", clientIp);
+            throw new RateLimitException("Too many password reset requests. Please try again later.");
+        }
         userRepository.findByEmail(email).ifPresent(user -> {
             otpService.generateAndSendOtp(user.getEmail());
             auditLogService.record(AuditAction.FORGOT_PASSWORD, "User", user.getId(),

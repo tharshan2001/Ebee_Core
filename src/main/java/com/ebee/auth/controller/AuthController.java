@@ -121,9 +121,9 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
-            @Valid @RequestBody ForgotPasswordRequest request) {
-        // TODO: add per-IP rate limiting (e.g., 3 requests per 15 minutes per IP)
-        authService.forgotPassword(request.getEmail());
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest servletRequest) {
+        authService.forgotPassword(request.getEmail(), RequestUtils.getClientIp(servletRequest));
         return ResponseEntity.ok(ApiResponse.success("OTP sent to your email and phone"));
     }
 

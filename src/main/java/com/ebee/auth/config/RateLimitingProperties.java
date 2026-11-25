@@ -9,12 +9,14 @@ public class RateLimitingProperties {
     private final Login login;
     private final Generic generic;
     private final Ip ip;
+    private final PasswordReset passwordReset;
 
     @ConstructorBinding
-    public RateLimitingProperties(Login login, Generic generic, Ip ip) {
+    public RateLimitingProperties(Login login, Generic generic, Ip ip, PasswordReset passwordReset) {
         this.login = login != null ? login : new Login(5, 15);
         this.generic = generic != null ? generic : new Generic(20, 15);
         this.ip = ip != null ? ip : new Ip(100, 1);
+        this.passwordReset = passwordReset != null ? passwordReset : new PasswordReset(3, 20, 15);
     }
 
     public Login getLogin() {
@@ -27,6 +29,10 @@ public class RateLimitingProperties {
 
     public Ip getIp() {
         return ip;
+    }
+
+    public PasswordReset getPasswordReset() {
+        return passwordReset;
     }
 
     public static class Login {
@@ -79,6 +85,32 @@ public class RateLimitingProperties {
 
         public int getMaxRequests() {
             return maxRequests;
+        }
+
+        public int getWindowMinutes() {
+            return windowMinutes;
+        }
+    }
+
+    /** Limits on OTP-sending endpoints, which cost money (SMS) and can be used to spam users. */
+    public static class PasswordReset {
+        private final int maxPerEmail;
+        private final int maxPerIp;
+        private final int windowMinutes;
+
+        @ConstructorBinding
+        public PasswordReset(Integer maxPerEmail, Integer maxPerIp, Integer windowMinutes) {
+            this.maxPerEmail = maxPerEmail != null ? maxPerEmail : 3;
+            this.maxPerIp = maxPerIp != null ? maxPerIp : 20;
+            this.windowMinutes = windowMinutes != null ? windowMinutes : 15;
+        }
+
+        public int getMaxPerEmail() {
+            return maxPerEmail;
+        }
+
+        public int getMaxPerIp() {
+            return maxPerIp;
         }
 
         public int getWindowMinutes() {

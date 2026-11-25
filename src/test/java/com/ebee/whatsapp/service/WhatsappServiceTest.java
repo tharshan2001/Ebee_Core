@@ -50,7 +50,7 @@ class WhatsappServiceTest {
 
     @BeforeEach
     void setUp() {
-        properties = new WhatsappProperties(API_BASE_URL, PHONE_NUMBER_ID, ACCESS_TOKEN, VERIFY_TOKEN);
+        properties = new WhatsappProperties(API_BASE_URL, PHONE_NUMBER_ID, ACCESS_TOKEN, VERIFY_TOKEN, "test-app-secret");
         service = new WhatsappService(properties, restTemplate);
     }
 
@@ -169,5 +169,59 @@ class WhatsappServiceTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("message body");
         verify(restTemplate, never()).exchange(anyString(), any(), any(), any(Class.class));
+    }
+
+    // ── Webhook signature (X-Hub-Signature-256) ─────────────────────────
+
+    private static String sign(String secret, byte[] body) throws Exception {
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec(
+                secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+        return "sha256=" + java.util.HexFormat.of().formatHex(mac.doFinal(body));
+    }
+
+    private static final byte[] BODY =
+            "{\"object\":\"whatsapp_business_account\",\"entry\":[]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    @Test
+    void isValidSignature_acceptsCorrectSignature() throws Exception {
+        assertThat(service.isValidSignature(BODY, sign("test-app-secret", BODY))).isTrue();
+    }
+
+    @Test
+    void isValidSignature_rejectsWrongSecret() throws Exception {
+        assertThat(service.isValidSignature(BODY, sign("other-secret", BODY))).isFalse();
+    }
+
+    @Test
+    void isValidSignature_rejectsTamperedBody() throws Exception {
+        String sig = sign("test-app-secret", BODY);
+        byte[] tampered = "{\"object\":\"whatsapp_business_account\",\"entry\":[{}]}"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(service.isValidSignature(tampered, sig)).isFalse();
+    }
+
+    @Test
+    void isValidSignature_rejectsMissingOrMalformedHeader() {
+        assertThat(service.isValidSignature(BODY, null)).isFalse();
+        assertThat(service.isValidSignature(BODY, "")).isFalse();
+        assertThat(service.isValidSignature(BODY, "sha1=abcd")).isFalse();
+        assertThat(service.isValidSignature(BODY, "sha256=not-hex")).isFalse();
+    }
+
+    @Test
+    void isValidSignature_failsClosed_whenAppSecretNotConfigured() throws Exception {
+        WhatsappService noSecret = new WhatsappService(
+                new WhatsappProperties(API_BASE_URL, PHONE_NUMBER_ID, ACCESS_TOKEN, VERIFY_TOKEN, ""), restTemplate);
+        assertThat(noSecret.isValidSignature(BODY, sign("test-app-secret", BODY))).isFalse();
+        assertThat(noSecret.isValidSignature(BODY, "sha256=" + "0".repeat(64))).isFalse();
+    }
+
+    @Test
+    void verifySubscription_rejectsEmptyToken_whenVerifyTokenNotConfigured() {
+        WhatsappService noToken = new WhatsappService(
+                new WhatsappProperties(API_BASE_URL, PHONE_NUMBER_ID, ACCESS_TOKEN, "", "test-app-secret"), restTemplate);
+        assertThatThrownBy(() -> noToken.verifySubscription("subscribe", "", "challenge"))
+                .isInstanceOf(WhatsappService.WhatsappVerificationException.class);
     }
 }

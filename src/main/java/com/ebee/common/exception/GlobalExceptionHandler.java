@@ -33,6 +33,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(PeriodClosedException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePeriodClosed(PeriodClosedException ex) {
+        log.warn("Period closed: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(RateLimitException.class)
     public ResponseEntity<ApiResponse<Void>> handleRateLimit(RateLimitException ex) {
         log.warn("Rate limit exceeded: {}", ex.getMessage());

@@ -632,6 +632,7 @@ public class OrderServiceImpl implements OrderService {
                 || status == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Use delivery or cancel endpoints after shipping");
         }
+        validateForwardTransition(order, status);
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(status);
@@ -656,6 +657,32 @@ public class OrderServiceImpl implements OrderService {
         eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
 
         return orderMapper.toResponse(updatedOrder);
+    }
+
+    /** Fulfilment order a manual status update may move along (forward only; steps may be skipped). */
+    private static final List<OrderStatus> FULFILMENT_STEPS =
+            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED);
+
+    /**
+     * Manual updates only move forward: PENDING → CONFIRMED → PROCESSING → SHIPPED. Going back
+     * (e.g. SHIPPED → PENDING while the order is on a trip) would desync delivery and stock.
+     * Exception kept from before: SHIPPED again on a shipped order whose delivery record was
+     * cleared, which re-initialises its delivery so it can be put on a trip.
+     */
+    private static void validateForwardTransition(Order order, OrderStatus target) {
+        OrderStatus current = order.getStatus();
+        if (current == OrderStatus.SHIPPED && target == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
+            return;
+        }
+        int from = FULFILMENT_STEPS.indexOf(current);
+        int to = FULFILMENT_STEPS.indexOf(target);
+        if (to < 0) {
+            throw new IllegalArgumentException("Status " + target + " can't be set manually");
+        }
+        if (from < 0 || to <= from) {
+            throw new IllegalArgumentException("Order " + order.getOrderNumber() + " can't go from " + current
+                    + " to " + target + "; order status only moves forward (PENDING → CONFIRMED → PROCESSING → SHIPPED)");
+        }
     }
 
     @Transactional
@@ -718,6 +745,12 @@ public class OrderServiceImpl implements OrderService {
 
         if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Cannot return an order that is already " + order.getStatus());
+        }
+        // Same rule as return/exchange requests: only goods the customer actually received come back.
+        // Orders that haven't been delivered yet are cancelled instead.
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new IllegalArgumentException("Only delivered orders can be returned (order " + order.getOrderNumber()
+                    + " is " + order.getStatus() + "); cancel it instead");
         }
 
         Map<UUID, OrderItem> orderItemMap = order.getItems().stream()

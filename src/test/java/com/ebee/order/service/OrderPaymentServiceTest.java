@@ -100,7 +100,8 @@ class OrderPaymentServiceTest {
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        // The order keeps its original method; the payment row records CASH.
+        assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.COD);
         assertThat(saved.getPaidAt()).isNotNull();
 
         verify(auditLogService).record(eq(AuditAction.UPDATE), eq("Order"), eq(order.getId()), anyString());

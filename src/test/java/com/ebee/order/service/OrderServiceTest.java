@@ -724,6 +724,63 @@ class OrderServiceTest {
     }
 
     @Test
+    void updateOrderStatus_canSkipForwardSteps() {
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(order.getId(), OrderStatus.SHIPPED);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(order.getDeliveryStatus()).isEqualTo(com.ebee.delivery.enums.DeliveryStatus.PENDING);
+    }
+
+    @Test
+    void updateOrderStatus_goingBackwards_isRejected() {
+        order.setStatus(OrderStatus.SHIPPED);
+        order.setDeliveryStatus(com.ebee.delivery.enums.DeliveryStatus.ASSIGNED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(order.getId(), OrderStatus.PENDING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only moves forward");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void updateOrderStatus_statusesWithNoManualStep_areRejected() {
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(order.getId(), OrderStatus.FAILED))
+                .hasMessageContaining("can't be set manually");
+    }
+
+    @Test
+    void updateOrderStatus_reshipWithClearedDelivery_isStillAllowed() {
+        order.setStatus(OrderStatus.SHIPPED);
+        order.setDeliveryStatus(null);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+
+        orderService.updateOrderStatus(order.getId(), OrderStatus.SHIPPED);
+
+        assertThat(order.getDeliveryStatus()).isEqualTo(com.ebee.delivery.enums.DeliveryStatus.PENDING);
+    }
+
+    @Test
+    void returnOrder_notYetDelivered_isRejected_cancelInstead() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.returnOrder(order.getId(),
+                new ReturnOrderItemRequest(null, RefundChoice.REFUND, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only delivered orders can be returned");
+        verify(inventoryService, never()).returnStock(any(), anyList(), anyList(), anyList(), anyList());
+    }
+
+    @Test
     void updateOrderStatus_cancelledOrder_throws() {
         order.setStatus(OrderStatus.CANCELLED);
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));

@@ -281,10 +281,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         validateTransition(current, target);
 
-        if (target == PurchaseOrderStatus.CANCELLED && current == PurchaseOrderStatus.RECEIVED) {
-            purchaseOrderPaymentService.releaseSupplierOutstanding(order);
-        }
-
         order.setStatus(target);
         PurchaseOrder saved = purchaseOrderRepository.save(order);
         return purchaseOrderMapper.toFullResponse(saved);
@@ -371,6 +367,42 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         PurchaseOrder saved = purchaseOrderRepository.save(order);
         return purchaseOrderMapper.toFullResponse(saved);
+    }
+
+    /**
+     * The supplier won't deliver the rest: keep what arrived, stop expecting the remainder.
+     * The PO total becomes the value actually received; the supplier is only owed for that.
+     */
+    @Override
+    public PurchaseOrderResponse closeShort(UUID id, String reason) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdWithItemsLocked(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PurchaseOrder", "id", id));
+        if (order.getStatus() != PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+            throw new IllegalArgumentException("Only PARTIALLY_RECEIVED purchase orders can be closed short (current: "
+                    + order.getStatus() + ")");
+        }
+        BigDecimal receivedTotal = BigDecimal.ZERO;
+        BigDecimal receivedTax = BigDecimal.ZERO;
+        for (PurchaseOrderItem item : order.getItems()) {
+            int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+            BigDecimal unit = item.getUnitPrice() != null ? item.getUnitPrice() : ZERO;
+            BigDecimal tax = item.getUnitTax().multiply(BigDecimal.valueOf(received));
+            receivedTax = receivedTax.add(tax);
+            receivedTotal = receivedTotal.add(unit.multiply(BigDecimal.valueOf(received))).add(tax);
+        }
+        if (order.getPaidAmount().compareTo(receivedTotal) > 0) {
+            throw new IllegalArgumentException("Paid " + order.getPaidAmount() + " is more than the "
+                    + receivedTotal + " received; record the supplier refund before closing short");
+        }
+        order.setTotalAmount(receivedTotal);
+        order.setTaxTotal(receivedTax);
+        if (order.getOutstandingBalance().signum() == 0 && order.getPaidAmount().signum() > 0) {
+            order.setPaymentStatus(PurchasePaymentStatus.PAID);
+        }
+        order.setStatus(PurchaseOrderStatus.RECEIVED);
+        String note = "Closed short" + (reason != null && !reason.isBlank() ? ": " + reason.trim() : "");
+        order.setNotes(order.getNotes() == null || order.getNotes().isBlank() ? note : order.getNotes() + "\n" + note);
+        return purchaseOrderMapper.toFullResponse(purchaseOrderRepository.save(order));
     }
 
     @Override
@@ -543,17 +575,23 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             throw new IllegalArgumentException("Order is already in status: " + current);
         }
 
+        // Stock has arrived once a PO is (partly) received: cancelling would leave that stock and
+        // what's owed for it in place. Use return-items (stock back to supplier) or close-short instead.
         if (target == PurchaseOrderStatus.CANCELLED) {
-            return;
+            if (current == PurchaseOrderStatus.DRAFT || current == PurchaseOrderStatus.PENDING
+                    || current == PurchaseOrderStatus.APPROVED) {
+                return;
+            }
+            throw new IllegalArgumentException("Cannot cancel a " + current + " purchase order: stock has already "
+                    + "been received. Return the items to the supplier, or close the order short.");
         }
 
+        // RECEIVED/RETURNED/PARTIALLY_RECEIVED are only reached through receive, return-items and close-short,
+        // which also move the stock and the supplier balance.
         boolean valid = switch (current) {
             case DRAFT -> target == PurchaseOrderStatus.PENDING;
             case PENDING -> target == PurchaseOrderStatus.APPROVED;
-            case APPROVED -> false;
-            case PARTIALLY_RECEIVED -> false;
-            case RECEIVED -> target == PurchaseOrderStatus.RETURNED;
-            case RETURNED, CANCELLED -> false;
+            case APPROVED, PARTIALLY_RECEIVED, RECEIVED, RETURNED, CANCELLED -> false;
         };
 
         if (!valid) {

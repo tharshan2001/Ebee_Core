@@ -60,7 +60,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.createdBy LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.customer.id = :customerId")
     Page<Order> findByCustomerIdWithDetailsFull(@Param("customerId") UUID customerId, Pageable pageable);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.createdBy JOIN FETCH o.items i JOIN FETCH i.product WHERE o.customer.id = :customerId AND o.paymentStatus IN :statuses ORDER BY o.createdAt ASC")
+    /**
+     * Orders a customer-level payment can be applied to, oldest first. LEFT JOIN on product so
+     * combo-only orders are included (combo lines have no product); cancelled/returned orders and
+     * orders with nothing left to pay are skipped.
+     */
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.agent a LEFT JOIN FETCH a.user LEFT JOIN FETCH o.createdBy "
+            + "LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product "
+            + "WHERE o.customer.id = :customerId AND o.paymentStatus IN :statuses "
+            + "AND o.status NOT IN (com.ebee.order.enums.OrderStatus.CANCELLED, com.ebee.order.enums.OrderStatus.RETURNED) "
+            + "AND o.outstandingBalance > 0 ORDER BY o.createdAt ASC")
     List<Order> findByCustomerIdAndPaymentStatusInWithDetails(@Param("customerId") UUID customerId, @Param("statuses") List<PaymentStatus> statuses);
 
     Optional<Order> findByOrderNumber(String orderNumber);

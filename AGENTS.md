@@ -342,6 +342,13 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - API under `/api/locations`: list/create/update locations, `GET /stock/{productId}` (per location), agent home location, `/transfers` (list, get, create, `/{id}/dispatch`, `/{id}/receive`, `/{id}/cancel`).
 - Tests: `StockTransferServiceTest`, `LocationServiceTest`, `InventoryLocationTest`.
 
+### Business-rule fixes (Phases D–G)
+- **Purchase orders:** cancelling is only allowed from DRAFT / PENDING / APPROVED. Once stock has arrived, use `POST /api/purchase-orders/{id}/return-items` or the new `POST /{id}/close-short?reason=` (PARTIALLY_RECEIVED → RECEIVED; total becomes the value received; rejected if already paid more than that). RECEIVED / RETURNED / PARTIALLY_RECEIVED can't be set through the status endpoint.
+- **Direct returns** (`POST /api/orders/{id}/return`) require a DELIVERED order, like return/exchange requests; undelivered orders are cancelled instead.
+- **Accounting periods:** `recordPeriodTransaction` creates the current period (and its fiscal year) on first use and throws `PeriodClosedException` (409) when the period is CLOSED/ARCHIVED — the whole operation rolls back instead of silently dropping the journal entry. The monthly job used to call `openPeriod(month, year)` with swapped arguments and never opened anything; it now uses the same `ensurePeriod`.
+- **Payments:** customer-level bulk payments apply to combo-only orders too (LEFT JOIN product) and skip CANCELLED/RETURNED orders and orders with nothing outstanding. `recordPayment` no longer overwrites `order.paymentMethod` (each `Payment` row records its own method).
+- **Order status:** manual updates only move forward (PENDING → CONFIRMED → PROCESSING → SHIPPED, steps may be skipped); FAILED / RETURN_EXCHANGE can't be set manually. Re-shipping a SHIPPED order whose delivery was cleared is still allowed. `OrderStatus.RETURN_EXCHANGE` is never set by the code; it's kept for existing rows.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

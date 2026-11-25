@@ -97,6 +97,14 @@ public class PurchaseOrderController {
         return ResponseEntity.ok(ApiResponse.success("Purchase order received successfully", response));
     }
 
+    @PostMapping("/{id}/close-short")
+    public ResponseEntity<ApiResponse<PurchaseOrderResponse>> closeShort(
+            @PathVariable UUID id,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(ApiResponse.success("Purchase order closed short",
+                purchaseOrderService.closeShort(id, reason)));
+    }
+
     @PostMapping("/{id}/return-items")
     public ResponseEntity<ApiResponse<PurchaseOrderResponse>> returnItems(
             @PathVariable UUID id,

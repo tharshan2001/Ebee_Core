@@ -16,18 +16,21 @@ import java.util.UUID;
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
-    Optional<Inventory> findByProductId(UUID productId);
+    Optional<Inventory> findByProductIdAndLocationId(UUID productId, UUID locationId);
+
+    List<Inventory> findAllByProductId(UUID productId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Inventory i WHERE i.product.id = :productId")
-    Optional<Inventory> findByProductIdWithLock(@Param("productId") UUID productId);
+    @Query("SELECT i FROM Inventory i WHERE i.product.id = :productId AND i.location.id = :locationId")
+    Optional<Inventory> findByProductIdWithLock(@Param("productId") UUID productId, @Param("locationId") UUID locationId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     // ORDER BY makes concurrent transactions lock rows in the same order (no deadlocks).
-    @Query("SELECT i FROM Inventory i WHERE i.product.id IN :productIds ORDER BY i.product.id")
-    List<Inventory> findByProductIdInWithLock(@Param("productIds") Collection<UUID> productIds);
+    @Query("SELECT i FROM Inventory i WHERE i.location.id = :locationId AND i.product.id IN :productIds ORDER BY i.product.id")
+    List<Inventory> findByProductIdInWithLock(@Param("productIds") Collection<UUID> productIds,
+                                              @Param("locationId") UUID locationId);
 
-    List<Inventory> findByProductIdIn(Collection<UUID> productIds);
+    List<Inventory> findByProductIdInAndLocationId(Collection<UUID> productIds, UUID locationId);
 
     @Query("SELECT i FROM Inventory i LEFT JOIN FETCH i.product WHERE i.quantity - i.reservedQuantity <= i.reorderLevel AND i.reorderLevel IS NOT NULL")
     List<Inventory> findLowStockInventories();

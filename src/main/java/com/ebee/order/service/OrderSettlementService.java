@@ -219,7 +219,9 @@ public class OrderSettlementService {
             }
         }
         if (!productIds.isEmpty()) {
-            inventoryService.returnStock(productIds, quantities, unitCosts, notes);
+            // Back to where it was shipped from (pre-V127 orders were backfilled to the default location).
+            UUID locationId = order.getLocation() != null ? order.getLocation().getId() : null;
+            inventoryService.returnStock(locationId, productIds, quantities, unitCosts, notes);
         }
     }
 

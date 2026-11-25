@@ -38,6 +38,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
+    private static final java.util.UUID MAIN_LOCATION_ID = java.util.UUID.randomUUID();
+
     private InventoryResponse dummyResponse() {
         return InventoryResponse.builder()
                 .id(UUID.randomUUID())
@@ -55,6 +57,7 @@ class InventoryServiceTest {
     @Mock private StockMovementRecorder stockMovementRecorder;
     @Mock private InventoryAlertService inventoryAlertService;
 
+    @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @InjectMocks private InventoryService inventoryService;
 
     private Product product;
@@ -63,6 +66,13 @@ class InventoryServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Single default location, like a fresh V127 database.
+        com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
+                com.ebee.location.entity.Location.Type.WAREHOUSE);
+        org.springframework.test.util.ReflectionTestUtils.setField(mainLocation, "id", MAIN_LOCATION_ID);
+        lenient().when(locationService.defaultLocation()).thenReturn(mainLocation);
+        lenient().when(locationService.resolve(any(), any())).thenReturn(mainLocation);
+        lenient().when(locationService.require(any())).thenReturn(mainLocation);
         productId = UUID.randomUUID();
         product = Product.builder().id(productId).name("Test Product").isActive(true).build();
         inventory = Inventory.builder()
@@ -77,7 +87,7 @@ class InventoryServiceTest {
     @Test
     void createInventory_success() {
         when(productRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.empty());
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.empty());
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
@@ -90,7 +100,7 @@ class InventoryServiceTest {
     @Test
     void createInventory_alreadyExists_throws() {
         when(productRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.createInventory(productId, 50, 10))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -106,7 +116,7 @@ class InventoryServiceTest {
 
         InventoryLayer layer = new InventoryLayer(inventory, 100, 100, BigDecimal.TEN, java.time.LocalDateTime.now());
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryLayerRepository.findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(
                 any(), eq(0))).thenReturn(List.of(layer));
         when(inventoryLayerRepository.saveAll(anyList())).thenReturn(List.of(layer));
@@ -128,7 +138,7 @@ class InventoryServiceTest {
         request.setQuantityChange(-200);
         request.setMovementType(StockMovementType.OUT);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -143,7 +153,7 @@ class InventoryServiceTest {
         request.setQuantityChange(-20);
         request.setMovementType(StockMovementType.OUT);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -155,7 +165,7 @@ class InventoryServiceTest {
         StockRequest request = new StockRequest();
         request.setProductId(productId);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.empty());
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -167,7 +177,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(10);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
@@ -183,7 +193,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(45);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.reserveStock(productId, 10))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -195,7 +205,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(30);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
@@ -210,7 +220,7 @@ class InventoryServiceTest {
     void releaseReservedStock_moreThanReserved_throws() {
         inventory.setReservedQuantity(5);
 
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.releaseReservedStock(productId, 10))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -219,13 +229,13 @@ class InventoryServiceTest {
 
     @Test
     void hasSufficientStock_returnsTrue() {
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         assertThat(inventoryService.hasSufficientStock(productId, 50)).isTrue();
     }
 
     @Test
     void hasSufficientStock_returnsFalse() {
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         assertThat(inventoryService.hasSufficientStock(productId, 150)).isFalse();
     }
 
@@ -233,7 +243,7 @@ class InventoryServiceTest {
     void getAvailableStock_returnsDifference() {
         inventory.setQuantity(100);
         inventory.setReservedQuantity(30);
-        when(inventoryRepository.findByProductId(productId)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         assertThat(inventoryService.getAvailableStock(productId)).isEqualTo(70);
     }
 }

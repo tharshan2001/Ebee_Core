@@ -157,6 +157,11 @@ public class Order {
     @JoinColumn(name = "trip_id")
     private com.ebee.trip.entity.Trip trip;
 
+    /** Location the order's stock comes from (and goes back to on returns). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
+    private com.ebee.location.entity.Location location;
+
     @PrePersist
     @PreUpdate
     public void validate() {

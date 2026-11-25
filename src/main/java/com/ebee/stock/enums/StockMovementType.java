@@ -8,5 +8,9 @@ public enum StockMovementType {
     DAMAGE,
     PURCHASE,
     RESERVE,
-    RELEASE
+    RELEASE,
+    /** Leaving a location on a stock transfer. */
+    TRANSFER_OUT,
+    /** Arriving at a location from a stock transfer. */
+    TRANSFER_IN
 }

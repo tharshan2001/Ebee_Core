@@ -316,7 +316,7 @@ class OrderSettlementLedgerScenarioTest {
         settlement.cancel(order, RefundChoice.REFUND, true, "Order cancelled");
 
         // Combo components go back at the current average cost (null = not known per component).
-        verify(inventoryService).returnStock(eq(List.of(a.getId(), b.getId())), eq(List.of(2, 1)),
+        verify(inventoryService).returnStock(any(), eq(List.of(a.getId(), b.getId())), eq(List.of(2, 1)),
                 eq(java.util.Arrays.asList(null, null)), any());
         assertLedgerMatchesOrder(order);
     }

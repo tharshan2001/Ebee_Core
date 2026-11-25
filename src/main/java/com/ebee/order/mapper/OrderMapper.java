@@ -33,6 +33,8 @@ public interface OrderMapper {
     @Mapping(target = "paidAmount", source = "paidAmount")
     @Mapping(target = "paidAt", source = "paidAt")
     @Mapping(target = "outstandingBalance", source = "outstandingBalance")
+    @Mapping(target = "locationId", source = "location.id")
+    @Mapping(target = "locationName", source = "location.name")
     OrderResponse toResponse(Order order);
 
     List<OrderResponse> toResponseList(List<Order> orders);

@@ -66,6 +66,8 @@ import static org.mockito.Mockito.lenient;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
+    private static final java.util.UUID MAIN_LOCATION_ID = java.util.UUID.randomUUID();
+
     @Mock private OrderRepository orderRepository;
     @Mock private AgentRepository agentRepository;
     @Mock private ProductRepository productRepository;
@@ -89,6 +91,7 @@ class OrderServiceTest {
     @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
+    @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -106,10 +109,17 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Single default location, like a fresh V127 database.
+        com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
+                com.ebee.location.entity.Location.Type.WAREHOUSE);
+        org.springframework.test.util.ReflectionTestUtils.setField(mainLocation, "id", MAIN_LOCATION_ID);
+        lenient().when(locationService.defaultLocation()).thenReturn(mainLocation);
+        lenient().when(locationService.resolve(any(), any())).thenReturn(mainLocation);
+        lenient().when(locationService.require(any())).thenReturn(mainLocation);
         lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
-        lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
-            java.util.List<Integer> qtys = inv.getArgument(1);
+        lenient().when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<Integer> qtys = inv.getArgument(2);
             return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
         });
         adminUserId = UUID.randomUUID();
@@ -293,7 +303,8 @@ class OrderServiceTest {
         var result = orderService.createOrder(orderRequest);
 
         assertThat(result).isNotNull();
-        verify(inventoryService).deductStock(anyList(), anyList(), anyList());
+        // Stock comes from the resolved location (here the default "Main").
+        verify(inventoryService).deductStock(eq(MAIN_LOCATION_ID), anyList(), anyList(), anyList());
         verify(commissionCalculationService).calculateCommissionForOrder(any());
         verify(auditLogService).record(eq(AuditAction.CREATE), eq("Order"), any(), anyString());
         verify(customerService).incrementTotalOrders(customer.getId());
@@ -820,7 +831,7 @@ class OrderServiceTest {
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
-        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
         verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId), anyString());
         verify(orderNotificationService).sendOrderCancelled(any());
@@ -959,7 +970,7 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
-        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).adjustCommissionForOrder(order);
         verify(orderNotificationService).sendOrderStatus(any());
     }

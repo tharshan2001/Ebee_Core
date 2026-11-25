@@ -58,6 +58,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceComboTest {
 
+    private static final java.util.UUID MAIN_LOCATION_ID = java.util.UUID.randomUUID();
+
     @Mock private OrderRepository orderRepository;
     @Mock private AgentRepository agentRepository;
     @Mock private ProductRepository productRepository;
@@ -82,6 +84,7 @@ class OrderServiceComboTest {
     @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
+    @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -99,10 +102,17 @@ class OrderServiceComboTest {
 
     @BeforeEach
     void setUp() {
+        // Single default location, like a fresh V127 database.
+        com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
+                com.ebee.location.entity.Location.Type.WAREHOUSE);
+        org.springframework.test.util.ReflectionTestUtils.setField(mainLocation, "id", MAIN_LOCATION_ID);
+        lenient().when(locationService.defaultLocation()).thenReturn(mainLocation);
+        lenient().when(locationService.resolve(any(), any())).thenReturn(mainLocation);
+        lenient().when(locationService.require(any())).thenReturn(mainLocation);
         lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
-        lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
-            java.util.List<Integer> qtys = inv.getArgument(1);
+        lenient().when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<Integer> qtys = inv.getArgument(2);
             return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
         });
         adminUserId = UUID.randomUUID();
@@ -370,7 +380,7 @@ class OrderServiceComboTest {
     void createOrder_comboStockUnavailable_throws() {
         when(comboRepository.findByIdWithDetails(combo.getId())).thenReturn(Optional.of(combo));
         doThrow(new IllegalArgumentException("Insufficient stock for Shampoo"))
-                .when(inventoryService).checkStockAvailability(anyList(), anyList());
+                .when(inventoryService).checkStockAvailability(any(), anyList(), anyList());
 
         OrderRequest request = buildComboRequest(combo.getId());
 
@@ -416,7 +426,7 @@ class OrderServiceComboTest {
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(productRepository.findByItemCodeIn(anyList())).thenReturn(List.of(product1));
         // Stock rows in order: [regular product1 ×3], [combo: product1 ×2], [combo: product2 ×1]
-        when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenReturn(List.of(
+        when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenReturn(List.of(
                 new BigDecimal("333.00"), new BigDecimal("444.00"), new BigDecimal("555.00")));
 
         OrderRequest request = new OrderRequest();

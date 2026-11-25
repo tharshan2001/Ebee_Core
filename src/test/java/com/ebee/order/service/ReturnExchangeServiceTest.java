@@ -271,7 +271,7 @@ class ReturnExchangeServiceTest {
                 returnRequest.getId(), reviewRequest, adminUserId);
 
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.APPROVED);
-        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).adjustCommissionForOrder(order);
         verify(customerService).creditToAdvance(eq(customer), any(), any(), eq(order.getId()), any());
         verify(orderNotificationService).sendOrderStatus(any());
@@ -297,7 +297,7 @@ class ReturnExchangeServiceTest {
         returnExchangeService.reviewReturnExchange(returnRequest.getId(), reviewRequest, adminUserId);
 
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.APPROVED);
-        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).adjustCommissionForOrder(order);
     }
 
@@ -439,7 +439,7 @@ class ReturnExchangeServiceTest {
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.REJECTED);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(orderItem1.getReturnedQuantity()).isEqualTo(0);
-        verify(inventoryService, never()).returnStock(anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService, never()).returnStock(any(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService, never()).cancelCommissionForOrder(any());
     }
 

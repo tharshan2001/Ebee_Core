@@ -94,8 +94,16 @@ public class Product {
     @Builder.Default
     private Boolean featured = false;
 
-    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Inventory inventory;
+    /** One stock row per location. */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.Set<Inventory> inventories;
+
+    public java.util.Set<Inventory> getInventories() {
+        if (inventories == null) {
+            inventories = new java.util.HashSet<>();
+        }
+        return inventories;
+    }
 
     @OneToMany(mappedBy = "product")
     private List<OrderItem> orderItems = new ArrayList<>();

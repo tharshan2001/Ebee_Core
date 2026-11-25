@@ -18,6 +18,8 @@ public interface PurchaseOrderMapper {
     @Mapping(target = "supplierName", source = "purchaseOrder.supplier.name")
     @Mapping(target = "createdById", source = "purchaseOrder.createdBy.id")
     @Mapping(target = "createdByName", expression = "java(purchaseOrder.getCreatedBy() != null ? purchaseOrder.getCreatedBy().getFirstName() + \" \" + purchaseOrder.getCreatedBy().getLastName() : null)")
+    @Mapping(target = "locationId", source = "purchaseOrder.location.id")
+    @Mapping(target = "locationName", source = "purchaseOrder.location.name")
     @Mapping(target = "items", source = "purchaseOrderItems")
     @Mapping(target = "attachments", source = "attachmentList")
     PurchaseOrderResponse toResponse(PurchaseOrder purchaseOrder, List<PurchaseOrderItemResponse> purchaseOrderItems, List<AttachmentResponse> attachmentList);

@@ -62,6 +62,13 @@ jobs:
         run: ./mvnw verify -q --batch-mode --no-transfer-progress
         env:
           SPRING_PROFILES_ACTIVE: test
+          # application-test.yml points at a developer's local database (ebee_test / local user).
+          # OS env vars take precedence over profile files, so point Spring at the CI services instead.
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ebee_db_test
+          SPRING_DATASOURCE_USERNAME: ebee
+          SPRING_DATASOURCE_PASSWORD: ebee_test
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
 
   docker:
     needs: build

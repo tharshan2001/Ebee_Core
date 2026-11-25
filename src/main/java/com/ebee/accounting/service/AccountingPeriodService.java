@@ -5,6 +5,7 @@ import com.ebee.accounting.entity.AccountingPeriodAudit;
 import com.ebee.accounting.entity.AccountingPeriodTransaction;
 import com.ebee.accounting.entity.FiscalYear;
 import com.ebee.accounting.enums.PeriodStatus;
+import com.ebee.common.exception.PeriodClosedException;
 import com.ebee.accounting.repository.AccountingPeriodAuditRepository;
 import com.ebee.accounting.repository.AccountingPeriodRepository;
 import com.ebee.accounting.repository.AccountingPeriodTransactionRepository;
@@ -233,17 +234,12 @@ public class AccountingPeriodService {
         int month = today.getMonthValue();
         int year = today.getYear();
 
-        Optional<AccountingPeriod> periodOpt = accountingPeriodRepository.findByMonthAndYear(month, year);
-
-        if (periodOpt.isEmpty()) {
-            log.warn("No open period found for {}/{}, transaction not recorded", month, year);
-            return null;
-        }
-
-        AccountingPeriod period = periodOpt.get();
+        // The period is created on first use, so nothing is lost before the monthly job runs.
+        // A closed period rejects the whole operation (it used to drop the entry silently).
+        AccountingPeriod period = ensurePeriod(today);
         if (period.getStatus() != PeriodStatus.OPEN) {
-            log.warn("Period {}/{} is not open (status={}), transaction not recorded", month, year, period.getStatus());
-            return null;
+            throw new PeriodClosedException("Accounting period " + year + "-" + String.format("%02d", month)
+                    + " is " + period.getStatus() + "; reopen it before recording " + transactionType);
         }
 
         AccountingPeriodTransaction transaction = AccountingPeriodTransaction.builder()
@@ -285,31 +281,35 @@ public class AccountingPeriodService {
         int month = today.getMonthValue();
         int year = today.getYear();
 
-        Optional<AccountingPeriod> existing = accountingPeriodRepository.findByMonthAndYear(month, year);
-        if (existing.isPresent()) {
-            log.info("Period {}/{} already exists (status={}), skipping auto-open",
-                    year, month, existing.get().getStatus());
+        if (accountingPeriodRepository.findByMonthAndYear(month, year).isPresent()) {
+            log.info("Period {}/{} already exists, skipping auto-open", year, month);
             return;
         }
+        ensurePeriod(today);
+        log.info("Auto-opened accounting period {}/{}", year, month);
+    }
 
-        // Ensure fiscal year exists
-        Optional<FiscalYear> fiscalYear = fiscalYearRepository.findByFiscalYear(year);
-        if (fiscalYear.isEmpty()) {
-            FiscalYear newFy = FiscalYear.builder()
+    /**
+     * The accounting period for a date, creating its fiscal year and opening it if it doesn't
+     * exist yet. (The monthly job used to call openPeriod(month, year) with the arguments swapped,
+     * so periods were never auto-opened.)
+     */
+    private AccountingPeriod ensurePeriod(LocalDate date) {
+        int month = date.getMonthValue();
+        int year = date.getYear();
+        Optional<AccountingPeriod> existing = accountingPeriodRepository.findByMonthAndYear(month, year);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        if (fiscalYearRepository.findByFiscalYear(year).isEmpty()) {
+            fiscalYearRepository.save(FiscalYear.builder()
                     .fiscalYear(year)
                     .startDate(LocalDate.of(year, 1, 1))
                     .endDate(LocalDate.of(year, 12, 31))
                     .isActive(true)
-                    .build();
-            fiscalYearRepository.save(newFy);
+                    .build());
             log.info("Auto-created fiscal year {}", year);
         }
-
-        try {
-            openPeriod(month, year, null);
-            log.info("Auto-opened accounting period {}/{}", year, month);
-        } catch (Exception e) {
-            log.error("Failed to auto-open period {}/{}: {}", year, month, e.getMessage());
-        }
+        return openPeriod(year, month, null);
     }
 }

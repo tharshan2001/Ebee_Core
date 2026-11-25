@@ -158,8 +158,6 @@ public class OrderPaymentService {
             throw new IllegalArgumentException("Payment proof (slip/receipt) is required for " + request.paymentMethod());
         }
 
-        boolean isCreditOrder = order.getPaymentMethod() == PaymentMethod.CREDIT;
-        boolean isCodOrder = order.getPaymentMethod() == PaymentMethod.COD;
 
         BigDecimal newPaidAmount = order.getPaidAmount().add(request.amount());
 
@@ -172,7 +170,7 @@ public class OrderPaymentService {
             order.setPaidAmount(newPaidAmount);
             order.setOutstandingBalance(order.getTotalAmount().subtract(newPaidAmount));
         }
-        order.setPaymentMethod(request.paymentMethod());
+        // Keep the order's original payment method (e.g. COD); each Payment row records how it was paid.
         order.setPaidAt(LocalDateTime.now());
 
         order = orderRepository.save(order);

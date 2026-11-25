@@ -31,6 +31,9 @@ public interface PurchaseOrderService {
 
     PurchaseOrderResponse returnItems(UUID id, ReturnItemsRequest request);
 
+    /** Keep what arrived on a PARTIALLY_RECEIVED PO and stop expecting the rest. */
+    PurchaseOrderResponse closeShort(UUID id, String reason);
+
     PurchaseOrderResponse addAttachment(UUID orderId, MultipartFile file);
 
     void deleteAttachment(UUID orderId, UUID attachmentId);

@@ -110,14 +110,14 @@ class InventoryServiceTest {
         when(inventoryLayerRepository.findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(
                 any(), eq(0))).thenReturn(List.of(layer));
         when(inventoryLayerRepository.saveAll(anyList())).thenReturn(List.of(layer));
-        when(inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(any()))
-                .thenReturn(Optional.empty());
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
         inventoryService.adjustStock(request);
 
         assertThat(inventory.getQuantity()).isEqualTo(90);
+        assertThat(layer.getRemainingQuantity()).isEqualTo(90);
+        assertThat(inventory.getAverageCost()).isEqualByComparingTo(BigDecimal.TEN);
         verify(stockMovementRecorder).record(any(), eq(-10), eq(100), eq(90), eq(StockMovementType.OUT), any());
     }
 

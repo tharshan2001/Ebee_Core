@@ -103,6 +103,11 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
+        lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<Integer> qtys = inv.getArgument(1);
+            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+        });
         adminUserId = UUID.randomUUID();
         agentUserId = UUID.randomUUID();
 
@@ -284,8 +289,7 @@ class OrderServiceTest {
         var result = orderService.createOrder(orderRequest);
 
         assertThat(result).isNotNull();
-        verify(inventoryService).recordOrderStocks(
-                anyList(), anyList(), eq(StockMovementType.OUT), anyList());
+        verify(inventoryService).deductStock(anyList(), anyList(), anyList());
         verify(commissionCalculationService).calculateCommissionForOrder(any());
         verify(auditLogService).record(eq(AuditAction.CREATE), eq("Order"), any(), anyString());
         verify(customerService).incrementTotalOrders(customer.getId());
@@ -743,8 +747,7 @@ class OrderServiceTest {
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
-        verify(inventoryService).recordOrderStocks(
-                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
+        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
         verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId), anyString());
         verify(orderNotificationService).sendOrderCancelled(any());
@@ -883,8 +886,7 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
-        verify(inventoryService).recordOrderStocks(
-                anyList(), anyList(), eq(StockMovementType.RETURN), anyList());
+        verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
         verify(orderNotificationService).sendOrderStatus(any());
     }

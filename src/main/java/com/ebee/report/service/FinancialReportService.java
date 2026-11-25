@@ -44,7 +44,8 @@ public class FinancialReportService {
         BigDecimal revenue = orderRepository.sumRevenueByDateRange(start, end);
 
         // Use FIFO cost from order_items.costPrice (snapshots WAC at order time)
-        BigDecimal costPrice = orderItemRepository.sumCostOfGoodsSold(start, end);
+        BigDecimal costPrice = orderItemRepository.sumCostOfGoodsSold(start, end).setScale(2, RoundingMode.HALF_UP);
+        long linesMissingCost = orderItemRepository.countLinesMissingCost(start, end);
 
         BigDecimal collectedRevenue = orderRepository.sumCollectedRevenueByDateRange(start, end);
         BigDecimal outstandingRevenue = orderRepository.sumOutstandingByDateRange(start, end);
@@ -63,6 +64,7 @@ public class FinancialReportService {
                 .collectedRevenue(collectedRevenue)
                 .outstandingRevenue(outstandingRevenue)
                 .totalCostPrice(costPrice)
+                .linesMissingCost(linesMissingCost)
                 .grossProfit(grossProfit)
                 .grossMargin(grossMargin.setScale(2, RoundingMode.HALF_UP))
                 .totalCommissions(commissions)

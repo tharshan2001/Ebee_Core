@@ -12,6 +12,8 @@ public class FinancialReport {
     private BigDecimal collectedRevenue;
     private BigDecimal outstandingRevenue;
     private BigDecimal totalCostPrice;
+    /** Sold lines without a recorded cost (pre-FIFO orders); when > 0, totalCostPrice is understated. */
+    private long linesMissingCost;
     private BigDecimal grossProfit;
     private BigDecimal grossMargin;
     private BigDecimal totalCommissions;

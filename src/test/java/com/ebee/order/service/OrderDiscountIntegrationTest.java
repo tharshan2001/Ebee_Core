@@ -88,6 +88,11 @@ class OrderDiscountIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
+        lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<Integer> qtys = inv.getArgument(1);
+            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+        });
         adminUserId = UUID.randomUUID();
 
         adminUser = User.builder()
@@ -372,8 +377,7 @@ class OrderDiscountIntegrationTest {
         assertThat(notifiedOrder.getNotes()).isEqualTo("Test notification order");
         assertThat(notifiedCommission.getCommissionAmount()).isEqualByComparingTo("180.00");
 
-        verify(inventoryService).recordOrderStocks(
-                anyList(), anyList(), eq(StockMovementType.OUT), anyList());
+        verify(inventoryService).deductStock(anyList(), anyList(), anyList());
         verify(customerService).incrementTotalOrders(customer.getId());
         verify(auditLogService).record(any(), any(), any(), anyString());
     }

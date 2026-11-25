@@ -27,6 +27,13 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
     @Query("SELECT i.product.category AS category, SUM(i.quantity) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.category")
     List<CategorySalesProjection> findSalesByCategory(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT COALESCE(SUM(i.costPrice * i.quantity), 0) FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end")
+    /** Cost of the units actually kept by customers (returned units excluded), matching revenue's exclusions. */
+    @Query("SELECT COALESCE(SUM(i.costPrice * (i.quantity - COALESCE(i.returnedQuantity, 0))), 0) FROM OrderItem i JOIN i.order o "
+            + "WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     java.math.BigDecimal sumCostOfGoodsSold(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    /** Sold lines with no recorded cost (orders created before FIFO costing) — their cost is missing from COGS. */
+    @Query("SELECT COUNT(i) FROM OrderItem i JOIN i.order o WHERE i.costPrice IS NULL "
+            + "AND o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
+    long countLinesMissingCost(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

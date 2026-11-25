@@ -23,7 +23,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
     Optional<Inventory> findByProductIdWithLock(@Param("productId") UUID productId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Inventory i WHERE i.product.id IN :productIds")
+    // ORDER BY makes concurrent transactions lock rows in the same order (no deadlocks).
+    @Query("SELECT i FROM Inventory i WHERE i.product.id IN :productIds ORDER BY i.product.id")
     List<Inventory> findByProductIdInWithLock(@Param("productIds") Collection<UUID> productIds);
 
     List<Inventory> findByProductIdIn(Collection<UUID> productIds);

@@ -591,6 +591,7 @@ public class CustomerService {
         response.setEmail(customer.getEmail());
         response.setBookNo(customer.getBookNo());
         response.setVatNumber(customer.getVatNumber());
+        response.setPriceGroupId(customer.getPriceGroupId());
         response.setTotalOrders(customer.getTotalOrders());
         response.setCreditLimit(customer.getCreditLimit());
         response.setOutstandingBalance(customer.getOutstandingBalance());

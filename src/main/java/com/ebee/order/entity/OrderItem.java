@@ -61,6 +61,21 @@ public class OrderItem {
     @Column(name = "cost_price", precision = 14, scale = 4)
     private BigDecimal costPrice;
 
+    /** Selling unit (product_units.id) when sold by the pack; null = by the stock unit. */
+    @Column(name = "sales_unit_id")
+    private java.util.UUID salesUnitId;
+
+    /** e.g. "Box of 12" (kept even if the pack is changed later). */
+    @Column(name = "sales_unit_name", length = 50)
+    private String salesUnitName;
+
+    /**
+     * Stock units per unit of this line. quantity, returnedQuantity, unitPrice, unitTax and
+     * costPrice are all per sales unit; stock moves quantity × this.
+     */
+    @Column(name = "units_per_sales_unit", nullable = false)
+    private Integer unitsPerSalesUnit;
+
     /** VAT rate applied (percent); null = no VAT, or a combo with mixed rates. */
     @Column(name = "tax_rate", precision = 5, scale = 2)
     private BigDecimal taxRate;
@@ -114,6 +129,10 @@ public class OrderItem {
 
     @jakarta.persistence.PrePersist
     protected void applyTaxDefaults() {
+        // JPA allows one @PrePersist per entity: tax and unit defaults both live here.
+        if (unitsPerSalesUnit == null) {
+            unitsPerSalesUnit = 1;
+        }
         if (unitTax == null) {
             unitTax = BigDecimal.ZERO;
         }
@@ -121,4 +140,14 @@ public class OrderItem {
             taxAmount = BigDecimal.ZERO;
         }
     }
+
+    public int getUnitsPerSalesUnit() {
+        return unitsPerSalesUnit == null || unitsPerSalesUnit < 1 ? 1 : unitsPerSalesUnit;
+    }
+
+    /** Stock units for {@code salesUnits} of this line. */
+    public int toStockUnits(int salesUnits) {
+        return salesUnits * getUnitsPerSalesUnit();
+    }
+
 }

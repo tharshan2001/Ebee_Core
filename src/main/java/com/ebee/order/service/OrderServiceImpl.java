@@ -98,6 +98,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
     private final com.ebee.location.service.LocationService locationService;
     private final com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
+    private final com.ebee.pricing.service.PricingService pricingService;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -296,11 +297,15 @@ public class OrderServiceImpl implements OrderService {
 
             String discountType = itemRequest.getDiscountType() != null ? itemRequest.getDiscountType().name() : null;
             BigDecimal rate = taxRateFor(ctx, product);
-            // Discounts apply to the catalog price first; VAT is worked out on the result.
+            // List price: the customer's group price (else normal price), × pack size unless the pack has its own price.
+            var quote = pricingService.quote(product, ctx.customer != null ? ctx.customer.getPriceGroupId() : null,
+                    itemRequest.getUnitId());
+            // Discounts apply to the list price first; VAT is worked out on the result.
             var tax = com.ebee.tax.service.TaxCalculator.forUnit(
-                    product.getPriceWithDiscount(discountType, itemRequest.getDiscountValue()), rate, ctx.pricesIncludeTax);
+                    product.getPriceWithDiscount(quote.listPrice(), quote.unitsPerSalesUnit(), discountType,
+                            itemRequest.getDiscountValue()), rate, ctx.pricesIncludeTax);
             BigDecimal originalUnitPrice = com.ebee.tax.service.TaxCalculator.forUnit(
-                    product.getPrice(), rate, ctx.pricesIncludeTax).grossUnitPrice();
+                    quote.listPrice(), rate, ctx.pricesIncludeTax).grossUnitPrice();
             BigDecimal unitPrice = tax.grossUnitPrice();
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             BigDecimal lineTax = tax.unitTax().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
@@ -317,6 +322,9 @@ public class OrderServiceImpl implements OrderService {
                     .taxRate(tax.unitTax().signum() > 0 ? rate : null)
                     .unitTax(tax.unitTax())
                     .taxAmount(lineTax)
+                    .salesUnitId(quote.productUnit() != null ? quote.productUnit().getId() : null)
+                    .salesUnitName(quote.salesUnitName())
+                    .unitsPerSalesUnit(quote.unitsPerSalesUnit())
                     .build();
 
             ctx.order.getItems().add(item);
@@ -325,8 +333,9 @@ public class OrderServiceImpl implements OrderService {
 
             ctx.lineRows.put(item, List.of(ctx.stockProductIds.size()));
             ctx.stockProductIds.add(product.getId());
-            ctx.stockQuantities.add(itemRequest.getQuantity());
-            ctx.stockNotes.add("Order " + ctx.orderNumber + " - Item " + (i + 1));
+            ctx.stockQuantities.add(item.toStockUnits(itemRequest.getQuantity()));
+            ctx.stockNotes.add("Order " + ctx.orderNumber + " - Item " + (i + 1)
+                    + (quote.productUnit() != null ? " (" + itemRequest.getQuantity() + " × " + quote.salesUnitName() + ")" : ""));
         }
     }
 

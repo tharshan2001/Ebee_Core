@@ -41,4 +41,7 @@ public class OrderItemRequest {
      * total. The free product is not stocked (no inventory deduction).
      */
     private Boolean applyFreeProductAsDiscount;
+
+    /** Sell by the pack: a product_units id for this product. quantity is then in packs. */
+    private java.util.UUID unitId;
 }

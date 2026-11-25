@@ -171,7 +171,8 @@ public class OrderPdfService {
         if (item.getCombo() != null) {
             return item.getCombo().getName();
         }
-        return item.getProduct() != null ? item.getProduct().getName() : "Item";
+        String name = item.getProduct() != null ? item.getProduct().getName() : "Item";
+        return item.getSalesUnitName() != null ? name + " (" + item.getSalesUnitName() + ")" : name;
     }
 
     private static String lineCode(com.ebee.order.entity.OrderItem item) {

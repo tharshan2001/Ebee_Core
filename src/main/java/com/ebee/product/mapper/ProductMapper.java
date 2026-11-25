@@ -15,7 +15,7 @@ public interface ProductMapper {
     @Mapping(target = "isActive", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "inventory", ignore = true)
+    @Mapping(target = "inventories", ignore = true)
     Product toEntity(ProductRequest request);
 
     @Mapping(target = "inventory", ignore = true)

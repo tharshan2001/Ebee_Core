@@ -34,9 +34,14 @@ public class Inventory {
     @EqualsAndHashCode.Include
     private UUID id;
 
-    @OneToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "product_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    /** Stock is held per (product, location). */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "location_id", nullable = false)
+    private com.ebee.location.entity.Location location;
 
     @Column(nullable = false)
     @Builder.Default

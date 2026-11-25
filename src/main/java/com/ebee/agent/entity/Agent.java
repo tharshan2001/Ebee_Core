@@ -45,6 +45,11 @@ public class Agent {
     @Column(name = "commission_rate", nullable = false, precision = 10, scale = 2)
     private BigDecimal commissionRate;
 
+    /** Home location: the agent's orders ship from here unless another is chosen. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
+    private com.ebee.location.entity.Location location;
+
     @Column(name = "total_sales", nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal totalSales = BigDecimal.ZERO;

@@ -16,6 +16,8 @@ public record PurchaseOrderResponse(
         PurchaseOrderStatus status,
         BigDecimal totalAmount,
         BigDecimal taxTotal,
+        UUID locationId,
+        String locationName,
         PurchasePaymentMethod paymentMethod,
         PurchasePaymentStatus paymentStatus,
         BigDecimal paidAmount,

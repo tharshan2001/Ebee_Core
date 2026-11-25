@@ -36,5 +36,8 @@ public class OrderRequest {
     /** Account an upfront payment went into; null = default for the payment method. */
     private java.util.UUID accountId;
 
+    /** Location to ship from; null = the agent's home location, else the default location. */
+    private java.util.UUID locationId;
+
     private String proofFileUrl;
 }

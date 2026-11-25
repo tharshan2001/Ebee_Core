@@ -36,6 +36,14 @@ public class PurchaseOrder {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    /** Location the stock is received into. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
+    private com.ebee.location.entity.Location location;
+
+    public com.ebee.location.entity.Location getLocation() { return location; }
+    public void setLocation(com.ebee.location.entity.Location location) { this.location = location; }
+
     /** Input VAT included in totalAmount. */
     @Column(name = "tax_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal taxTotal = BigDecimal.ZERO;

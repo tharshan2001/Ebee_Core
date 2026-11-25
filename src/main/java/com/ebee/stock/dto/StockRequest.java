@@ -21,4 +21,7 @@ public class StockRequest {
 
     @NotBlank(message = "Reason/notes is required for stock adjustment")
     private String notes;
+
+    /** Location to adjust; null = default location. */
+    private java.util.UUID locationId;
 }

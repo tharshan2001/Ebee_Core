@@ -96,6 +96,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.ebee.tax.service.TaxService taxService;
     private final com.ebee.tax.service.VatService vatService;
     private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
+    private final com.ebee.location.service.LocationService locationService;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -112,6 +113,9 @@ public class OrderServiceImpl implements OrderService {
         ctx.agent = resolveAgent(request);
         ctx.currentUser = resolveCurrentUser();
         ctx.customer = customerService.findByPhone(request.getCustomerPhoneNumber());
+        // Ship from: chosen location, else the agent's home location, else the default (L1).
+        ctx.location = locationService.resolve(request.getLocationId(),
+                ctx.agent != null && ctx.agent.getLocation() != null ? ctx.agent.getLocation().getId() : null);
 
         District district = resolveDistrict(ctx.customer);
         OrderSource orderSource = ctx.agent != null ? OrderSource.AGENT : OrderSource.DIRECT;
@@ -125,6 +129,7 @@ public class OrderServiceImpl implements OrderService {
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
                 .orderSource(orderSource)
+                .location(ctx.location)
                 .paymentMethod(request.getPaymentMethod())
                 .items(new ArrayList<>())
                 .build();
@@ -133,7 +138,8 @@ public class OrderServiceImpl implements OrderService {
         processRegularItems(split.regularItems(), ctx);
         processComboItems(split.comboItems(), ctx);
 
-        List<BigDecimal> rowCosts = inventoryService.deductStock(ctx.stockProductIds, ctx.stockQuantities, ctx.stockNotes);
+        List<BigDecimal> rowCosts = inventoryService.deductStock(ctx.location.getId(),
+                ctx.stockProductIds, ctx.stockQuantities, ctx.stockNotes);
         applyLineCosts(ctx, rowCosts);
 
         ctx.order.setTotalAmount(ctx.totalAmount);
@@ -166,6 +172,7 @@ public class OrderServiceImpl implements OrderService {
         List<Integer> stockQuantities = new ArrayList<>();
         List<String> stockNotes = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        com.ebee.location.entity.Location location;
         boolean vatOn;
         boolean pricesIncludeTax = true;
         BigDecimal taxTotal = BigDecimal.ZERO;
@@ -323,7 +330,7 @@ public class OrderServiceImpl implements OrderService {
                         + " - FREE " + rule.getFreeProduct().getName());
             }
 
-            inventoryService.checkStockAvailability(comboStockProductIds, comboStockQuantities);
+            inventoryService.checkStockAvailability(ctx.location.getId(), comboStockProductIds, comboStockQuantities);
             int firstRow = ctx.stockProductIds.size();
             int componentRows = combo.getItems().size();
             ctx.stockProductIds.addAll(comboStockProductIds);

@@ -15,6 +15,9 @@ public class InventoryResponse {
     private UUID productId;
     private String productName;
     private String productItemCode;
+    /** Null on a product-level summary across all locations. */
+    private java.util.UUID locationId;
+    private String locationName;
     private Integer quantity;
     private Integer reservedQuantity;
     private Integer availableQuantity;

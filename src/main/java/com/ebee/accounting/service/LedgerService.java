@@ -28,185 +28,82 @@ public class LedgerService {
     private final AgentLedgerRepository agentLedgerRepository;
     private final AccountingPeriodService accountingPeriodService;
 
+    // ── Customer ledger (accounts receivable) ───────────────────────────
+    // balance = SUM(debit) - SUM(credit) = what the customer owes us.
+    // See LedgerTransactionType for the posting rules. The advance wallet is NOT posted here.
+
     @Transactional
     public CustomerLedger recordCustomerInvoice(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .orderId(orderId)
-                .transactionType(LedgerTransactionType.INVOICE.name())
-                .debit(amount)
-                .credit(BigDecimal.ZERO)
-                .description(description)
-                .build();
-        log.info("Recording customer invoice: customer={}, order={}, amount={}", customerId, orderId, amount);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.INVOICE.name(),
-                amount,
-                BigDecimal.ZERO,
-                orderId,
-                "ORDER",
-                description,
-                recordedBy
-        );
-
-        return saved;
+        return postCustomer(customerId, orderId, null, LedgerTransactionType.INVOICE,
+                amount, BigDecimal.ZERO, description, null, null, "ORDER", orderId, recordedBy);
     }
 
+    /** Money received against an order or the account (cash, bank, cheque, or from the advance wallet). */
     @Transactional
     public CustomerLedger recordCustomerPayment(UUID customerId, UUID paymentId, BigDecimal amount, String description, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .paymentId(paymentId)
-                .transactionType(LedgerTransactionType.PAYMENT.name())
-                .debit(BigDecimal.ZERO)
-                .credit(amount)
-                .description(description)
-                .build();
-        log.info("Recording customer payment: customer={}, payment={}, amount={}", customerId, paymentId, amount);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.PAYMENT.name(),
-                BigDecimal.ZERO,
-                amount,
-                paymentId,
-                "PAYMENT",
-                description,
-                recordedBy
-        );
-
-        return saved;
+        return postCustomer(customerId, null, paymentId, LedgerTransactionType.PAYMENT,
+                BigDecimal.ZERO, amount, description, null, null, "PAYMENT", paymentId, recordedBy);
     }
 
+    /** Order value removed: cancellation, return, or permanently failed delivery. */
     @Transactional
-    public CustomerLedger recordCustomerRefund(UUID customerId, UUID returnId, BigDecimal amount, String description, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .returnId(returnId)
-                .transactionType(LedgerTransactionType.REFUND.name())
-                .debit(BigDecimal.ZERO)
-                .credit(amount)
-                .description(description)
-                .build();
-        log.info("Recording customer refund: customer={}, return={}, amount={}", customerId, returnId, amount);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.REFUND.name(),
-                amount,
-                BigDecimal.ZERO,
-                returnId,
-                "RETURN",
-                description,
-                recordedBy
-        );
-
-        return saved;
+    public CustomerLedger recordCustomerCreditNote(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
+        return postCustomer(customerId, orderId, null, LedgerTransactionType.CREDIT_NOTE,
+                BigDecimal.ZERO, amount, description, null, null, "ORDER", orderId, recordedBy);
     }
 
+    /** Overpaid money handed back to the customer in cash/bank. Debit: it reverses money we received. */
     @Transactional
-    public CustomerLedger recordCustomerAdvance(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .orderId(orderId)
-                .transactionType(LedgerTransactionType.ADVANCE.name())
-                .debit(BigDecimal.ZERO)
-                .credit(amount)
-                .description(description)
-                .build();
-        log.info("Recording customer advance: customer={}, order={}, amount={}", customerId, orderId, amount);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.ADVANCE.name(),
-                BigDecimal.ZERO,
-                amount,
-                orderId,
-                "ADVANCE",
-                description,
-                recordedBy
-        );
-
-        return saved;
+    public CustomerLedger recordCustomerRefund(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
+        return postCustomer(customerId, orderId, null, LedgerTransactionType.REFUND,
+                amount, BigDecimal.ZERO, description, null, null, "REFUND", orderId, recordedBy);
     }
 
+    /** Overpaid money moved from the order into the customer's advance wallet. Debit, same as a refund. */
+    @Transactional
+    public CustomerLedger recordCustomerAdvanceTransfer(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
+        return postCustomer(customerId, orderId, null, LedgerTransactionType.ADVANCE_TRANSFER,
+                amount, BigDecimal.ZERO, description, null, null, "ADVANCE", orderId, recordedBy);
+    }
+
+    /** Manual increase of what the customer owes. */
     @Transactional
     public CustomerLedger recordCustomerAdjustment(UUID customerId, BigDecimal debit, LocalDate effectiveDate, String description, String reference, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .transactionType(LedgerTransactionType.ADJUSTMENT.name())
-                .debit(debit)
-                .credit(BigDecimal.ZERO)
-                .effectiveDate(effectiveDate)
-                .description(description)
-                .reference(reference)
-                .build();
-        log.info("Recording customer adjustment: customer={}, debit={}, effectiveDate={}, description={}", customerId, debit, effectiveDate, description);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.ADJUSTMENT.name(),
-                debit,
-                BigDecimal.ZERO,
-                null,
-                "ADJUSTMENT",
-                description,
-                recordedBy
-        );
-
-        return saved;
+        return postCustomer(customerId, null, null, LedgerTransactionType.ADJUSTMENT,
+                debit, BigDecimal.ZERO, description, effectiveDate, reference, "ADJUSTMENT", null, recordedBy);
     }
 
+    /** Manual decrease of what the customer owes (e.g. reconciliation corrections). */
     @Transactional
     public CustomerLedger recordCustomerCreditAdjustment(UUID customerId, UUID orderId, BigDecimal credit, String description, UUID recordedBy) {
-        CustomerLedger entry = CustomerLedger.builder()
-                .customerId(customerId)
-                .orderId(orderId)
-                .transactionType(LedgerTransactionType.ADJUSTMENT.name())
-                .debit(BigDecimal.ZERO)
-                .credit(credit)
-                .description(description)
-                .build();
-        log.info("Recording customer credit adjustment: customer={}, order={}, credit={}, description={}", customerId, orderId, credit, description);
-        CustomerLedger saved = customerLedgerRepository.save(entry);
-
-        accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.ADJUSTMENT.name(),
-                BigDecimal.ZERO,
-                credit,
-                orderId,
-                "RETURN_ADJUSTMENT",
-                description,
-                recordedBy
-        );
-
-        return saved;
+        return postCustomer(customerId, orderId, null, LedgerTransactionType.ADJUSTMENT,
+                BigDecimal.ZERO, credit, description, null, null, "ADJUSTMENT", orderId, recordedBy);
     }
 
-    @Transactional
-    public CustomerLedger recordReturnExchangeCredit(UUID customerId, UUID orderId, BigDecimal amount, String description, UUID recordedBy) {
+    private CustomerLedger postCustomer(UUID customerId, UUID orderId, UUID paymentId, LedgerTransactionType type,
+                                        BigDecimal debit, BigDecimal credit, String description,
+                                        LocalDate effectiveDate, String reference,
+                                        String periodRefType, UUID periodRefId, UUID recordedBy) {
+        if (debit.signum() < 0 || credit.signum() < 0) {
+            throw new IllegalArgumentException("Ledger amounts must not be negative");
+        }
         CustomerLedger entry = CustomerLedger.builder()
                 .customerId(customerId)
                 .orderId(orderId)
-                .transactionType(LedgerTransactionType.RETURN_EXCHANGE_CREDIT.name())
-                .debit(BigDecimal.ZERO)
-                .credit(amount)
+                .paymentId(paymentId)
+                .transactionType(type.name())
+                .debit(debit)
+                .credit(credit)
                 .description(description)
+                .effectiveDate(effectiveDate)
+                .reference(reference)
                 .build();
-        log.info("Recording return exchange credit: customer={}, order={}, amount={}", customerId, orderId, amount);
+        log.info("Customer ledger {}: customer={}, order={}, payment={}, debit={}, credit={}",
+                type, customerId, orderId, paymentId, debit, credit);
         CustomerLedger saved = customerLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
-                LedgerTransactionType.RETURN_EXCHANGE_CREDIT.name(),
-                amount,
-                BigDecimal.ZERO,
-                orderId,
-                "RETURN_EXCHANGE",
-                description,
-                recordedBy
-        );
+                type.name(), debit, credit, periodRefId, periodRefType, description, recordedBy);
 
         return saved;
     }

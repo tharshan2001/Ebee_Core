@@ -73,6 +73,8 @@ class ReturnExchangeServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(returnExchangeService, "orderSettlementService",
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService));
         adminUserId = UUID.randomUUID();
         adminUser = User.builder()
                 .id(adminUserId)

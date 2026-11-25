@@ -34,4 +34,19 @@ public interface CustomerLedgerRepository extends JpaRepository<CustomerLedger, 
 
     @Query("SELECT l FROM CustomerLedger l WHERE l.customerId = :customerId ORDER BY l.createdAt DESC LIMIT 1")
     Optional<CustomerLedger> findLatestByCustomerId(@Param("customerId") UUID customerId);
+
+    // ── Reconciliation (rows: [customerId, amount]) ──────────────────
+
+    @Query("SELECT l.customerId, COALESCE(SUM(l.debit) - SUM(l.credit), 0) FROM CustomerLedger l GROUP BY l.customerId")
+    List<Object[]> sumBalanceByCustomer();
+
+    /** Entries not tied to an order, payment or return (manual adjustments, account-level payments). Legacy ADVANCE rows excluded. */
+    @Query("SELECT l.customerId, COALESCE(SUM(l.debit) - SUM(l.credit), 0) FROM CustomerLedger l "
+            + "WHERE l.orderId IS NULL AND l.paymentId IS NULL AND l.returnId IS NULL AND l.transactionType <> 'ADVANCE' "
+            + "GROUP BY l.customerId")
+    List<Object[]> sumUnlinkedByCustomer();
+
+    /** Legacy ADVANCE entries (wallet credits that the old rules posted into the receivable ledger). */
+    @Query("SELECT l.customerId, COUNT(l) FROM CustomerLedger l WHERE l.transactionType = 'ADVANCE' GROUP BY l.customerId")
+    List<Object[]> countLegacyAdvanceByCustomer();
 }

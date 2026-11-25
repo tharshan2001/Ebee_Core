@@ -106,32 +106,60 @@ class LedgerServiceTest {
         CustomerLedger saved = customerLedgerCaptor.getValue();
 
         assertThat(saved.getCustomerId()).isEqualTo(customerId);
-        assertThat(saved.getReturnId()).isEqualTo(returnId);
+        // Refunds are debits tied to the order (returnId param is the order id).
+        assertThat(saved.getOrderId()).isEqualTo(returnId);
         assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.REFUND.name());
-        assertThat(saved.getDebit()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(saved.getCredit()).isEqualTo(amount);
+        assertThat(saved.getDebit()).isEqualByComparingTo(amount);
+        assertThat(saved.getCredit()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getDescription()).isEqualTo(description);
     }
 
     @Test
-    void recordCustomerAdvance_createsAdvanceEntry() {
+    void recordCustomerAdvanceTransfer_isDebitTiedToOrder() {
         UUID customerId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         UUID recordedBy = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("1000.00");
-        String description = "Advance payment";
 
-        CustomerLedger result = ledgerService.recordCustomerAdvance(customerId, orderId, amount, description, recordedBy);
+        ledgerService.recordCustomerAdvanceTransfer(customerId, orderId, amount, "Moved to advance", recordedBy);
 
         verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
         CustomerLedger saved = customerLedgerCaptor.getValue();
-
-        assertThat(saved.getCustomerId()).isEqualTo(customerId);
         assertThat(saved.getOrderId()).isEqualTo(orderId);
-        assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.ADVANCE.name());
+        assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.ADVANCE_TRANSFER.name());
+        assertThat(saved.getDebit()).isEqualByComparingTo(amount);
+        assertThat(saved.getCredit()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void recordCustomerRefund_isDebitTiedToOrder() {
+        UUID customerId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("500.00");
+
+        ledgerService.recordCustomerRefund(customerId, orderId, amount, "Refund", UUID.randomUUID());
+
+        verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
+        CustomerLedger saved = customerLedgerCaptor.getValue();
+        assertThat(saved.getOrderId()).isEqualTo(orderId);
+        assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.REFUND.name());
+        assertThat(saved.getDebit()).isEqualByComparingTo(amount);
+        assertThat(saved.getCredit()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void recordCustomerCreditNote_isCreditTiedToOrder() {
+        UUID orderId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("750.00");
+
+        ledgerService.recordCustomerCreditNote(UUID.randomUUID(), orderId, amount, "Cancelled", UUID.randomUUID());
+
+        verify(customerLedgerRepository).save(customerLedgerCaptor.capture());
+        CustomerLedger saved = customerLedgerCaptor.getValue();
+        assertThat(saved.getOrderId()).isEqualTo(orderId);
+        assertThat(saved.getTransactionType()).isEqualTo(LedgerTransactionType.CREDIT_NOTE.name());
+        assertThat(saved.getCredit()).isEqualByComparingTo(amount);
         assertThat(saved.getDebit()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(saved.getCredit()).isEqualTo(amount);
-        assertThat(saved.getDescription()).isEqualTo(description);
     }
 
     @Test

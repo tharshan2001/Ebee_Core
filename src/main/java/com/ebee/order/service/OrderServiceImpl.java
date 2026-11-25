@@ -91,6 +91,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
     private final OrderPaymentService orderPaymentService;
+    private final OrderSettlementService orderSettlementService;
     private final OrderPdfService orderPdfService;
     private final LedgerService ledgerService;
     private final ComboRepository comboRepository;
@@ -389,6 +390,26 @@ public class OrderServiceImpl implements OrderService {
                     "Order " + savedOrder.getOrderNumber(), ctx.currentUser.getId());
         }
 
+        if (ctx.customer != null && savedOrder.getPaidAmount() != null
+                && savedOrder.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            Payment initialPayment = new Payment();
+            initialPayment.setOrderId(savedOrder.getId());
+            initialPayment.setAmount(savedOrder.getPaidAmount());
+            initialPayment.setPaymentMethod(savedOrder.getPaymentMethod());
+            initialPayment.setChequeNumber(request.getChequeNumber());
+            initialPayment.setProofFileUrl(request.getProofFileUrl());
+            initialPayment.setRecordedBy(securityService.getCurrentUserId());
+            initialPayment.setRecordedByName(securityService.getCurrentUserEmail());
+            paymentRepository.save(initialPayment);
+
+            // Upfront money must reach the receivable ledger, otherwise a fully paid order
+            // still shows as owed once outstanding is re-synced from the ledger.
+            ledgerService.recordCustomerPayment(
+                    ctx.customer.getId(), initialPayment.getId(), savedOrder.getPaidAmount(),
+                    "Upfront payment for Order " + savedOrder.getOrderNumber() + " via " + savedOrder.getPaymentMethod(),
+                    ctx.currentUser.getId());
+        }
+
         if (ctx.customer != null) {
             BigDecimal previousOutstanding = ctx.customer.getOutstandingBalance();
             BigDecimal previousAdvance = ctx.customer.getAdvanceBalance();
@@ -399,20 +420,6 @@ public class OrderServiceImpl implements OrderService {
                     previousOutstanding, ctx.customer.getOutstandingBalance(),
                     previousAdvance, ctx.customer.getAdvanceBalance(),
                     DuesChangeType.ORDER_CREATED));
-        } else {
-            orderPaymentService.syncCustomerOutstanding(ctx.order.getCustomer());
-        }
-
-        if (savedOrder.getPaidAmount() != null && savedOrder.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
-            Payment initialPayment = new Payment();
-            initialPayment.setOrderId(savedOrder.getId());
-            initialPayment.setAmount(savedOrder.getPaidAmount());
-            initialPayment.setPaymentMethod(savedOrder.getPaymentMethod());
-            initialPayment.setChequeNumber(request.getChequeNumber());
-            initialPayment.setProofFileUrl(request.getProofFileUrl());
-            initialPayment.setRecordedBy(securityService.getCurrentUserId());
-            initialPayment.setRecordedByName(securityService.getCurrentUserEmail());
-            paymentRepository.save(initialPayment);
         }
 
         Commission commission = null;
@@ -605,42 +612,21 @@ public class OrderServiceImpl implements OrderService {
 
         boolean stockAlreadyRestored = order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT;
 
-        if (!stockAlreadyRestored) {
-            List<UUID> stockProductIds = order.getItems().stream()
-                    .map(item -> item.getProduct().getId())
-                    .toList();
-            List<Integer> stockQuantities = order.getItems().stream()
-                    .map(OrderItem::getQuantity)
-                    .toList();
-            List<String> stockNotes = order.getItems().stream()
-                    .map(item -> "Order " + order.getOrderNumber() + " cancelled - Item restored")
-                    .toList();
-            inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
-        }
-
         commissionLifecycleService.cancelCommissionForOrder(id);
 
         BigDecimal previousOutstanding = order.getCustomer().getOutstandingBalance();
         BigDecimal previousAdvance = order.getCustomer().getAdvanceBalance();
 
-        boolean hasPaidAmount = order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0;
-        DuesChangeType changeType;
+        OrderSettlementService.Settlement settlement = orderSettlementService.cancel(
+                order, request.refundChoice(), !stockAlreadyRestored, "Order cancelled");
 
-        if (hasPaidAmount) {
-            changeType = request.refundChoice() == RefundChoice.CREDIT_ADVANCE
-                    ? DuesChangeType.CANCEL_ADVANCE
-                    : DuesChangeType.CANCEL_REFUND;
-            orderPaymentService.handleOrderSettlement(order, request.refundChoice(), changeType);
-        } else {
-            changeType = DuesChangeType.CANCEL_UNPAID;
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
+        DuesChangeType changeType = !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
+                : settlement.toAdvance().signum() > 0 ? DuesChangeType.CANCEL_ADVANCE
+                : DuesChangeType.CANCEL_REFUND;
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
         Order updatedOrder = orderRepository.save(order);
-
-        orderPaymentService.syncCustomerOutstanding(order.getCustomer());
         customerRepository.save(order.getCustomer());
 
         eventPublisher.publishEvent(new CustomerDuesChangedEvent(
@@ -673,55 +659,25 @@ public class OrderServiceImpl implements OrderService {
         Map<UUID, OrderItem> orderItemMap = order.getItems().stream()
                 .collect(Collectors.toMap(OrderItem::getId, oi -> oi));
 
-        List<ReturnItemRequest> itemsToReturn;
+        List<OrderSettlementService.ReturnLine> lines = new ArrayList<>();
         if (request.items() == null || request.items().isEmpty()) {
-            itemsToReturn = order.getItems().stream()
+            order.getItems().stream()
                     .filter(oi -> oi.getReturnableQuantity() > 0)
-                    .map(oi -> new ReturnItemRequest(oi.getId(), oi.getReturnableQuantity()))
-                    .toList();
+                    .forEach(oi -> lines.add(new OrderSettlementService.ReturnLine(oi, oi.getReturnableQuantity())));
         } else {
-            itemsToReturn = request.items();
-        }
-
-        List<UUID> stockProductIds = new ArrayList<>();
-        List<Integer> stockQuantities = new ArrayList<>();
-        List<String> stockNotes = new ArrayList<>();
-        BigDecimal totalReturnedSubtotal = BigDecimal.ZERO;
-
-        for (ReturnItemRequest itemReq : itemsToReturn) {
-            OrderItem orderItem = orderItemMap.get(itemReq.orderItemId());
-            if (orderItem == null) {
-                throw new IllegalArgumentException("Order item " + itemReq.orderItemId() + " does not belong to this order");
-            }
-            if (itemReq.quantity() > orderItem.getReturnableQuantity()) {
-                throw new IllegalArgumentException(
-                        "Cannot return " + itemReq.quantity() + " units of " + orderItem.getProduct().getName()
-                                + ". Returnable: " + orderItem.getReturnableQuantity());
-            }
-            if (orderItem.getCombo() != null && itemReq.quantity() != orderItem.getQuantity()) {
-                throw new IllegalArgumentException("Combo items must be returned in full quantity");
-            }
-
-            orderItem.setReturnedQuantity(orderItem.getReturnedQuantity() + itemReq.quantity());
-
-            if (orderItem.getCombo() != null) {
-                for (ComboItem ci : orderItem.getCombo().getItems()) {
-                    stockProductIds.add(ci.getProduct().getId());
-                    stockQuantities.add(ci.getQuantity() * itemReq.quantity());
-                    stockNotes.add("Order " + order.getOrderNumber() + " returned - Combo item restored");
+            for (ReturnItemRequest itemReq : request.items()) {
+                OrderItem orderItem = orderItemMap.get(itemReq.orderItemId());
+                if (orderItem == null) {
+                    throw new IllegalArgumentException("Order item " + itemReq.orderItemId() + " does not belong to this order");
                 }
-            } else {
-                stockProductIds.add(orderItem.getProduct().getId());
-                stockQuantities.add(itemReq.quantity());
-                stockNotes.add("Order " + order.getOrderNumber() + " returned - Item restored");
+                if (orderItem.getCombo() != null && itemReq.quantity() != orderItem.getQuantity()) {
+                    throw new IllegalArgumentException("Combo items must be returned in full quantity");
+                }
+                lines.add(new OrderSettlementService.ReturnLine(orderItem, itemReq.quantity()));
             }
-
-            totalReturnedSubtotal = totalReturnedSubtotal.add(
-                    orderItem.getUnitPrice().multiply(BigDecimal.valueOf(itemReq.quantity())));
         }
-
-        if (!stockProductIds.isEmpty()) {
-            inventoryService.recordOrderStocks(stockProductIds, stockQuantities, StockMovementType.RETURN, stockNotes);
+        if (lines.isEmpty()) {
+            throw new IllegalArgumentException("Nothing left to return on order " + order.getOrderNumber());
         }
 
         commissionLifecycleService.cancelCommissionForOrder(id);
@@ -730,55 +686,12 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal previousOutstanding = customer.getOutstandingBalance();
         BigDecimal previousAdvance = customer.getAdvanceBalance();
 
-        order.setTotalAmount(order.getTotalAmount().subtract(totalReturnedSubtotal));
+        OrderSettlementService.Settlement settlement = orderSettlementService.returnLines(
+                order, lines, request.refundChoice(), "Order return");
 
-        BigDecimal refundAmount;
-        if (order.getPaidAmount().compareTo(totalReturnedSubtotal) > 0) {
-            refundAmount = totalReturnedSubtotal;
-        } else {
-            refundAmount = order.getPaidAmount();
-        }
-
-        DuesChangeType changeType;
-        boolean hasPaidAmount = refundAmount.compareTo(BigDecimal.ZERO) > 0;
-
-        if (hasPaidAmount) {
-            changeType = request.refundChoice() == RefundChoice.CREDIT_ADVANCE
-                    ? DuesChangeType.RETURN_ADVANCE
-                    : DuesChangeType.RETURN_REFUND;
-
-            if (request.refundChoice() == RefundChoice.CREDIT_ADVANCE) {
-                customerService.creditToAdvance(customer, refundAmount,
-                        com.ebee.customer.enums.AdvanceReferenceType.ORDER_RETURNED,
-                        order.getId(),
-                        "Return credit for Order " + order.getOrderNumber());
-                order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
-            } else {
-                order.setPaidAmount(order.getPaidAmount().subtract(refundAmount));
-                if (order.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                    order.setPaymentStatus(PaymentStatus.REFUNDED);
-                    order.setPaidAmount(BigDecimal.ZERO);
-                }
-            }
-        } else {
-            changeType = DuesChangeType.CANCEL_UNPAID;
-        }
-
-        BigDecimal adjustmentAmount = totalReturnedSubtotal.subtract(refundAmount);
-        if (adjustmentAmount.compareTo(BigDecimal.ZERO) > 0) {
-            ledgerService.recordCustomerCreditAdjustment(
-                    customer.getId(),
-                    order.getId(),
-                    adjustmentAmount,
-                    "Return adjustment for Order " + order.getOrderNumber(),
-                    securityService.getCurrentUserId()
-            );
-        }
-
-        order.setOutstandingBalance(order.getTotalAmount().subtract(order.getPaidAmount()));
-        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
+        DuesChangeType changeType = !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
+                : settlement.toAdvance().signum() > 0 ? DuesChangeType.RETURN_ADVANCE
+                : DuesChangeType.RETURN_REFUND;
 
         boolean allReturned = order.getItems().stream().allMatch(OrderItem::isFullyReturned);
         OrderStatus oldStatus = order.getStatus();
@@ -787,18 +700,6 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order updatedOrder = orderRepository.save(order);
-
-        if (hasPaidAmount && request.refundChoice() == RefundChoice.REFUND) {
-            ledgerService.recordCustomerRefund(
-                    customer.getId(),
-                    updatedOrder.getId(),
-                    refundAmount,
-                    "Return for Order " + order.getOrderNumber(),
-                    securityService.getCurrentUserId()
-            );
-        }
-
-        orderPaymentService.syncCustomerOutstanding(customer);
         customerRepository.save(customer);
 
         eventPublisher.publishEvent(new CustomerDuesChangedEvent(
@@ -856,6 +757,9 @@ public class OrderServiceImpl implements OrderService {
         Customer customer = order.getCustomer();
         if (customer == null) {
             throw new IllegalArgumentException("Order has no customer assigned");
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.RETURNED) {
+            throw new IllegalArgumentException("Cannot use advance on a " + order.getStatus().name().toLowerCase() + " order");
         }
 
         BigDecimal previousOutstanding = customer.getOutstandingBalance();

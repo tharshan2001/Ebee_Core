@@ -20,15 +20,16 @@ import com.ebee.delivery.repository.DeliveryRepository;
 import com.ebee.driver.entity.Driver;
 import com.ebee.driver.enums.DriverAvailability;
 import com.ebee.driver.repository.DriverRepository;
-import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.entity.Order;
 import com.ebee.order.enums.OrderStatus;
 import com.ebee.order.event.OrderStatusChangedEvent;
 import com.ebee.order.repository.OrderRepository;
-import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.enums.RoleType;
 import com.ebee.user.repository.UserRepository;
+import com.ebee.order.service.OrderSettlementService;
+import com.ebee.customer.event.CustomerDuesChangedEvent;
+import com.ebee.customer.enums.DuesChangeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -54,11 +55,11 @@ public class DeliveryService {
     private final DriverRepository driverRepository;
     private final SecurityService securityService;
     private final NotificationPort notificationPort;
-    private final InventoryService inventoryService;
     private final CommissionLifecycleService commissionLifecycleService;
     private final AuditLogService auditLogService;
     private final DeliveryStateTransition deliveryStateTransition;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderSettlementService orderSettlementService;
 
     @Transactional
     public DeliveryResponse updateDeliveryStatus(UUID orderId, DeliveryStatusUpdateRequest request) {
@@ -89,6 +90,13 @@ public class DeliveryService {
 
         User previousDriver = order.getDeliveryAssignedTo();
 
+        if (newStatus == DeliveryStatus.FAILED_PERMANENT
+                && OrderSettlementService.wouldReturnMoney(order, java.math.BigDecimal.ZERO)
+                && request.getRefundChoice() == null) {
+            throw new IllegalArgumentException("refundChoice (REFUND or CREDIT_ADVANCE) is required: customer has paid "
+                    + order.getPaidAmount() + " for order " + order.getOrderNumber());
+        }
+
         DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
                 order, newStatus, request.getReason(), securityService.isAdmin());
 
@@ -105,13 +113,20 @@ public class DeliveryService {
         }
 
         if (result.wasFailedPermanent()) {
-            order.getItems().forEach(item -> inventoryService.recordOrderStock(
-                    item.getProduct().getId(),
-                    item.getQuantity(),
-                    StockMovementType.RETURN,
-                    "Delivery permanently failed - Order " + order.getOrderNumber()
-            ));
+            // The order is now CANCELLED: restore stock (combos included) and settle the money
+            // exactly like a cancellation.
             commissionLifecycleService.cancelCommissionForOrder(order.getId());
+            var customer = order.getCustomer();
+            var previousOutstanding = customer.getOutstandingBalance();
+            var previousAdvance = customer.getAdvanceBalance();
+            OrderSettlementService.Settlement settlement = orderSettlementService.cancel(
+                    order, request.getRefundChoice(), true, "Delivery permanently failed");
+            eventPublisher.publishEvent(new CustomerDuesChangedEvent(
+                    this, customer, previousOutstanding, customer.getOutstandingBalance(),
+                    previousAdvance, customer.getAdvanceBalance(),
+                    !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
+                            : settlement.toAdvance().signum() > 0 ? DuesChangeType.CANCEL_ADVANCE
+                            : DuesChangeType.CANCEL_REFUND));
         }
 
         Order savedOrder = orderRepository.save(order);

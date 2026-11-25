@@ -327,13 +327,8 @@ public class CustomerService {
         customer.setAdvanceBalance(newBalance);
         customerRepository.save(customer);
 
-        ledgerService.recordCustomerAdvance(
-                customer.getId(),
-                referenceId,
-                amount,
-                description,
-                securityService.getCurrentUserId()
-        );
+        // Wallet only: the advance balance is not part of the receivable ledger. When the credit
+        // comes from an overpaid order, OrderSettlementService posts the matching ADVANCE_TRANSFER.
 
         publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
                 DuesChangeType.ADVANCE_CREDITED);
@@ -395,14 +390,7 @@ public class CustomerService {
         customer.setAdvanceBalance(newBalance);
         customerRepository.save(customer);
         advanceTransactionRepository.save(transaction);
-
-        ledgerService.recordCustomerAdvance(
-                customer.getId(),
-                null,
-                request.amount(),
-                "Manual advance adjustment: " + request.description(),
-                securityService.getCurrentUserId()
-        );
+        // Wallet only: manual advance changes don't touch the receivable ledger.
 
         publishDuesChange(customer, customer.getOutstandingBalance(), previousAdvance,
                 DuesChangeType.MANUAL_ADJUSTMENT);

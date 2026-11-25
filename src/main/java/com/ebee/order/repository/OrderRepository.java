@@ -149,4 +149,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT o.trip.status FROM Order o WHERE o.id = :orderId")
     TripStatus findTripStatusByOrderId(@Param("orderId") UUID orderId);
+
+    /** Rows: [customerId, sum of outstandingBalance]. Used by ledger reconciliation. */
+    @Query("SELECT o.customer.id, COALESCE(SUM(o.outstandingBalance), 0) FROM Order o WHERE o.customer IS NOT NULL GROUP BY o.customer.id")
+    List<Object[]> sumOutstandingByCustomer();
 }

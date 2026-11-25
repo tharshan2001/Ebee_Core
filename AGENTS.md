@@ -272,6 +272,31 @@ See `.env.sample`. Critical secrets that must be present at runtime:
 
 **Tests:** 487 pass
 
+## Current State (November 25, 2026)
+
+### Customer Ledger Rules (Phase A fix)
+The customer ledger is **accounts receivable only**: `balance = SUM(debit) - SUM(credit)` = what the customer owes.
+The advance balance is a separate wallet (`customer_advance_transactions`) and is **not** posted to the ledger.
+
+| Event | Entry |
+|---|---|
+| Order created | `INVOICE` debit (total) |
+| Money received (upfront, later, bulk, or from advance wallet) | `PAYMENT` credit |
+| Value removed (cancel / return / FAILED_PERMANENT) | `CREDIT_NOTE` credit |
+| Overpaid money refunded in cash/bank | `REFUND` **debit** |
+| Overpaid money moved to the advance wallet | `ADVANCE_TRANSFER` debit (+ wallet credit) |
+| Manual correction | `ADJUSTMENT` debit/credit |
+| `ADVANCE` | legacy only — old wallet credits posted to A/R; no longer written |
+
+- `OrderSettlementService` is the single path for cancellation, item returns, approved return/exchange, and `FAILED_PERMANENT`: credit note → refund/advance only the **overpaid** part (`paid - newTotal`) → sync balances. Combo lines expand to component products for stock restore.
+- Returns on a partly paid order reduce what is owed first; cash only goes back for real overpayment.
+- `FAILED_PERMANENT` now settles money like a cancellation; `refundChoice` is required in `DeliveryStatusUpdateRequest` when the customer has paid.
+- Upfront payment at order creation posts a `PAYMENT` ledger entry. Paid amount above the order total is rejected (non-COD).
+- `useAdvance` rejects amounts above the order's outstanding and cancelled/returned orders.
+- Invariant: `ledger balance == Σ order.outstandingBalance + Σ unlinked entries` (no order/payment/return id, excluding legacy `ADVANCE`). Check with `GET /api/accounting/reconciliation/customers?mismatchesOnly=true` (ADMIN).
+- Tests: `OrderSettlementLedgerScenarioTest` runs the real LedgerService + settlement on an in-memory ledger and asserts the invariant per scenario.
+- Existing production rows written under the old rules are NOT corrected by this change — run the reconciliation report, review, then post dated `ADJUSTMENT` entries.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

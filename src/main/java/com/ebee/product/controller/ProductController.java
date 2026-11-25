@@ -84,8 +84,8 @@ public class ProductController {
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {
                 request.setSpecifications(objectMapper.readValue(specificationsJson, new TypeReference<List<ProductSpecification>>() {}));
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getMessage());
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getOriginalMessage());
             }
         }
         if (images != null) {
@@ -258,8 +258,8 @@ public class ProductController {
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {
                 request.setSpecifications(objectMapper.readValue(specificationsJson, new TypeReference<List<ProductSpecification>>() {}));
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getMessage());
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalArgumentException("Invalid specifications JSON: " + e.getOriginalMessage());
             }
         }
         request.setRemoveImageUrls(removeImageUrls);

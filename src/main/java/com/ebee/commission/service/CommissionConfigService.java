@@ -46,7 +46,7 @@ public class CommissionConfigService {
         BigDecimal previousRate = config.getCommissionRate();
         mapper.updateConfigFromRequest(request, config);
         config = configRepository.save(config);
-        if (config.getType() == CommissionType.DEFAULT && rateChanged(previousRate, request.getCommissionRate() != null ? BigDecimal.valueOf(request.getCommissionRate()) : null)) {
+        if (config.getType() == CommissionType.DEFAULT && rateChanged(previousRate, request.getCommissionRate())) {
             recalculateLinkedCommissions(config);
         }
         return mapper.toConfigResponse(config);
@@ -104,7 +104,7 @@ public class CommissionConfigService {
             config.setType(CommissionType.DEFAULT);
             if (config.getMinAmount() == null) config.setMinAmount(BigDecimal.ZERO);
             config = configRepository.save(config);
-            if (rateChanged(previousRate, request.getCommissionRate() != null ? BigDecimal.valueOf(request.getCommissionRate()) : null)) {
+            if (rateChanged(previousRate, request.getCommissionRate())) {
                 recalculateLinkedCommissions(config);
             }
         } else {

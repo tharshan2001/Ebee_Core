@@ -26,6 +26,7 @@ public class ReminderSchedulerService {
 
     private final ReminderRepository reminderRepository;
     private final NotificationPort notificationPort;
+    private final com.ebee.common.service.ScheduledJobMonitor jobMonitor;
 
     @Scheduled(fixedRate = 60_000)
     @SchedulerLock(name = "processReminders", lockAtMostFor = "PT2M", lockAtLeastFor = "PT55S")
@@ -41,6 +42,8 @@ public class ReminderSchedulerService {
     private void processExactAlerts(LocalDate date, LocalTime now) {
         List<Reminder> reminders = reminderRepository.findPendingRemindersForAlert(date, now);
 
+        int failed = 0;
+        String firstError = null;
         for (Reminder reminder : reminders) {
             try {
                 String subject = "Reminder: " + reminder.getTitle();
@@ -64,16 +67,24 @@ public class ReminderSchedulerService {
                 reminderRepository.save(reminder);
 
                 log.info("Exact alert sent for reminder: {}", reminder.getId());
-            } catch (Exception e) {
-                log.error("Failed to send exact alert for reminder {}: {}", reminder.getId(), e.getMessage());
+            } catch (RuntimeException e) {
+                // One bad reminder mustn't block the rest; the run reports what it skipped.
+                log.error("Failed to send exact alert for reminder {}: {}", reminder.getId(), e.getMessage(), e);
+                failed++;
+                if (firstError == null) {
+                    firstError = "reminder " + reminder.getId() + ": " + e.getMessage();
+                }
             }
         }
+        jobMonitor.reportPartialFailure("ReminderSchedulerService.exactAlerts", failed, reminders.size(), firstError);
     }
 
     private void processEarlyAlerts(LocalDate date, LocalTime now) {
         LocalTime earlyBound = now.plusMinutes(5);
         List<Reminder> reminders = reminderRepository.findPendingRemindersForEarlyAlert(date, now, earlyBound);
 
+        int failed = 0;
+        String firstError = null;
         for (Reminder reminder : reminders) {
             try {
                 String subject = "Reminder: " + reminder.getTitle();
@@ -100,10 +111,16 @@ public class ReminderSchedulerService {
                 reminderRepository.save(reminder);
 
                 log.info("Early alert sent for reminder: {}", reminder.getId());
-            } catch (Exception e) {
-                log.error("Failed to send early alert for reminder {}: {}", reminder.getId(), e.getMessage());
+            } catch (RuntimeException e) {
+                // One bad reminder mustn't block the rest; the run reports what it skipped.
+                log.error("Failed to send early alert for reminder {}: {}", reminder.getId(), e.getMessage(), e);
+                failed++;
+                if (firstError == null) {
+                    firstError = "reminder " + reminder.getId() + ": " + e.getMessage();
+                }
             }
         }
+        jobMonitor.reportPartialFailure("ReminderSchedulerService.earlyAlerts", failed, reminders.size(), firstError);
     }
 
 }

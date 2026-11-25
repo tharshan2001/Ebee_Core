@@ -116,7 +116,7 @@ class InventoryServiceTest {
 
         InventoryLayer layer = new InventoryLayer(inventory, 100, 100, BigDecimal.TEN, java.time.LocalDateTime.now());
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryLayerRepository.findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(
                 any(), eq(0))).thenReturn(List.of(layer));
         when(inventoryLayerRepository.saveAll(anyList())).thenReturn(List.of(layer));
@@ -138,7 +138,7 @@ class InventoryServiceTest {
         request.setQuantityChange(-200);
         request.setMovementType(StockMovementType.OUT);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -153,7 +153,7 @@ class InventoryServiceTest {
         request.setQuantityChange(-20);
         request.setMovementType(StockMovementType.OUT);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -165,7 +165,7 @@ class InventoryServiceTest {
         StockRequest request = new StockRequest();
         request.setProductId(productId);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.empty());
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> inventoryService.adjustStock(request))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -177,7 +177,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(10);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
@@ -193,7 +193,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(45);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.reserveStock(productId, 10))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -205,7 +205,7 @@ class InventoryServiceTest {
         inventory.setQuantity(50);
         inventory.setReservedQuantity(30);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any())).thenReturn(inventory);
         when(inventoryMapper.toResponse(any())).thenReturn(dummyResponse());
 
@@ -220,7 +220,7 @@ class InventoryServiceTest {
     void releaseReservedStock_moreThanReserved_throws() {
         inventory.setReservedQuantity(5);
 
-        when(inventoryRepository.findByProductIdAndLocationId(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByProductIdWithLock(productId, MAIN_LOCATION_ID)).thenReturn(Optional.of(inventory));
 
         assertThatThrownBy(() -> inventoryService.releaseReservedStock(productId, 10))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -25,8 +25,8 @@ public class AgentWithCredentialsResponse {
     private String district;
     private String country;
     private String phoneNumber;
-    private Double commissionRate;
-    private Double effectiveCommissionRate;
+    private java.math.BigDecimal commissionRate;
+    private java.math.BigDecimal effectiveCommissionRate;
     private String nicNumber;
     private String bankAccountNumber;
     private String bankName;

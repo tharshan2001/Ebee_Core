@@ -375,6 +375,13 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - API under `/api/pricing`: `/groups` (list/create/update), `PUT|DELETE /groups/{groupId}/products/{productId}?price=`, `GET /products/{productId}/group-prices`, `PUT /customers/{customerId}/group?groupId=` (omit to clear), `/units` (list/create), `GET /products/{productId}/units`, `PUT /products/{productId}/units/{unitId}`, `GET /quote?productId&customerId&productUnitId`.
 - Tests: `PricingServiceTest`, pack cases in `ProductDiscountTest`, `OrderServiceTest`, `OrderSettlementLedgerScenarioTest`.
 
+### Correctness pass (Phase 2)
+- **Scheduled-job failures are visible:** `common.service.ScheduledJobMonitor` is an aspect around every `@Scheduled` method (outermost, so it also sees commit/rollback failures). A failing job is logged and admins get an in-app `SCHEDULED_JOB_FAILED` alert (throttled to one per job per hour). Jobs that skip bad items and carry on (reminders) call `reportPartialFailure(job, failed, total, firstError)`. Don't wrap a scheduled job body in `try/catch (Exception)`; let it propagate.
+- Commission auto-processing (`processApprovedCommissions`) no longer swallows per-item errors inside its transaction: any failure rolls back the run and alerts.
+- The remaining `catch (Exception …)` blocks are deliberate best-effort isolation (notification sends, WebSocket broadcasts, audit-log writes, auth token parsing) — a failed SMS/broadcast must not fail the order. Narrowed where a specific type exists (specifications JSON → `JsonProcessingException`, record-to-map reflection → `ReflectiveOperationException`).
+- **Stock row locking:** every `InventoryService` path that changes `quantity` or `reserved_quantity` (`adjustStock`, `recordOrderStock`, `reserveStock`, `releaseReservedStock`, `confirmOrderStock`, plus the batch paths) loads the row with `findByProductIdWithLock` (PESSIMISTIC_WRITE), so concurrent changes queue instead of failing on version conflicts.
+- **Exact commission values:** `CommissionConfigRequest/Response` (`commissionRate`, `minAmount`, `maxAmount`), `AgentUpdateRequest`, `AgentResponse`, `AgentWithCredentialsResponse` and the agent commission-rate endpoints use `BigDecimal` instead of `Double`. JSON stays numeric but may show trailing zeros (e.g. `5.00`).
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

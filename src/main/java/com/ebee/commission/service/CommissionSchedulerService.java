@@ -17,13 +17,10 @@ public class CommissionSchedulerService {
     @SchedulerLock(name = "processApprovedCommissions")
     public void processApprovedCommissions() {
         log.info("Running scheduled auto-processing of approved commissions (10-day hold)");
-        try {
-            int count = lifecycleService.processApprovedCommissions();
-            if (count > 0) {
-                log.info("Auto-processed {} commissions from APPROVED to PROCESSING", count);
-            }
-        } catch (Exception e) {
-            log.error("Failed to auto-process commissions: {}", e.getMessage(), e);
+        // Failures propagate to ScheduledJobMonitor, which logs them and alerts admins.
+        int count = lifecycleService.processApprovedCommissions();
+        if (count > 0) {
+            log.info("Auto-processed {} commissions from APPROVED to PROCESSING", count);
         }
     }
 }

@@ -60,6 +60,16 @@ public class InventoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
     }
 
+    /**
+     * Stock row for a product at a location, locked (SELECT … FOR UPDATE) for the rest of the
+     * transaction. Every path that changes quantity or reserved quantity uses this, so concurrent
+     * orders for the same product queue up instead of failing on version conflicts.
+     */
+    private Inventory lockedInventoryAt(UUID productId, UUID locationId) {
+        return inventoryRepository.findByProductIdWithLock(productId, loc(locationId))
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+    }
+
     /** Stock row for a product at a location, created empty if the product has never been there. */
     private Inventory ensureInventory(Product product, com.ebee.location.entity.Location location) {
         return inventoryRepository.findByProductIdAndLocationId(product.getId(), location.getId())
@@ -148,11 +158,16 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse adjustStock(StockRequest request) {
-        Inventory inventory = request.getQuantityChange() != null && request.getQuantityChange() > 0
-                ? ensureInventory(productRepository.findById(request.getProductId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId())),
-                        locationService.resolve(request.getLocationId(), null))
-                : inventoryAt(request.getProductId(), request.getLocationId());
+        Inventory inventory;
+        if (request.getQuantityChange() != null && request.getQuantityChange() > 0) {
+            var location = locationService.resolve(request.getLocationId(), null);
+            inventory = inventoryRepository.findByProductIdWithLock(request.getProductId(), location.getId())
+                    .orElseGet(() -> ensureInventory(productRepository.findById(request.getProductId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId())),
+                            location));
+        } else {
+            inventory = lockedInventoryAt(request.getProductId(), request.getLocationId());
+        }
 
         int quantityBefore = inventory.getQuantity();
         int quantityAfter = quantityBefore + request.getQuantityChange();
@@ -192,7 +207,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public StockResponse recordOrderStock(UUID productId, Integer quantity, StockMovementType movementType, String notes) {
-        Inventory inventory = inventoryAt(productId, null);
+        Inventory inventory = lockedInventoryAt(productId, null);
 
         int quantityBefore = inventory.getQuantity();
         int quantityChange = movementType == StockMovementType.OUT ? -quantity : quantity;
@@ -418,7 +433,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse reserveStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryAt(productId, null);
+        Inventory inventory = lockedInventoryAt(productId, null);
 
         int available = inventory.getQuantity() - inventory.getReservedQuantity();
         if (available < quantity) {
@@ -442,7 +457,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse releaseReservedStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryAt(productId, null);
+        Inventory inventory = lockedInventoryAt(productId, null);
 
         if (inventory.getReservedQuantity() < quantity) {
             throw new IllegalArgumentException("Cannot release more than reserved quantity");
@@ -462,7 +477,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse confirmOrderStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryAt(productId, null);
+        Inventory inventory = lockedInventoryAt(productId, null);
 
         if (inventory.getReservedQuantity() < quantity) {
             throw new IllegalArgumentException("Insufficient reserved stock");

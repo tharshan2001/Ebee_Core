@@ -48,6 +48,7 @@ class ExpenseServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private StoragePort storagePort;
 
+    @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @InjectMocks private ExpenseService expenseService;
 
     @Captor private ArgumentCaptor<Expense> expenseCaptor;
@@ -165,6 +166,9 @@ class ExpenseServiceTest {
 
         expenseService.approveExpense(expenseId);
 
+        verify(moneyAccountService).recordMovement(eq(com.ebee.finance.entity.AccountTransaction.Direction.OUT),
+                any(), eq("EXPENSE"), isNull(), eq(com.ebee.finance.entity.AccountTransaction.Type.EXPENSE),
+                eq("EXPENSE"), eq(expenseId), anyString());
         verify(expenseRepository).save(expenseCaptor.capture());
         assertThat(expenseCaptor.getValue().getStatus()).isEqualTo(ExpenseStatus.APPROVED);
         assertThat(expenseCaptor.getValue().getApprovedBy()).isEqualTo(admin);

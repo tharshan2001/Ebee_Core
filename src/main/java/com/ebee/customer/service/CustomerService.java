@@ -67,6 +67,7 @@ public class CustomerService {
     private final LedgerService ledgerService;
     private final CustomerLedgerRepository customerLedgerRepository;
     private final SecurityService securityService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
@@ -465,7 +466,8 @@ public class CustomerService {
                 if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
                 BigDecimal payAmount = remaining.min(order.getOutstandingBalance());
                 orderPaymentService.recordPayment(order.getId(),
-                        new RecordPaymentRequest(payAmount, request.paymentMethod(), null, null), false);
+                        new RecordPaymentRequest(payAmount, request.paymentMethod(), request.chequeNumber(),
+                                request.proofFileUrl(), request.accountId()), false);
                 remaining = remaining.subtract(payAmount);
                 settledCount++;
             }
@@ -483,6 +485,9 @@ public class CustomerService {
                         securityService.getCurrentUserId()
                 );
                 remaining = remaining.subtract(adjustmentPayment);
+                moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.IN, adjustmentPayment, request.paymentMethod().name(),
+                        request.accountId(), com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_RECEIPT, "CUSTOMER", customerId,
+                        "Account payment via " + request.paymentMethod());
             }
         }
 

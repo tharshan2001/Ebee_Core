@@ -70,7 +70,8 @@ class CommissionClawbackScenarioTest {
         AgentRepository agentRepo = mock(AgentRepository.class);
         when(agentRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        payments = new CommissionPaymentService(commissionRepo, mapper, notifications, audit, ledgerService, security);
+        payments = new CommissionPaymentService(commissionRepo, mapper, notifications, audit, ledgerService, security,
+                mock(com.ebee.finance.service.MoneyAccountService.class));
         lifecycle = new CommissionLifecycleService(commissionRepo, mapper, notifications, payments, audit,
                 ledgerService, security, agentRepo);
 

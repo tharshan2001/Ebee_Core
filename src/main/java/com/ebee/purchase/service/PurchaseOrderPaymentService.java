@@ -25,15 +25,18 @@ public class PurchaseOrderPaymentService {
     private final SupplierRepository supplierRepository;
     private final LedgerService ledgerService;
     private final SecurityService securityService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     public PurchaseOrderPaymentService(PurchaseOrderRepository purchaseOrderRepository,
                                        SupplierRepository supplierRepository,
                                        LedgerService ledgerService,
-                                       SecurityService securityService) {
+                                       SecurityService securityService,
+                                       com.ebee.finance.service.MoneyAccountService moneyAccountService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.supplierRepository = supplierRepository;
         this.ledgerService = ledgerService;
         this.securityService = securityService;
+        this.moneyAccountService = moneyAccountService;
     }
 
     public void initPayment(PurchaseOrder order, PurchasePaymentMethod paymentMethod, BigDecimal paidAmount) {
@@ -63,6 +66,8 @@ public class PurchaseOrderPaymentService {
         }
 
         order.setPaymentMethod(paymentMethod);
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, order.getPaidAmount(), paymentMethod.name(), null,
+                com.ebee.finance.entity.AccountTransaction.Type.SUPPLIER_PAYMENT, "PURCHASE_ORDER", order.getId(), "Paid at order: PO " + order.getPoNumber());
     }
 
     public void initPaymentOnReceipt(PurchaseOrder order) {
@@ -113,6 +118,9 @@ public class PurchaseOrderPaymentService {
                 order.getSupplier(), request.amount(), order.getId(),
                 "Payment for PO " + order.getPoNumber() + " via " + request.paymentMethod(),
                 "PO Payment: " + order.getPoNumber());
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, request.amount(), request.paymentMethod().name(),
+                request.accountId(), com.ebee.finance.entity.AccountTransaction.Type.SUPPLIER_PAYMENT, "PURCHASE_ORDER", order.getId(),
+                "Payment for PO " + order.getPoNumber());
 
         return purchaseOrderRepository.save(order);
     }

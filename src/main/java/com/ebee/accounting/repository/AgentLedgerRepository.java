@@ -32,4 +32,9 @@ public interface AgentLedgerRepository extends JpaRepository<AgentLedger, UUID> 
 
     @Query("SELECT l FROM AgentLedger l WHERE l.agentId = :agentId ORDER BY l.createdAt DESC LIMIT 1")
     Optional<AgentLedger> findLatestByAgentId(@Param("agentId") UUID agentId);
+
+    /** Rows: [agentId, credit − debit] before the cutoff (positive = we owe the agent, negative = clawback owed to us). */
+    @Query("SELECT l.agentId, COALESCE(SUM(l.credit) - SUM(l.debit), 0) FROM AgentLedger l "
+            + "WHERE l.createdAt < :before GROUP BY l.agentId")
+    java.util.List<Object[]> balancesBefore(@Param("before") java.time.LocalDateTime before);
 }

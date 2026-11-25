@@ -325,6 +325,14 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - `sumRevenueByDateRange` (P&L, dashboards, sales reports) is now **net of VAT**.
 - Invoice PDF becomes "TAX INVOICE" with seller/buyer VAT numbers and a net/VAT breakdown when VAT is on. Invoice and receipt no longer crash on combo lines.
 
+### Bank & Cash Accounts, Balance Sheet, Cash Flow (Feature 2)
+- New `finance` package: `payment_accounts` (CASH / BANK / CHEQUES_IN_HAND / WALLET), `account_transactions` (IN/OUT, typed, positive amounts; balance = Σ IN − Σ OUT; opening balance is an OPENING transaction) and `payment_account_defaults` (purpose → account). V126 seeds "Cash in hand", "Main bank account", "Cheques in hand" and defaults: CASH/COD/REFUND/EXPENSE → cash, BANK_TRANSFER/CARD_PAYMENT/COMMISSION_PAYOUT → bank, CHEQUE → cheques in hand.
+- `MoneyAccountService.recordMovement(direction, amount, purpose, accountId, type, …)` is called by every flow that moves real money: customer payments (`OrderPaymentService.recordPayment`, upfront at order creation, account-level payments in `CustomerService`), refunds (`OrderSettlementService` via `recordPayout`, falling back to the REFUND default), supplier payments (PO payment, PO paid at creation, `SupplierServiceImpl` bulk), expense approval, and the cash part of commission payouts. Purpose = payment method name or flow; an explicit `accountId` (optional on `RecordPaymentRequest`, `OrderRequest`, purchase `RecordPaymentRequest`) overrides it. CREDIT and payments from the advance wallet move no money and record nothing.
+- API (ADMIN) under `/api/finance`: accounts CRUD with balances (`?asOf`), `/accounts/{id}/statement?from&to`, `/transfers`, `/cheque-deposits` (cheques-in-hand → bank only), `/owner-deposits`, `/owner-withdrawals`, `/account-defaults`, `/balance-sheet?asOf`, `/cash-flow?from&to`.
+- Balance sheet: assets = account balances + customer receivables + stock at cost (**current** FIFO value, not as of the date) + agent clawbacks + supplier advances + VAT refundable; liabilities = supplier payables + commission payable + customer advance wallets + customer credits + VAT payable; equity = difference. Each party's ledger balance is split by sign.
+- Cash flow: operating (customers, refunds, suppliers, expenses, commissions), financing (owner money, opening balances), other (adjustments); transfers and cheque deposits excluded.
+- Accounts start at zero: money received before V126 isn't in them, so enter real opening balances per account before relying on the balance sheet.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

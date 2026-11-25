@@ -21,4 +21,6 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
     @Modifying
     @Query("UPDATE Location l SET l.defaultLocation = false WHERE l.defaultLocation = true")
     void clearDefault();
+
+    Optional<Location> findByCodeIgnoreCase(String code);
 }

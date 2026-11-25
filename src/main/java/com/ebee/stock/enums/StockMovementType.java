@@ -14,5 +14,7 @@ public enum StockMovementType {
     /** Arriving at a location from a stock transfer. */
     TRANSFER_IN,
     /** Expired stock written off. */
-    EXPIRED
+    EXPIRED,
+    /** Stock on hand when the business started using the system (import). */
+    OPENING
 }

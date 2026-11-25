@@ -922,6 +922,17 @@ public class OrderServiceImpl implements OrderService {
         throw new IllegalStateException("Couldn't generate order number. Try again.", ex);
     }
 
+    /**
+     * Every other failure in createOrder (out of stock, credit limit, missing district…) is passed
+     * through unchanged. Without this, Spring Retry looks for a matching @Recover method, finds
+     * none, and wraps the error in ExhaustedRetryException("Cannot locate recovery method"), so the
+     * API answered 500 instead of the real 400 message.
+     */
+    @Recover
+    public OrderResponse rethrowOrderFailure(RuntimeException ex, OrderRequest request) {
+        throw ex;
+    }
+
     private static boolean isDuplicateOrderNumber(DataIntegrityViolationException ex) {
         Throwable cause = ex.getMostSpecificCause();
         if (cause == null) return false;

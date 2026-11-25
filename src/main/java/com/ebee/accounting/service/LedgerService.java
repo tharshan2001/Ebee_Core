@@ -100,6 +100,7 @@ public class LedgerService {
                 .build();
         log.info("Customer ledger {}: customer={}, order={}, payment={}, debit={}, credit={}",
                 type, customerId, orderId, paymentId, debit, credit);
+        accountingPeriodService.requireOpenCurrentPeriod("CustomerLedger");
         CustomerLedger saved = customerLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -126,6 +127,7 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier invoice: supplier={}, po={}, amount={}", supplierId, purchaseOrderId, amount);
+        accountingPeriodService.requireOpenCurrentPeriod("SupplierLedger");
         SupplierLedger saved = supplierLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -154,6 +156,7 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier payment: supplier={}, payment={}, amount={}", supplierId, supplierPaymentId, amount);
+        accountingPeriodService.requireOpenCurrentPeriod("SupplierLedger");
         SupplierLedger saved = supplierLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -182,6 +185,7 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier expense: supplier={}, expense={}, amount={}", supplierId, expenseId, amount);
+        accountingPeriodService.requireOpenCurrentPeriod("SupplierLedger");
         SupplierLedger saved = supplierLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -209,6 +213,7 @@ public class LedgerService {
                 .reference(reference)
                 .build();
         log.info("Recording supplier adjustment: supplier={}, debit={}, effectiveDate={}, description={}", supplierId, debit, effectiveDate, description);
+        accountingPeriodService.requireOpenCurrentPeriod("SupplierLedger");
         SupplierLedger saved = supplierLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -245,6 +250,7 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording agent commission: agent={}, commission={}, amount={}", agentId, commissionId, amount);
+        accountingPeriodService.requireOpenCurrentPeriod("AgentLedger");
         AgentLedger saved = agentLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(
@@ -271,6 +277,7 @@ public class LedgerService {
                 .description(description)
                 .build();
         log.info("Recording agent payout: agent={}, payout={}, amount={}", agentId, payoutId, amount);
+        accountingPeriodService.requireOpenCurrentPeriod("AgentLedger");
         AgentLedger saved = agentLedgerRepository.save(entry);
 
         accountingPeriodService.recordPeriodTransaction(

@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Collection;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -44,18 +45,63 @@ public class InventoryService {
     private final StockRepository stockRepository;
     private final StockMovementRecorder stockMovementRecorder;
     private final InventoryAlertService inventoryAlertService;
+    private final com.ebee.location.service.LocationService locationService;
+
+    // ── location helpers ───────────────────────────────────────────────
+
+    private UUID loc(UUID locationId) {
+        return locationId != null ? locationId : locationService.defaultLocation().getId();
+    }
+
+    /** Stock row for a product at a location (default location when null). */
+    private Inventory inventoryAt(UUID productId, UUID locationId) {
+        UUID l = loc(locationId);
+        return inventoryRepository.findByProductIdAndLocationId(productId, l)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+    }
+
+    /** Stock row for a product at a location, created empty if the product has never been there. */
+    private Inventory ensureInventory(Product product, com.ebee.location.entity.Location location) {
+        return inventoryRepository.findByProductIdAndLocationId(product.getId(), location.getId())
+                .orElseGet(() -> inventoryRepository.save(Inventory.builder()
+                        .product(product)
+                        .location(location)
+                        .quantity(0)
+                        .reservedQuantity(0)
+                        .averageCost(BigDecimal.ZERO)
+                        .build()));
+    }
+
+    /** Lock (and create if missing, for inbound moves) the rows for these products at one location. */
+    private Map<UUID, Inventory> lockRows(Collection<UUID> productIds, UUID locationId, boolean createMissing) {
+        UUID l = loc(locationId);
+        if (createMissing) {
+            com.ebee.location.entity.Location location = locationService.require(l);
+            for (UUID pid : new TreeSet<>(productIds)) {
+                if (inventoryRepository.findByProductIdAndLocationId(pid, l).isEmpty()) {
+                    Product product = productRepository.findById(pid)
+                            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", pid));
+                    ensureInventory(product, location);
+                }
+            }
+        }
+        return inventoryRepository.findByProductIdInWithLock(new TreeSet<>(productIds), l).stream()
+                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+    }
 
     @Transactional
     public InventoryResponse createInventory(UUID productId, Integer initialQuantity, Integer reorderLevel) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
-        if (inventoryRepository.findByProductId(productId).isPresent()) {
+        com.ebee.location.entity.Location location = locationService.defaultLocation();
+        if (inventoryRepository.findByProductIdAndLocationId(productId, location.getId()).isPresent()) {
             throw new IllegalArgumentException("Inventory already exists for product: " + productId);
         }
 
         Inventory inventory = Inventory.builder()
                 .product(product)
+                .location(location)
                 .quantity(initialQuantity != null ? initialQuantity : 0)
                 .reservedQuantity(0)
                 .reorderLevel(reorderLevel)
@@ -68,9 +114,14 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public InventoryResponse getInventoryByProductId(UUID productId) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
         return inventoryMapper.toResponse(inventory);
+    }
+
+    /** Stock for a product at every location. */
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> getStockByLocation(UUID productId) {
+        return inventoryRepository.findAllByProductId(productId).stream().map(inventoryMapper::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -97,8 +148,11 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse adjustStock(StockRequest request) {
-        Inventory inventory = inventoryRepository.findByProductId(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", request.getProductId()));
+        Inventory inventory = request.getQuantityChange() != null && request.getQuantityChange() > 0
+                ? ensureInventory(productRepository.findById(request.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId())),
+                        locationService.resolve(request.getLocationId(), null))
+                : inventoryAt(request.getProductId(), request.getLocationId());
 
         int quantityBefore = inventory.getQuantity();
         int quantityAfter = quantityBefore + request.getQuantityChange();
@@ -138,8 +192,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public StockResponse recordOrderStock(UUID productId, Integer quantity, StockMovementType movementType, String notes) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         int quantityBefore = inventory.getQuantity();
         int quantityChange = movementType == StockMovementType.OUT ? -quantity : quantity;
@@ -183,7 +236,13 @@ public class InventoryService {
     @Transactional
     public List<StockResponse> recordOrderStocks(List<UUID> productIds, List<Integer> quantities,
                                                   StockMovementType movementType, List<String> notes) {
-        return applyMovements(productIds, quantities, movementType, notes, null, null);
+        return recordOrderStocks(null, productIds, quantities, movementType, notes);
+    }
+
+    @Transactional
+    public List<StockResponse> recordOrderStocks(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                                  StockMovementType movementType, List<String> notes) {
+        return applyMovements(locationId, productIds, quantities, movementType, notes, null, null);
     }
 
     /**
@@ -192,8 +251,20 @@ public class InventoryService {
      */
     @Transactional
     public List<BigDecimal> deductStock(List<UUID> productIds, List<Integer> quantities, List<String> notes) {
+        return deductStock(null, productIds, quantities, notes);
+    }
+
+    /** FIFO deduction at a location (default when null), returning the cost consumed per row. */
+    @Transactional
+    public List<BigDecimal> deductStock(UUID locationId, List<UUID> productIds, List<Integer> quantities, List<String> notes) {
+        return deductStock(locationId, StockMovementType.OUT, productIds, quantities, notes);
+    }
+
+    @Transactional
+    public List<BigDecimal> deductStock(UUID locationId, StockMovementType type, List<UUID> productIds,
+                                        List<Integer> quantities, List<String> notes) {
         List<BigDecimal> lineCosts = new ArrayList<>();
-        applyMovements(productIds, quantities, StockMovementType.OUT, notes, null, lineCosts);
+        applyMovements(locationId, productIds, quantities, type, notes, null, lineCosts);
         return lineCosts;
     }
 
@@ -204,18 +275,35 @@ public class InventoryService {
     @Transactional
     public List<StockResponse> returnStock(List<UUID> productIds, List<Integer> quantities,
                                            List<BigDecimal> unitCosts, List<String> notes) {
-        return applyMovements(productIds, quantities, StockMovementType.RETURN, notes, unitCosts, null);
+        return returnStock(null, productIds, quantities, unitCosts, notes);
     }
 
-    private List<StockResponse> applyMovements(List<UUID> productIds, List<Integer> quantities,
+    @Transactional
+    public List<StockResponse> returnStock(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                           List<BigDecimal> unitCosts, List<String> notes) {
+        return addStock(locationId, StockMovementType.RETURN, productIds, quantities, unitCosts, notes);
+    }
+
+    /** Inbound move (RETURN or TRANSFER_IN) at a location, each row at the given unit cost. */
+    @Transactional
+    public List<StockResponse> addStock(UUID locationId, StockMovementType type, List<UUID> productIds,
+                                        List<Integer> quantities, List<BigDecimal> unitCosts, List<String> notes) {
+        return applyMovements(locationId, productIds, quantities, type, notes, unitCosts, null);
+    }
+
+    private static boolean isOutbound(StockMovementType t) {
+        return t == StockMovementType.OUT || t == StockMovementType.TRANSFER_OUT;
+    }
+
+    private List<StockResponse> applyMovements(UUID locationId, List<UUID> productIds, List<Integer> quantities,
                                                StockMovementType movementType, List<String> notes,
                                                List<BigDecimal> returnUnitCosts, List<BigDecimal> lineCostsOut) {
-        if (movementType != StockMovementType.OUT && movementType != StockMovementType.RETURN) {
-            throw new IllegalArgumentException("Only OUT and RETURN are supported here, got " + movementType);
+        if (movementType != StockMovementType.OUT && movementType != StockMovementType.RETURN
+                && movementType != StockMovementType.TRANSFER_OUT && movementType != StockMovementType.TRANSFER_IN) {
+            throw new IllegalArgumentException("Unsupported batch movement: " + movementType);
         }
-        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdInWithLock(new TreeSet<>(productIds))
-                .stream()
-                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+        boolean outbound = isOutbound(movementType);
+        Map<UUID, Inventory> inventoryMap = lockRows(productIds, locationId, !outbound);
 
         // Validate against the combined quantity per product (the same product can appear on several
         // lines, e.g. a regular item and inside a combo).
@@ -228,7 +316,7 @@ public class InventoryService {
             if (quantities.get(i) == null || quantities.get(i) <= 0) {
                 throw new IllegalArgumentException("Quantity must be positive");
             }
-            int change = movementType == StockMovementType.OUT ? -quantities.get(i) : quantities.get(i);
+            int change = outbound ? -quantities.get(i) : quantities.get(i);
             netChange.merge(pid, change, Integer::sum);
         }
         for (Map.Entry<UUID, Integer> e : netChange.entrySet()) {
@@ -251,10 +339,10 @@ public class InventoryService {
             Inventory inv = inventoryMap.get(productIds.get(i));
             int qty = quantities.get(i);
             int before = inv.getQuantity();
-            int change = movementType == StockMovementType.OUT ? -qty : qty;
+            int change = outbound ? -qty : qty;
             int after = before + change;
 
-            if (movementType == StockMovementType.OUT) {
+            if (outbound) {
                 BigDecimal cost = consumeFifoLayers(inv, qty);
                 if (lineCostsOut != null) {
                     lineCostsOut.add(cost);
@@ -277,8 +365,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse reserveStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         int available = inventory.getQuantity() - inventory.getReservedQuantity();
         if (available < quantity) {
@@ -302,8 +389,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse releaseReservedStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         if (inventory.getReservedQuantity() < quantity) {
             throw new IllegalArgumentException("Cannot release more than reserved quantity");
@@ -323,8 +409,7 @@ public class InventoryService {
     @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
     @Transactional
     public InventoryResponse confirmOrderStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         if (inventory.getReservedQuantity() < quantity) {
             throw new IllegalArgumentException("Insufficient reserved stock");
@@ -351,14 +436,18 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public boolean hasSufficientStock(UUID productId, Integer quantity) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
         return inventory.hasSufficientStock(quantity);
     }
 
     @Transactional(readOnly = true)
     public void checkStockAvailability(List<UUID> productIds, List<Integer> quantities) {
-        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
+        checkStockAvailability(null, productIds, quantities);
+    }
+
+    @Transactional(readOnly = true)
+    public void checkStockAvailability(UUID locationId, List<UUID> productIds, List<Integer> quantities) {
+        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdInAndLocationId(productIds, loc(locationId))
                 .stream()
                 .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
 
@@ -379,7 +468,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public Map<UUID, BigDecimal> getAverageCosts(List<UUID> productIds) {
-        return inventoryRepository.findByProductIdIn(productIds)
+        return inventoryRepository.findByProductIdInAndLocationId(productIds, loc(null))
                 .stream()
                 .collect(Collectors.toMap(
                         inv -> inv.getProduct().getId(),
@@ -391,9 +480,14 @@ public class InventoryService {
     @Transactional
     public List<StockResponse> recordPurchaseStocks(List<UUID> productIds, List<Integer> quantities,
                                                      List<BigDecimal> unitCosts, List<String> notes) {
-        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
-                .stream()
-                .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
+        return recordPurchaseStocks(null, productIds, quantities, unitCosts, notes);
+    }
+
+    /** Receive purchased stock into a location (rows are created for products new to it). */
+    @Transactional
+    public List<StockResponse> recordPurchaseStocks(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                                     List<BigDecimal> unitCosts, List<String> notes) {
+        Map<UUID, Inventory> inventoryMap = lockRows(productIds, locationId, true);
 
         for (int i = 0; i < productIds.size(); i++) {
             Inventory inv = inventoryMap.get(productIds.get(i));
@@ -439,15 +533,13 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public Integer getAvailableStock(UUID productId) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
         return inventory.getAvailableQuantity();
     }
 
     @Transactional(readOnly = true)
     public Page<StockResponse> getStockHistoryByProductId(UUID productId, Pageable pageable) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         return stockRepository.findByInventoryIdOrderByCreatedAtDesc(inventory.getId(), pageable)
                 .map(stockMapper::toResponse);
@@ -455,8 +547,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public Page<InventoryLayerResponse> getLayersByProductId(UUID productId, Pageable pageable) {
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory", "productId", productId));
+        Inventory inventory = inventoryAt(productId, null);
 
         return inventoryLayerRepository
                 .findByInventoryIdOrderByReceivedAtAsc(inventory.getId(), pageable)

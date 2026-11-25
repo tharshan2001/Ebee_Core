@@ -31,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +42,8 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class InventoryFifoCostingTest {
 
+    private static final java.util.UUID MAIN_LOCATION_ID = java.util.UUID.randomUUID();
+
     @Mock private InventoryRepository inventoryRepository;
     @Mock private InventoryLayerRepository inventoryLayerRepository;
     @Mock private ProductRepository productRepository;
@@ -48,6 +52,7 @@ class InventoryFifoCostingTest {
     @Mock private StockRepository stockRepository;
     @Mock private StockMovementRecorder stockMovementRecorder;
     @Mock private InventoryAlertService inventoryAlertService;
+    @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @InjectMocks private InventoryService inventoryService;
 
     private final List<InventoryLayer> layers = new ArrayList<>();
@@ -56,12 +61,21 @@ class InventoryFifoCostingTest {
 
     @BeforeEach
     void setUp() {
+        // Single default location, like a fresh V127 database.
+        com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
+                com.ebee.location.entity.Location.Type.WAREHOUSE);
+        org.springframework.test.util.ReflectionTestUtils.setField(mainLocation, "id", MAIN_LOCATION_ID);
+        lenient().when(locationService.defaultLocation()).thenReturn(mainLocation);
+        lenient().when(locationService.resolve(any(), any())).thenReturn(mainLocation);
+        lenient().when(locationService.require(any())).thenReturn(mainLocation);
         productId = UUID.randomUUID();
         Product product = Product.builder().id(productId).name("Widget").isActive(true).build();
         inventory = Inventory.builder().id(UUID.randomUUID()).product(product)
                 .quantity(0).reservedQuantity(0).build();
 
-        when(inventoryRepository.findByProductIdInWithLock(any())).thenAnswer(inv -> {
+        when(inventoryRepository.findByProductIdAndLocationId(any(), any())).thenAnswer(inv ->
+                java.util.Optional.ofNullable(productId.equals(inv.getArgument(0)) ? inventory : null));
+        when(inventoryRepository.findByProductIdInWithLock(any(), any())).thenAnswer(inv -> {
             Collection<UUID> ids = inv.getArgument(0);
             return ids.contains(productId) ? List.of(inventory) : List.of();
         });
@@ -148,7 +162,7 @@ class InventoryFifoCostingTest {
 
         inventoryService.deductStock(List.of(productId), List.of(1), List.of("order"));
 
-        verify(inventoryRepository).findByProductIdInWithLock(any());
-        verify(inventoryRepository, never()).findByProductIdIn(any());
+        verify(inventoryRepository).findByProductIdInWithLock(any(), eq(MAIN_LOCATION_ID));
+        verify(inventoryRepository, never()).findByProductIdInAndLocationId(any(), any());
     }
 }

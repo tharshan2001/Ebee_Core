@@ -75,6 +75,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
     private final com.ebee.tax.service.TaxService taxService;
     private final com.ebee.tax.service.VatService vatService;
+    private final com.ebee.location.service.LocationService locationService;
 
     public PurchaseOrderServiceImpl(PurchaseOrderRepository purchaseOrderRepository,
                                     PurchaseOrderAttachmentRepository attachmentRepository,
@@ -87,7 +88,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                                     StoragePort storagePort,
                                     PurchaseOrderPaymentService purchaseOrderPaymentService,
                                     com.ebee.tax.service.TaxService taxService,
-                                    com.ebee.tax.service.VatService vatService) {
+                                    com.ebee.tax.service.VatService vatService,
+                                    com.ebee.location.service.LocationService locationService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.attachmentRepository = attachmentRepository;
         this.supplierRepository = supplierRepository;
@@ -100,6 +102,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         this.purchaseOrderPaymentService = purchaseOrderPaymentService;
         this.taxService = taxService;
         this.vatService = vatService;
+        this.locationService = locationService;
     }
 
     @Retryable(retryFor = DuplicatePoNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
@@ -131,6 +134,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setStatus(PurchaseOrderStatus.DRAFT);
         order.setNotes(request.notes());
         order.setCreatedBy(currentUser);
+        order.setLocation(locationService.resolve(request.locationId(), null));
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal taxTotal = BigDecimal.ZERO;
@@ -342,7 +346,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             }
         }
 
-        recordStockReceipt(productIds, quantities, unitCosts, notes, order.getPoNumber());
+        recordStockReceipt(poLocationId(order), productIds, quantities, unitCosts, notes, order.getPoNumber());
         vatService.post(com.ebee.tax.entity.VatEntry.Direction.INPUT,
                 com.ebee.tax.entity.VatEntry.SourceType.PURCHASE_RECEIPT, order.getId(), order.getPoNumber(),
                 receivedTotal.subtract(receivedTax), receivedTax);
@@ -423,7 +427,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             }
         }
 
-        inventoryService.recordOrderStocks(productIds, quantities, StockMovementType.OUT, notes);
+        inventoryService.recordOrderStocks(poLocationId(order), productIds, quantities, StockMovementType.OUT, notes);
         vatService.post(com.ebee.tax.entity.VatEntry.Direction.INPUT,
                 com.ebee.tax.entity.VatEntry.SourceType.PURCHASE_RETURN, order.getId(), order.getPoNumber(),
                 returnTotal.subtract(returnTax).negate(), returnTax.negate());
@@ -510,11 +514,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return String.format("%s%03d", prefix, count + 1);
     }
 
-    private void recordStockReceipt(List<UUID> productIds, List<Integer> quantities,
+    private void recordStockReceipt(UUID locationId, List<UUID> productIds, List<Integer> quantities,
                                      List<BigDecimal> unitCosts, List<String> notes, String poNumber) {
-        inventoryService.recordPurchaseStocks(productIds, quantities, unitCosts, notes);
+        inventoryService.recordPurchaseStocks(locationId, productIds, quantities, unitCosts, notes);
 
-        List<Inventory> inventories = inventoryRepository.findByProductIdIn(productIds);
+        List<Inventory> inventories = inventoryRepository.findByProductIdInAndLocationId(productIds, locationId);
         List<Product> productsToUpdate = new ArrayList<>();
         for (Inventory inv : inventories) {
             Product product = inv.getProduct();
@@ -522,6 +526,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             productsToUpdate.add(product);
         }
         productRepository.saveAll(productsToUpdate);
+    }
+
+    /** Where the PO's stock is received (pre-V127 rows were backfilled to the default location). */
+    private UUID poLocationId(PurchaseOrder order) {
+        return order.getLocation() != null ? order.getLocation().getId() : locationService.defaultLocation().getId();
     }
 
     /** Input VAT rates by tax_rate id for these products (empty when VAT is off). */

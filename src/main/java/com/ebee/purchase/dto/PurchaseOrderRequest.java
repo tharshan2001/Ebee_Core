@@ -20,5 +20,13 @@ public record PurchaseOrderRequest(
 
         PurchasePaymentMethod paymentMethod,
 
-        BigDecimal paidAmount
-) {}
+        BigDecimal paidAmount,
+
+        /** Location to receive into; null = default location. */
+        UUID locationId
+) {
+    public PurchaseOrderRequest(UUID supplierId, String notes, List<PurchaseOrderItemRequest> items,
+                                PurchasePaymentMethod paymentMethod, BigDecimal paidAmount) {
+        this(supplierId, notes, items, paymentMethod, paidAmount, null);
+    }
+}

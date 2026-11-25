@@ -26,13 +26,13 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     boolean existsByItemCodeAndIdNot(String itemCode, UUID id);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.id = :id")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithRelations(@Param("id") UUID id);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories")
     List<Product> findAllWithInventory();
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images")
     List<Product> findAllWithInventoryAndImages();
 
     @Query("SELECT p.id FROM Product p ORDER BY p.createdAt DESC")
@@ -41,13 +41,13 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p.id FROM Product p WHERE p.category = :category ORDER BY p.createdAt DESC")
     Page<UUID> findProductIdsByCategory(@Param("category") String category, Pageable pageable);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.id IN :ids")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE p.id IN :ids")
     List<Product> findProductsWithRelationsByIds(@Param("ids") Set<UUID> ids);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE p.itemCode = :itemCode")
     Optional<Product> findByItemCodeWithRelations(@Param("itemCode") String itemCode);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE LOWER(p.category) = LOWER(:category)")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE LOWER(p.category) = LOWER(:category)")
     List<Product> findByCategoryIgnoreCase(@Param("category") String category);
 
     @Query("SELECT COUNT(DISTINCT p.category) FROM Product p WHERE p.category IS NOT NULL")
@@ -62,7 +62,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.category = :category AND p.isActive = true ORDER BY p.createdAt DESC")
     Page<UUID> findProductIdsBySearchTermAndCategory(@Param("search") String search, @Param("category") String category, Pageable pageable);
 
-    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventory LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE (p.name LIKE %:search% OR p.itemCode LIKE %:search% OR p.category LIKE %:search%) AND p.isActive = true")
     List<Product> findBySearchTerm(@Param("search") String search);
 
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true ORDER BY p.createdAt DESC")
@@ -73,7 +73,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     long countByIsActiveTrue();
 
-    @Query("SELECT COUNT(p) FROM Product p WHERE p.inventory IS NOT NULL AND p.inventory.quantity <= COALESCE(p.inventory.reorderLevel, 0)")
+    @Query("SELECT COUNT(DISTINCT i.product.id) FROM Inventory i WHERE i.quantity <= COALESCE(i.reorderLevel, 0)")
     long countLowStockProducts();
 
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.featured = true ORDER BY p.createdAt DESC")

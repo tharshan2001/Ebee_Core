@@ -27,6 +27,8 @@ public class OrderResponse {
     private BigDecimal totalAmount;
     /** VAT included in totalAmount. */
     private BigDecimal taxTotal;
+    private java.util.UUID locationId;
+    private String locationName;
     private OrderStatus status;
     private PaymentMethod paymentMethod;
     private PaymentStatus paymentStatus;

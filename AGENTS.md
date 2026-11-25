@@ -333,6 +333,15 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - Cash flow: operating (customers, refunds, suppliers, expenses, commissions), financing (owner money, opening balances), other (adjustments); transfers and cheque deposits excluded.
 - Accounts start at zero: money received before V126 isn't in them, so enter real opening balances per account before relying on the balance sheet.
 
+### Locations & Stock Transfers (Feature 3)
+- New `location` package. V127 adds `locations` (WAREHOUSE / SHOP, exactly one `is_default`), creates **"Main"** as the default, and moves all existing stock, orders and POs to it. Behaviour is unchanged until a second location is added.
+- `inventory` is now one row per **(product, location)** (`uk_inventory_product_location`); `Inventory.product` is `@ManyToOne`, `Product.inventories` is a set. Product responses show `InventoryMapper.toProductSummary()` — one total across locations (`locationName` "All locations" when there's more than one).
+- `InventoryService`: every operation has a location-aware form (`deductStock(locationId, …)`, `returnStock(locationId, …)`, `addStock(…)`, `recordPurchaseStocks(locationId, …)`, `recordOrderStocks(locationId, …)`, `checkStockAvailability(locationId, …)`). The old signatures mean the **default location**. Rows are locked per (product, location) in product-id order; inbound moves create the row if the product is new to that location, outbound moves never do. `StockRequest.locationId` targets manual adjustments.
+- Orders ship from `OrderRequest.locationId`, else the agent's home location (`agents.location_id`, set via `PUT /api/locations/agents/{agentId}?locationId=`), else the default; stored on `orders.location_id`. Settlement returns stock to the order's location. POs receive into / return from `purchase_orders.location_id` (`PurchaseOrderRequest.locationId`).
+- Stock transfers (`stock_transfers`, `stock_transfer_items`): DRAFT → dispatch (`TRANSFER_OUT`, FIFO cost stored per line) → IN_TRANSIT → receive (`TRANSFER_IN` at the destination at the **same unit cost**) → RECEIVED. Cancel from DRAFT (nothing moves) or IN_TRANSIT (stock goes back to the source at its cost).
+- API under `/api/locations`: list/create/update locations, `GET /stock/{productId}` (per location), agent home location, `/transfers` (list, get, create, `/{id}/dispatch`, `/{id}/receive`, `/{id}/cancel`).
+- Tests: `StockTransferServiceTest`, `LocationServiceTest`, `InventoryLocationTest`.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

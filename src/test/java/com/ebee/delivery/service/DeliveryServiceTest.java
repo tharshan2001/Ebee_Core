@@ -204,7 +204,7 @@ class DeliveryServiceTest {
         deliveryService.updateDeliveryStatus(orderId, request);
 
         verify(inventoryService).returnStock(
-                eq(java.util.List.of(product.getId())), eq(java.util.List.of(1)), anyList(), anyList());
+                any(), eq(java.util.List.of(product.getId())), eq(java.util.List.of(1)), anyList(), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
         // The cancelled order's invoice is reversed.
         verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(orderId), any(), anyString(), any());

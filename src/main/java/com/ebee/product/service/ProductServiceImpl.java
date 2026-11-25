@@ -280,9 +280,7 @@ public class ProductServiceImpl implements ProductService {
                     List<ProductImage> productImages = imagesByProductId.getOrDefault(p.getId(), List.of());
                     response.setImageUrls(productImages.stream().map(ProductImage::getImageUrl).toList());
                     response.setImages(productImages.stream().map(this::toProductImageResponse).toList());
-                    if (p.getInventory() != null) {
-                        response.setInventory(inventoryMapper.toResponse(p.getInventory()));
-                    }
+                    response.setInventory(inventoryMapper.toProductSummary(p.getInventories()));
                     return response;
                 })
                 .toList();
@@ -463,9 +461,7 @@ public class ProductServiceImpl implements ProductService {
                         .toList()
                 : List.of();
         response.setImages(images);
-        if (product.getInventory() != null) {
-            response.setInventory(inventoryMapper.toResponse(product.getInventory()));
-        }
+        response.setInventory(inventoryMapper.toProductSummary(product.getInventories()));
         return response;
     }
 

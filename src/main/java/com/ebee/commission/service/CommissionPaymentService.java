@@ -101,17 +101,15 @@ public class CommissionPaymentService {
         commissions.sort(Comparator.comparing(Commission::getApprovedAt,
                 Comparator.nullsLast(Comparator.naturalOrder())));
         int count = 0;
+        // One transaction: a failure rolls the whole run back (it used to be logged per item while
+        // the transaction was already doomed) and ScheduledJobMonitor alerts admins.
+        // Notifications are best-effort inside NotificationService and can't fail the run.
         for (Commission c : commissions) {
-            try {
-                c.setStatus(CommissionStatus.PROCESSING);
-                commissionRepository.save(c);
-                commissionNotificationService.sendCommissionNotification(c, "Processing",
-                        "It has been automatically moved to processing after the 10-day holding period.");
-                count++;
-            } catch (Exception e) {
-                log.error("Failed to auto-process commission {} for order {}: {}",
-                        c.getId(), c.getOrder().getOrderNumber(), e.getMessage());
-            }
+            c.setStatus(CommissionStatus.PROCESSING);
+            commissionRepository.save(c);
+            commissionNotificationService.sendCommissionNotification(c, "Processing",
+                    "It has been automatically moved to processing after the 10-day holding period.");
+            count++;
         }
         return count;
     }

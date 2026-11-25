@@ -501,8 +501,8 @@ public class ProductServiceImpl implements ProductService {
             for (var method : record.getClass().getRecordComponents()) {
                 map.put(method.getName(), method.getAccessor().invoke(record));
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert record to map", e);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to convert record to map", e);
         }
         return map;
     }

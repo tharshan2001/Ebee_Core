@@ -158,7 +158,7 @@ public class AgentController {
     public ResponseEntity<ApiResponse<AgentResponse>> updateAgent(
             @PathVariable UUID id,
             @RequestParam("agentCode") String agentCode,
-            @RequestParam(value = "commissionRate", required = false) Double commissionRate,
+            @RequestParam(value = "commissionRate", required = false) java.math.BigDecimal commissionRate,
             @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType,
             @RequestParam("addressLine1") String addressLine1,
             @RequestParam(value = "addressLine2", required = false) String addressLine2,
@@ -207,7 +207,7 @@ public class AgentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AgentResponse>> updateCommissionRate(
             @PathVariable UUID id,
-            @RequestParam Double commissionRate,
+            @RequestParam java.math.BigDecimal commissionRate,
             @RequestParam(value = "commissionType", required = false) AgentCommissionType commissionType) {
         AgentResponse response = agentService.updateCommissionRate(id, commissionRate, commissionType);
         return ResponseEntity.ok(ApiResponse.success("Commission rate updated successfully", response));

@@ -41,7 +41,7 @@ public interface AgentService {
 
     void deleteAgent(UUID id);
 
-    AgentResponse updateCommissionRate(UUID id, Double commissionRate, AgentCommissionType commissionType);
+    AgentResponse updateCommissionRate(UUID id, java.math.BigDecimal commissionRate, AgentCommissionType commissionType);
 
     void resetPassword(UUID id);
 }

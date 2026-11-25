@@ -137,8 +137,8 @@ public class AgentServiceImpl implements AgentService {
                 .district(savedAgent.getDistrict() != null ? savedAgent.getDistrict().getDisplayName() : null)
                 .country(savedAgent.getCountry())
                 .phoneNumber(savedAgent.getPhoneNumber())
-                .commissionRate(savedAgent.getCommissionRate().doubleValue())
-                .effectiveCommissionRate(savedAgent.getCommissionRate().doubleValue())
+                .commissionRate(savedAgent.getCommissionRate())
+                .effectiveCommissionRate(savedAgent.getCommissionRate())
                 .commissionType(savedAgent.getCommissionType())
                 .nicNumber(savedAgent.getNicNumber())
                 .bankAccountNumber(savedAgent.getBankAccountNumber())
@@ -351,7 +351,7 @@ public class AgentServiceImpl implements AgentService {
         }
 
         if (request.getCommissionRate() != null) {
-            agent.setCommissionRate(BigDecimal.valueOf(request.getCommissionRate()));
+            agent.setCommissionRate(request.getCommissionRate());
         } else if (request.getCommissionType() == AgentCommissionType.DEFAULT) {
             CommissionConfig defaultConfig = commissionConfigRepository
                     .findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)
@@ -410,10 +410,10 @@ public class AgentServiceImpl implements AgentService {
 
     @Transactional
     @Override
-    public AgentResponse updateCommissionRate(UUID id, Double commissionRate, AgentCommissionType commissionType) {
+    public AgentResponse updateCommissionRate(UUID id, java.math.BigDecimal commissionRate, AgentCommissionType commissionType) {
         Agent agent = agentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", id));
-        agent.setCommissionRate(BigDecimal.valueOf(commissionRate));
+        agent.setCommissionRate(commissionRate);
         if (commissionType != null) {
             agent.setCommissionType(commissionType);
         }
@@ -528,11 +528,11 @@ public class AgentServiceImpl implements AgentService {
 
     private AgentResponse toAgentResponse(Agent agent, BigDecimal totalCommission, CommissionConfig defaultConfig) {
         AgentResponse response = agentMapper.toResponse(agent);
-        response.setTotalCommission(totalCommission != null ? totalCommission.doubleValue() : 0.0);
+        response.setTotalCommission(totalCommission != null ? totalCommission : BigDecimal.ZERO);
         if (agent.getCommissionType() == AgentCommissionType.PERFORMANCE) {
-            response.setEffectiveCommissionRate(agent.getCommissionRate().doubleValue());
+            response.setEffectiveCommissionRate(agent.getCommissionRate());
         } else {
-            response.setEffectiveCommissionRate(defaultConfig != null ? defaultConfig.getCommissionRate().doubleValue() : agent.getCommissionRate().doubleValue());
+            response.setEffectiveCommissionRate(defaultConfig != null ? defaultConfig.getCommissionRate() : agent.getCommissionRate());
         }
         return response;
     }

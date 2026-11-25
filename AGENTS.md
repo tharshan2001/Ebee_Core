@@ -392,6 +392,11 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
   - **Purchase orders:** receiving added the received value on top of the outstanding balance that was already "total − paid" (a 1,000 credit PO showed 2,000 owed); money paid when the PO was placed never reached the supplier ledger (a fully prepaid PO left the supplier showing 1,000 owed); closing short left the old outstanding. Now: outstanding = total − paid from the start (POs without a payment method start at first receipt), every payment (upfront or later) is a supplier-ledger payment, every receipt is a supplier-ledger invoice, close-short sets outstanding = received − paid. `suppliers.outstanding_balance` is now recalculated from the supplier ledger (floored at 0; a prepaid supplier has a negative ledger balance) instead of being added to and clamped separately. Removed the unused `addSupplierOutstanding` / `subtractSupplierOutstanding` / `releaseSupplierOutstanding` helpers.
   - **Order creation errors came back as HTTP 500:** because `OrderServiceImpl` has a `@Recover` for duplicate order numbers, Spring Retry wrapped every other failure (out of stock, credit limit, missing district) in `ExhaustedRetryException("Cannot locate recovery method")`. A catch-all `@Recover` now rethrows the original error.
 
+### Bulk messaging in batches
+- `MessageService.sendMessage` and `MessageDispatcher.dispatch` handle recipients `MessageService.BATCH_SIZE` (500) at a time and flush + clear the persistence context after each batch, so a message to every customer never holds them all in memory. Pages are read in id order.
+- `RecipientResolver.resolveInBatches` is the entry point; `AllCustomersRecipientResolver` / `AllAgentsRecipientResolver` page the database. Selected / manual lists use the default (split a bounded list). A new whole-population resolver must override `resolveInBatches` — don't load the population with `findAll()`.
+- Tests: `BulkMessagingBatchesTest` (paging, dispatcher), `BulkMessagingIntegrationTest` (real DB, > 1 batch).
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

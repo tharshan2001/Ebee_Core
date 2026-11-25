@@ -50,6 +50,7 @@ public class ProductServiceImpl implements ProductService {
     private final EntityManager entityManager;
     private final CategoryService categoryService;
     private final PrintTemplateService printTemplateService;
+    private final com.ebee.tax.service.TaxService taxService;
 
     @Transactional
     @Override
@@ -62,6 +63,9 @@ public class ProductServiceImpl implements ProductService {
         validateDiscount(request);
 
         Product product = productMapper.toEntity(request);
+        if (request.getTaxRateId() != null) {
+            taxService.requireRate(request.getTaxRateId());
+        }
         if (product.getPrice() == null) {
             product.setPrice(BigDecimal.ZERO);
         }
@@ -324,6 +328,9 @@ public class ProductServiceImpl implements ProductService {
         }
         if (request.getBrand() != null) {
             product.setBrand(request.getBrand());
+        }
+        if (request.getTaxRateId() != null) {
+            product.setTaxRateId(taxService.requireRate(request.getTaxRateId()).getId());
         }
         if (request.getTags() != null) {
             product.setTags(request.getTags());

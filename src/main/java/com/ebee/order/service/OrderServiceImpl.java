@@ -93,6 +93,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderSettlementService orderSettlementService;
     private final OrderPdfService orderPdfService;
     private final LedgerService ledgerService;
+    private final com.ebee.tax.service.TaxService taxService;
+    private final com.ebee.tax.service.VatService vatService;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -102,6 +104,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse createOrder(OrderRequest request) {
         CreationContext ctx = new CreationContext();
+        var taxSettings = taxService.getSettings();
+        ctx.vatOn = taxSettings.isVatRegistered();
+        ctx.pricesIncludeTax = taxSettings.isPricesIncludeTax();
 
         ctx.agent = resolveAgent(request);
         ctx.currentUser = resolveCurrentUser();
@@ -131,6 +136,7 @@ public class OrderServiceImpl implements OrderService {
         applyLineCosts(ctx, rowCosts);
 
         ctx.order.setTotalAmount(ctx.totalAmount);
+        ctx.order.setTaxTotal(ctx.taxTotal);
         orderPaymentService.initPayment(ctx.order, request.getPaymentMethod(),
                 request.getPaidAmount(), request.getChequeNumber(), request.getProofFileUrl());
 
@@ -159,6 +165,10 @@ public class OrderServiceImpl implements OrderService {
         List<Integer> stockQuantities = new ArrayList<>();
         List<String> stockNotes = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        boolean vatOn;
+        boolean pricesIncludeTax = true;
+        BigDecimal taxTotal = BigDecimal.ZERO;
+        Map<UUID, BigDecimal> rateCache = new java.util.HashMap<>();
         /** Which stock rows (indexes into stockProductIds) belong to each order line. */
         Map<OrderItem, List<Integer>> lineRows = new java.util.IdentityHashMap<>();
     }
@@ -250,10 +260,16 @@ public class OrderServiceImpl implements OrderService {
                                 + itemRequest.getProductItemCode() + "'");
             }
 
-            BigDecimal originalUnitPrice = product.getPrice();
             String discountType = itemRequest.getDiscountType() != null ? itemRequest.getDiscountType().name() : null;
-            BigDecimal unitPrice = product.getPriceWithDiscount(discountType, itemRequest.getDiscountValue());
+            BigDecimal rate = taxRateFor(ctx, product);
+            // Discounts apply to the catalog price first; VAT is worked out on the result.
+            var tax = com.ebee.tax.service.TaxCalculator.forUnit(
+                    product.getPriceWithDiscount(discountType, itemRequest.getDiscountValue()), rate, ctx.pricesIncludeTax);
+            BigDecimal originalUnitPrice = com.ebee.tax.service.TaxCalculator.forUnit(
+                    product.getPrice(), rate, ctx.pricesIncludeTax).grossUnitPrice();
+            BigDecimal unitPrice = tax.grossUnitPrice();
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal lineTax = tax.unitTax().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
 
             OrderItem item = OrderItem.builder()
                     .order(ctx.order)
@@ -264,10 +280,14 @@ public class OrderServiceImpl implements OrderService {
                     .subtotal(subtotal)
                     .discountType(discountType)
                     .discountValue(itemRequest.getDiscountValue())
+                    .taxRate(tax.unitTax().signum() > 0 ? rate : null)
+                    .unitTax(tax.unitTax())
+                    .taxAmount(lineTax)
                     .build();
 
             ctx.order.getItems().add(item);
             ctx.totalAmount = ctx.totalAmount.add(subtotal);
+            ctx.taxTotal = ctx.taxTotal.add(lineTax);
 
             ctx.lineRows.put(item, List.of(ctx.stockProductIds.size()));
             ctx.stockProductIds.add(product.getId());
@@ -310,7 +330,18 @@ public class OrderServiceImpl implements OrderService {
             ctx.stockNotes.addAll(comboStockNotes);
 
             BigDecimal comboPrice = combo.calculateComboPrice();
-            BigDecimal unitPrice = calculateComboUnitPrice(combo, rule, itemRequest, comboPrice);
+            // VAT: split the combo price across its products by list price; each part at its own rate.
+            List<com.ebee.tax.service.TaxCalculator.Share> shares = new ArrayList<>();
+            for (ComboItem ci : combo.getItems()) {
+                shares.add(new com.ebee.tax.service.TaxCalculator.Share(
+                        ci.getProduct().getPrice().multiply(BigDecimal.valueOf(ci.getQuantity())),
+                        taxRateFor(ctx, ci.getProduct())));
+            }
+            var comboTax = com.ebee.tax.service.TaxCalculator.forBundle(
+                    calculateComboUnitPrice(combo, rule, itemRequest, comboPrice), shares, ctx.pricesIncludeTax);
+            BigDecimal unitPrice = comboTax.grossUnitPrice();
+            BigDecimal comboListGross = com.ebee.tax.service.TaxCalculator.forBundle(
+                    comboPrice, shares, ctx.pricesIncludeTax).grossUnitPrice();
 
             OrderItem comboItem = OrderItem.builder()
                     .order(ctx.order)
@@ -318,8 +349,11 @@ public class OrderServiceImpl implements OrderService {
                     .combo(combo)
                     .quantity(1)
                     .unitPrice(unitPrice)
-                    .originalUnitPrice(comboPrice)
+                    .originalUnitPrice(comboListGross)
                     .subtotal(unitPrice)
+                    .taxRate(comboTax.unitTax().signum() > 0 ? com.ebee.tax.service.TaxCalculator.commonRate(shares) : null)
+                    .unitTax(comboTax.unitTax())
+                    .taxAmount(comboTax.unitTax())
                     .build();
             ctx.order.getItems().add(comboItem);
             List<Integer> comboRows = new ArrayList<>();
@@ -328,6 +362,7 @@ public class OrderServiceImpl implements OrderService {
             }
             ctx.lineRows.put(comboItem, comboRows);
             ctx.totalAmount = ctx.totalAmount.add(unitPrice);
+            ctx.taxTotal = ctx.taxTotal.add(comboTax.unitTax());
 
             if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT
                     && !Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
@@ -344,6 +379,15 @@ public class OrderServiceImpl implements OrderService {
                 ctx.lineRows.put(freeItem, List.of(firstRow + componentRows));
             }
         }
+    }
+
+    /** Product's VAT rate when VAT is on, else null. Cached per order. */
+    private BigDecimal taxRateFor(CreationContext ctx, Product product) {
+        if (!ctx.vatOn || product.getTaxRateId() == null) {
+            return null;
+        }
+        return ctx.rateCache.computeIfAbsent(product.getTaxRateId(),
+                id -> taxService.effectiveRates(List.of(id)).get(id));
     }
 
     private void validateCombo(Combo combo) {
@@ -425,6 +469,10 @@ public class OrderServiceImpl implements OrderService {
                     previousAdvance, ctx.customer.getAdvanceBalance(),
                     DuesChangeType.ORDER_CREATED));
         }
+
+        vatService.post(com.ebee.tax.entity.VatEntry.Direction.OUTPUT, com.ebee.tax.entity.VatEntry.SourceType.ORDER,
+                savedOrder.getId(), savedOrder.getOrderNumber(),
+                savedOrder.getTotalAmount().subtract(savedOrder.getTaxTotal()), savedOrder.getTaxTotal());
 
         Commission commission = null;
         if (ctx.agent != null) {

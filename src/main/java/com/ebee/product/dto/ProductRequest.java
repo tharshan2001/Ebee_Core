@@ -61,6 +61,9 @@ public class ProductRequest {
     @Size(max = 100, message = "Brand must not exceed 100 characters")
     private String brand;
 
+    /** VAT rate (tax_rates.id); omit to leave unchanged on update. */
+    private java.util.UUID taxRateId;
+
     private String tags;
 
     private List<ProductSpecification> specifications;

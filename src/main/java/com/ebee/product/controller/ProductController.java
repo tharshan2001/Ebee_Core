@@ -61,6 +61,7 @@ public class ProductController {
             @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "taxRateId", required = false) java.util.UUID taxRateId,
             @RequestParam(value = "tags", required = false) String tags,
             @RequestParam(value = "specifications", required = false) String specificationsJson) {
 
@@ -76,6 +77,7 @@ public class ProductController {
         request.setMaxDiscountType(DiscountType.fromString(maxDiscountType));
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
+        request.setTaxRateId(taxRateId);
         request.setTags(tags);
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {
@@ -228,6 +230,7 @@ public class ProductController {
             @RequestParam(value = "maxDiscountType", required = false) String maxDiscountType,
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
+            @RequestParam(value = "taxRateId", required = false) java.util.UUID taxRateId,
             @RequestParam(value = "tags", required = false) String tags,
             @RequestParam(value = "specifications", required = false) String specificationsJson,
             @RequestParam(value = "removeImageUrls", required = false) List<String> removeImageUrls) {
@@ -246,6 +249,7 @@ public class ProductController {
         request.setMaxDiscountValue(maxDiscountValue);
         request.setMaxDiscountFieldsSet(maxDiscountType != null || maxDiscountValue != null);
         request.setBrand(brand);
+        request.setTaxRateId(taxRateId);
         request.setTags(tags);
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {

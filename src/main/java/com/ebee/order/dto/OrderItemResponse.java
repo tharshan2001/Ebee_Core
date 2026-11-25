@@ -16,6 +16,9 @@ public class OrderItemResponse {
     private BigDecimal unitPrice;
     private BigDecimal originalUnitPrice;
     private BigDecimal subtotal;
+    private BigDecimal taxRate;
+    private BigDecimal unitTax;
+    private BigDecimal taxAmount;
     private String discountType;
     private BigDecimal discountValue;
     private BigDecimal costPrice;

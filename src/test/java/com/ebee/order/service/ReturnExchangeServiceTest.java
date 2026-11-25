@@ -74,7 +74,7 @@ class ReturnExchangeServiceTest {
     @BeforeEach
     void setUp() {
         org.springframework.test.util.ReflectionTestUtils.setField(returnExchangeService, "orderSettlementService",
-                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService));
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class)));
         adminUserId = UUID.randomUUID();
         adminUser = User.builder()
                 .id(adminUserId)

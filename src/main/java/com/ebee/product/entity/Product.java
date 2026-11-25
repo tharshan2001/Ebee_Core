@@ -78,6 +78,10 @@ public class Product {
     @Column(length = 100)
     private String brand;
 
+    /** VAT rate for this product (tax_rates.id); null = exempt. */
+    @Column(name = "tax_rate_id")
+    private UUID taxRateId;
+
     @Column(columnDefinition = "TEXT")
     private String tags;
 

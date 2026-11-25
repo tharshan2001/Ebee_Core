@@ -11,6 +11,8 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
 import com.ebee.order.enums.PaymentStatus;
 import com.ebee.order.enums.RefundChoice;
+import com.ebee.tax.entity.VatEntry;
+import com.ebee.tax.service.VatService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -41,13 +43,16 @@ public class OrderSettlementService {
     private final LedgerService ledgerService;
     private final CustomerService customerService;
     private final SecurityService securityService;
+    private final VatService vatService;
 
     public OrderSettlementService(InventoryService inventoryService, LedgerService ledgerService,
-                                  CustomerService customerService, SecurityService securityService) {
+                                  CustomerService customerService, SecurityService securityService,
+                                  VatService vatService) {
         this.inventoryService = inventoryService;
         this.ledgerService = ledgerService;
         this.customerService = customerService;
         this.securityService = securityService;
+        this.vatService = vatService;
     }
 
     /** A quantity of one order line being taken back. */
@@ -67,6 +72,10 @@ public class OrderSettlementService {
      * value, and give back everything paid. {@code order.totalAmount} is kept for history.
      */
     public Settlement cancel(Order order, RefundChoice refundChoice, boolean restoreStock, String reason) {
+        // VAT on everything still kept is reversed (order.taxTotal is kept for history, like totalAmount).
+        BigDecimal reversedTax = order.getItems().stream().map(OrderItem::getRetainedTax)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        postCreditNoteVat(order, order.getTotalAmount(), reversedTax);
         if (restoreStock) {
             List<ReturnLine> lines = order.getItems().stream()
                     .filter(i -> i.getReturnableQuantity() > 0)
@@ -93,10 +102,16 @@ public class OrderSettlementService {
             }
             returnedValue = returnedValue.add(item.getUnitPrice().multiply(BigDecimal.valueOf(line.quantity())));
         }
+        BigDecimal reversedTax = BigDecimal.ZERO;
+        for (ReturnLine line : lines) {
+            reversedTax = reversedTax.add(line.item().getUnitTax().multiply(BigDecimal.valueOf(line.quantity())));
+        }
         restoreStock(order, lines, reason);
         for (ReturnLine line : lines) {
             line.item().setReturnedQuantity(line.item().getReturnedQuantity() + line.quantity());
         }
+        order.setTaxTotal(order.getTaxTotal().subtract(reversedTax).max(BigDecimal.ZERO));
+        postCreditNoteVat(order, returnedValue, reversedTax);
 
         BigDecimal newTotal = order.getTotalAmount().subtract(returnedValue).max(BigDecimal.ZERO);
         order.setTotalAmount(newTotal);
@@ -163,6 +178,12 @@ public class OrderSettlementService {
             return returned.signum() > 0 ? PaymentStatus.REFUNDED : PaymentStatus.UNPAID;
         }
         return order.getOutstandingBalance().signum() == 0 ? PaymentStatus.PAID : PaymentStatus.PARTIALLY_PAID;
+    }
+
+    /** Negative OUTPUT VAT entry for value removed from a sale, dated today. */
+    private void postCreditNoteVat(Order order, BigDecimal grossRemoved, BigDecimal taxRemoved) {
+        vatService.post(VatEntry.Direction.OUTPUT, VatEntry.SourceType.CREDIT_NOTE, order.getId(),
+                order.getOrderNumber(), grossRemoved.subtract(taxRemoved).negate(), taxRemoved.negate());
     }
 
     // ── Stock ──────────────────────────────────────────────────────────

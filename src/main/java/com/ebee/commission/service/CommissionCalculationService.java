@@ -99,7 +99,9 @@ public class CommissionCalculationService {
 
         BigDecimal commissionRate = resolveCommissionRate(agent, config);
 
-        BigDecimal commissionAmount = order.getTotalAmount()
+        // Commission is earned on sales before VAT (VAT isn't revenue). Same as total when VAT is off.
+        BigDecimal netSales = order.getTotalAmount().subtract(order.getTaxTotal());
+        BigDecimal commissionAmount = netSales
                 .multiply(commissionRate)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
@@ -107,7 +109,7 @@ public class CommissionCalculationService {
                 .agent(agent)
                 .order(order)
                 .config(config)
-                .orderAmount(order.getTotalAmount())
+                .orderAmount(netSales)
                 .commissionRate(commissionRate)
                 .commissionAmount(commissionAmount)
                 .status(CommissionStatus.CALCULATED)

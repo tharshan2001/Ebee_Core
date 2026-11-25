@@ -25,6 +25,8 @@ public class OrderResponse {
     private String customerName;
     private String customerPhone;
     private BigDecimal totalAmount;
+    /** VAT included in totalAmount. */
+    private BigDecimal taxTotal;
     private OrderStatus status;
     private PaymentMethod paymentMethod;
     private PaymentStatus paymentStatus;

@@ -15,6 +15,7 @@ public record PurchaseOrderResponse(
         String supplierName,
         PurchaseOrderStatus status,
         BigDecimal totalAmount,
+        BigDecimal taxTotal,
         PurchasePaymentMethod paymentMethod,
         PurchasePaymentStatus paymentStatus,
         BigDecimal paidAmount,

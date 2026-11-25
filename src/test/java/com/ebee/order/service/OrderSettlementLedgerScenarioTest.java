@@ -45,6 +45,7 @@ class OrderSettlementLedgerScenarioTest {
     private InventoryService inventoryService;
     private OrderSettlementService settlement;
     private LedgerService ledgerService;
+    private com.ebee.tax.service.VatService vatService;
     private Customer customer;
 
     @BeforeEach
@@ -76,7 +77,8 @@ class OrderSettlementLedgerScenarioTest {
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         inventoryService = mock(InventoryService.class);
 
-        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService);
+        vatService = mock(com.ebee.tax.service.VatService.class);
+        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, vatService);
     }
 
     // ── helpers ────────────────────────────────────────────────────────
@@ -250,6 +252,43 @@ class OrderSettlementLedgerScenarioTest {
         assertThatThrownBy(() -> settlement.returnLines(order, List.of(line(order, 3)), RefundChoice.REFUND, "Order return"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Returnable: 2");
+    }
+
+    // ── VAT ────────────────────────────────────────────────────────────
+
+    private Order createVatOrder() {
+        Order order = createOrder(10, "0");          // 10 × 1,000 incl. VAT
+        OrderItem item = order.getItems().get(0);
+        item.setUnitTax(new BigDecimal("152.54"));
+        item.setTaxAmount(new BigDecimal("1525.40"));
+        order.setTaxTotal(new BigDecimal("1525.40"));
+        return order;
+    }
+
+    @Test
+    void partialReturn_reversesVatOnReturnedUnits_inTheReturnPeriod() {
+        Order order = createVatOrder();
+
+        settlement.returnLines(order, List.of(line(order, 3)), RefundChoice.REFUND, "Order return");
+
+        assertThat(order.getTaxTotal()).isEqualByComparingTo("1067.78"); // 7 × 152.54
+        verify(vatService).post(eq(com.ebee.tax.entity.VatEntry.Direction.OUTPUT),
+                eq(com.ebee.tax.entity.VatEntry.SourceType.CREDIT_NOTE), eq(order.getId()), any(),
+                org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new BigDecimal("-2542.38")) == 0),
+                org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new BigDecimal("-457.62")) == 0));
+    }
+
+    @Test
+    void cancel_reversesVatOnEverythingStillKept() {
+        Order order = createVatOrder();
+        settlement.returnLines(order, List.of(line(order, 4)), RefundChoice.REFUND, "Order return");
+
+        settlement.cancel(order, RefundChoice.REFUND, true, "Order cancelled");
+
+        // 6 units were still kept → 6 × 152.54 reversed on cancel.
+        verify(vatService).post(eq(com.ebee.tax.entity.VatEntry.Direction.OUTPUT),
+                eq(com.ebee.tax.entity.VatEntry.SourceType.CREDIT_NOTE), eq(order.getId()), any(),
+                any(), org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new BigDecimal("-915.24")) == 0));
     }
 
     // ── stock ──────────────────────────────────────────────────────────

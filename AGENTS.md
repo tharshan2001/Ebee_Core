@@ -314,6 +314,17 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - V124 adds `agents.clawback_balance`, `commissions.clawback_amount`, `commissions.paid_amount`.
 - Tests: `CommissionClawbackScenarioTest` (real lifecycle + payment + ledger on an in-memory agent ledger), `PayoutBatchTest`.
 
+### VAT (Feature 1)
+- New `tax` package: `tax_rates` (seeded "VAT 18%" and "Exempt"), single-row `business_settings` (`vat_registered`, `vat_registration_number`, `prices_include_tax`), and a `vat_entries` journal. API: `GET/PUT /api/tax/settings`, `GET/POST/PUT /api/tax/rates`, `GET /api/tax/vat-report?from&to` (ADMIN).
+- **Master switch:** while `vat_registered` is false (the default) no VAT is calculated anywhere and every total is unchanged. Turning it on requires a VAT registration number.
+- `products.tax_rate_id` (null = exempt), `customers.vat_number`. `suppliers.vat_number` exists in the DB but isn't exposed in the API yet.
+- Sales: `TaxCalculator.forUnit()` per unit, rounded to cents. `order_items.unit_price` stays the **gross** price charged; `unit_tax`/`tax_amount` hold the VAT in it; `orders.tax_total` = Σ. Discounts apply before VAT. Combos split their price across components by list price (`forBundle`), each at its own rate. Free items carry no VAT.
+- Customer ledger and payments use the gross total (unchanged). Commission is calculated on **net** sales (`totalAmount − taxTotal`).
+- Settlement reverses `unit_tax × returned units` on returns (lowers `orders.tax_total`) and VAT on all retained units on cancel, posted as negative `CREDIT_NOTE` VAT entries dated the day of the return — so credit notes reduce VAT in the period they're issued.
+- Purchases: PO `unit_price` is net; `unit_tax` = input VAT on top (from the product's rate); supplier owed = gross; FIFO layers stay at net cost. `PURCHASE_RECEIPT` / negative `PURCHASE_RETURN` VAT entries.
+- `sumRevenueByDateRange` (P&L, dashboards, sales reports) is now **net of VAT**.
+- Invoice PDF becomes "TAX INVOICE" with seller/buyer VAT numbers and a net/VAT breakdown when VAT is on. Invoice and receipt no longer crash on combo lines.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

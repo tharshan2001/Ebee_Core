@@ -194,11 +194,12 @@ public class CommissionLifecycleService {
                     || commission.getStatus() == CommissionStatus.REJECTED) {
                 return;
             }
-            BigDecimal newAmount = order.getTotalAmount()
+            BigDecimal netSales = order.getTotalAmount().subtract(order.getTaxTotal());
+            BigDecimal newAmount = netSales
                     .multiply(commission.getCommissionRate())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             Agent agent = commission.getAgent();
-            BigDecimal salesDrop = commission.getOrderAmount().subtract(order.getTotalAmount());
+            BigDecimal salesDrop = commission.getOrderAmount().subtract(netSales);
             String label = "order " + order.getOrderNumber() + " partly returned";
 
             if (commission.getStatus() == CommissionStatus.PAID) {
@@ -219,10 +220,10 @@ public class CommissionLifecycleService {
                 }
                 commission.setCommissionAmount(newAmount);
             }
-            commission.setOrderAmount(order.getTotalAmount());
+            commission.setOrderAmount(netSales);
             commissionRepository.save(commission);
             auditLogService.record(AuditAction.COMMISSION_CANCEL, "Commission", commission.getId(),
-                    "Commission for " + label + ": now LKR " + newAmount + " on order total " + order.getTotalAmount());
+                    "Commission for " + label + ": now LKR " + newAmount + " on net sales " + netSales);
         });
     }
 

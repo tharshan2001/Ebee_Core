@@ -61,6 +61,14 @@ public class Order {
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    /** VAT contained in totalAmount (0 when VAT is off). Net sales = totalAmount − taxTotal. */
+    @Column(name = "tax_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal taxTotal;
+
+    public BigDecimal getTaxTotal() {
+        return taxTotal == null ? BigDecimal.ZERO : taxTotal;
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -152,6 +160,9 @@ public class Order {
     @PrePersist
     @PreUpdate
     public void validate() {
+        if (taxTotal == null) {
+            taxTotal = BigDecimal.ZERO;
+        }
         if (agent == null && customer == null) {
             throw new IllegalArgumentException("Order must have at least an agent or a customer");
         }

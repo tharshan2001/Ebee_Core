@@ -61,6 +61,18 @@ public class OrderItem {
     @Column(name = "cost_price", precision = 14, scale = 4)
     private BigDecimal costPrice;
 
+    /** VAT rate applied (percent); null = no VAT, or a combo with mixed rates. */
+    @Column(name = "tax_rate", precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
+    /** VAT inside unitPrice, per unit. unitPrice stays the gross price charged. */
+    @Column(name = "unit_tax", nullable = false, precision = 12, scale = 2)
+    private BigDecimal unitTax;
+
+    /** unitTax × quantity at the time of sale. */
+    @Column(name = "tax_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal taxAmount;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "combo_id")
     private Combo combo;
@@ -85,5 +97,28 @@ public class OrderItem {
     @Transient
     public boolean isFullyReturned() {
         return returnedQuantity >= quantity;
+    }
+
+    public BigDecimal getUnitTax() {
+        return unitTax == null ? BigDecimal.ZERO : unitTax;
+    }
+
+    public BigDecimal getTaxAmount() {
+        return taxAmount == null ? BigDecimal.ZERO : taxAmount;
+    }
+
+    /** VAT on the units still kept by the customer. */
+    public BigDecimal getRetainedTax() {
+        return getUnitTax().multiply(BigDecimal.valueOf(getReturnableQuantity()));
+    }
+
+    @jakarta.persistence.PrePersist
+    protected void applyTaxDefaults() {
+        if (unitTax == null) {
+            unitTax = BigDecimal.ZERO;
+        }
+        if (taxAmount == null) {
+            taxAmount = BigDecimal.ZERO;
+        }
     }
 }

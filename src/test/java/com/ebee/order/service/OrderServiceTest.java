@@ -86,6 +86,8 @@ class OrderServiceTest {
     @Mock private com.ebee.accounting.service.LedgerService ledgerService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
+    @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -103,6 +105,7 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
         lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
             java.util.List<Integer> qtys = inv.getArgument(1);
@@ -262,7 +265,7 @@ class OrderServiceTest {
 
         // Real settlement logic on top of the mocks, so cancel/return tests exercise the actual rules.
         org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderSettlementService",
-                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService));
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class)));
     }
 
     @Test
@@ -448,6 +451,75 @@ class OrderServiceTest {
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaidAt()).isNotNull();
+    }
+
+    private UUID vatOn(boolean pricesIncludeTax) {
+        com.ebee.tax.entity.BusinessSettings s = new com.ebee.tax.entity.BusinessSettings();
+        s.setVatRegistered(true);
+        s.setVatRegistrationNumber("123456789-7000");
+        s.setPricesIncludeTax(pricesIncludeTax);
+        when(taxService.getSettings()).thenReturn(s);
+        UUID rateId = UUID.randomUUID();
+        when(taxService.effectiveRates(anyCollection())).thenReturn(java.util.Map.of(rateId, new BigDecimal("18.00")));
+        return rateId;
+    }
+
+    @Test
+    void createOrder_vatInclusive_splitsVatOutOfThePrice_totalUnchanged() {
+        UUID rateId = vatOn(true);
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD);
+        setupSingleItemCreateMocks(request);
+        paymentProduct.setTaxRateId(rateId);
+
+        orderService.createOrder(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        OrderItem line = saved.getItems().get(0);
+        // 1,000 incl. 18% → 152.54 VAT per unit; 2 units.
+        assertThat(line.getUnitPrice()).isEqualByComparingTo("1000.00");
+        assertThat(line.getUnitTax()).isEqualByComparingTo("152.54");
+        assertThat(line.getTaxAmount()).isEqualByComparingTo("305.08");
+        assertThat(line.getTaxRate()).isEqualByComparingTo("18.00");
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("2000.00");
+        assertThat(saved.getTaxTotal()).isEqualByComparingTo("305.08");
+        verify(vatService).post(eq(com.ebee.tax.entity.VatEntry.Direction.OUTPUT),
+                eq(com.ebee.tax.entity.VatEntry.SourceType.ORDER), any(), anyString(),
+                argThat(a -> a.compareTo(new BigDecimal("1694.92")) == 0),
+                argThat(a -> a.compareTo(new BigDecimal("305.08")) == 0));
+    }
+
+    @Test
+    void createOrder_vatExclusive_addsVatOnTop() {
+        UUID rateId = vatOn(false);
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD);
+        setupSingleItemCreateMocks(request);
+        paymentProduct.setTaxRateId(rateId);
+
+        orderService.createOrder(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        assertThat(saved.getItems().get(0).getUnitPrice()).isEqualByComparingTo("1180.00");
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("2360.00");
+        assertThat(saved.getTaxTotal()).isEqualByComparingTo("360.00");
+        // The customer owes the gross amount.
+        verify(ledgerService).recordCustomerInvoice(any(), any(),
+                argThat(a -> a.compareTo(new BigDecimal("2360.00")) == 0), anyString(), any());
+    }
+
+    @Test
+    void createOrder_vatOff_ignoresProductTaxRate() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD);
+        setupSingleItemCreateMocks(request);
+        paymentProduct.setTaxRateId(UUID.randomUUID());
+
+        orderService.createOrder(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getTaxTotal()).isZero();
+        assertThat(orderCaptor.getValue().getTotalAmount()).isEqualByComparingTo("2000.00");
+        verify(taxService, never()).effectiveRates(anyCollection());
     }
 
     @Test

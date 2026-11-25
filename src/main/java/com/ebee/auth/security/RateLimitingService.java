@@ -21,6 +21,7 @@ public class RateLimitingService {
     private final Map<String, SlidingWindow> loginAttempts = new ConcurrentHashMap<>();
     private final Map<String, SlidingWindow> genericRateLimiters = new ConcurrentHashMap<>();
     private final Map<String, SlidingWindow> ipRateLimiters = new ConcurrentHashMap<>();
+    private final Map<String, SlidingWindow> passwordResetLimiters = new ConcurrentHashMap<>();
 
     private final ScheduledExecutorService cleaner = Executors.newSingleThreadScheduledExecutor();
 
@@ -59,6 +60,23 @@ public class RateLimitingService {
         return window.tryAcquire();
     }
 
+    /**
+     * Per-email and per-IP limit for forgot-password. Both windows are consumed on
+     * every call, so an attacker can't use one address to spam many inboxes or
+     * many addresses to hammer one inbox.
+     */
+    public boolean isPasswordResetAllowed(String email, String clientIp) {
+        var cfg = rateLimitingProperties.getPasswordReset();
+        String emailKey = "email:" + (email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT));
+        boolean emailOk = passwordResetLimiters
+                .computeIfAbsent(emailKey, k -> new SlidingWindow(cfg.getMaxPerEmail(), cfg.getWindowMinutes()))
+                .tryAcquire();
+        boolean ipOk = passwordResetLimiters
+                .computeIfAbsent("ip:" + clientIp, k -> new SlidingWindow(cfg.getMaxPerIp(), cfg.getWindowMinutes()))
+                .tryAcquire();
+        return emailOk && ipOk;
+    }
+
     public void resetLoginAttempts(String key) {
         loginAttempts.remove(key);
     }
@@ -68,6 +86,7 @@ public class RateLimitingService {
         loginAttempts.values().removeIf(w -> now - w.getWindowStart() > w.getWindowDurationMs());
         genericRateLimiters.values().removeIf(w -> now - w.getWindowStart() > w.getWindowDurationMs());
         ipRateLimiters.values().removeIf(w -> now - w.getWindowStart() > w.getWindowDurationMs());
+        passwordResetLimiters.values().removeIf(w -> now - w.getWindowStart() > w.getWindowDurationMs());
     }
 
     private static class SlidingWindow {

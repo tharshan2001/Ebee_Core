@@ -341,4 +341,30 @@ class AuthServiceTest {
                 .isInstanceOf(DisabledException.class)
                 .hasMessageContaining("User account is not active");
     }
+
+    // ── Forgot password rate limiting ───────────────────────────────────
+
+    @Test
+    void forgotPassword_rateLimited_throwsAndSendsNothing() {
+        when(rateLimitingService.isPasswordResetAllowed("user@ebee.com", "203.0.113.7")).thenReturn(false);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> authService.forgotPassword("user@ebee.com", "203.0.113.7"))
+                .isInstanceOf(com.ebee.common.exception.RateLimitException.class);
+
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(otpService, never()).generateAndSendOtp(anyString());
+    }
+
+    @Test
+    void forgotPassword_allowed_sendsOtpForExistingUser() {
+        User user = new User();
+        user.setEmail("user@ebee.com");
+        when(rateLimitingService.isPasswordResetAllowed("user@ebee.com", "203.0.113.7")).thenReturn(true);
+        when(userRepository.findByEmail("user@ebee.com")).thenReturn(java.util.Optional.of(user));
+
+        authService.forgotPassword("user@ebee.com", "203.0.113.7");
+
+        verify(otpService).generateAndSendOtp("user@ebee.com");
+    }
 }

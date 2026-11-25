@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -92,15 +93,42 @@ class WhatsappWebhookControllerTest {
     }
 
     @Test
-    void receive_shouldReturn200_andProcessPayload() throws Exception {
+    void receive_shouldReturn200_andProcessPayload_whenSignatureValid() throws Exception {
         WhatsappWebhookRequest request = new WhatsappWebhookRequest("whatsapp_business_account", java.util.List.of());
+        when(whatsappService.isValidSignature(any(), eq("sha256=good"))).thenReturn(true);
 
         mockMvc.perform(post("/api/whatsapp/webhook")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Hub-Signature-256", "sha256=good")
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
         verify(whatsappService).processWebhook(any(WhatsappWebhookRequest.class));
+    }
+
+    @Test
+    void receive_shouldReturn401_andNotProcess_whenSignatureInvalid() throws Exception {
+        when(whatsappService.isValidSignature(any(), any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/whatsapp/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"object\":\"whatsapp_business_account\",\"entry\":[]}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(whatsappService, never()).processWebhook(any());
+    }
+
+    @Test
+    void receive_shouldReturn400_whenSignedButMalformedJson() throws Exception {
+        when(whatsappService.isValidSignature(any(), any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/whatsapp/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Hub-Signature-256", "sha256=good")
+                        .content("{not json"))
+                .andExpect(status().isBadRequest());
+
+        verify(whatsappService, never()).processWebhook(any());
     }
 
     @Test

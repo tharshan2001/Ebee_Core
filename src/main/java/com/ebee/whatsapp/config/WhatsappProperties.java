@@ -10,13 +10,16 @@ public class WhatsappProperties {
     private final String phoneNumberId;
     private final String accessToken;
     private final String verifyToken;
+    private final String appSecret;
 
     @ConstructorBinding
-    public WhatsappProperties(String apiBaseUrl, String phoneNumberId, String accessToken, String verifyToken) {
+    public WhatsappProperties(String apiBaseUrl, String phoneNumberId, String accessToken, String verifyToken,
+                              String appSecret) {
         this.apiBaseUrl = apiBaseUrl;
         this.phoneNumberId = phoneNumberId;
         this.accessToken = accessToken;
         this.verifyToken = verifyToken;
+        this.appSecret = appSecret;
     }
 
     public String getApiBaseUrl() {
@@ -33,5 +36,10 @@ public class WhatsappProperties {
 
     public String getVerifyToken() {
         return verifyToken;
+    }
+
+    /** Meta app secret used to verify the X-Hub-Signature-256 header on incoming webhooks. */
+    public String getAppSecret() {
+        return appSecret;
     }
 }

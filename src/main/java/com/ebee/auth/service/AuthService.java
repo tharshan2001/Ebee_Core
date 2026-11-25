@@ -17,7 +17,7 @@ public interface AuthService {
 
     void changePassword(String email, String currentPassword, String newPassword);
 
-    void forgotPassword(String email);
+    void forgotPassword(String email, String clientIp);
 
     String verifyOtp(String email, String otp);
 

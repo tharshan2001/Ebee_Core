@@ -18,6 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Objects;
 
 @Service
@@ -26,6 +32,7 @@ public class WhatsappService {
     private static final Logger log = LoggerFactory.getLogger(WhatsappService.class);
     private static final String SUBSCRIBE_MODE = "subscribe";
     private static final String API_VERSION = "v18.0";
+    private static final String SIGNATURE_PREFIX = "sha256=";
 
     private final WhatsappProperties properties;
     private final RestTemplate restTemplate;
@@ -40,12 +47,47 @@ public class WhatsappService {
             log.warn("WhatsApp webhook verification failed: mode='{}' is not '{}'", mode, SUBSCRIBE_MODE);
             throw new WhatsappVerificationException("Invalid mode");
         }
-        if (!Objects.equals(properties.getVerifyToken(), token)) {
+        String expected = properties.getVerifyToken();
+        if (expected == null || expected.isBlank()) {
+            log.error("WhatsApp webhook verification refused: WHATSAPP_VERIFY_TOKEN is not configured");
+            throw new WhatsappVerificationException("Verify token not configured");
+        }
+        if (token == null || !MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {
             log.warn("WhatsApp webhook verification failed: verify token mismatch");
             throw new WhatsappVerificationException("Invalid verify token");
         }
         log.info("WhatsApp webhook verified successfully for phoneNumberId='{}'", properties.getPhoneNumberId());
         return challenge;
+    }
+
+    /**
+     * Checks Meta's {@code X-Hub-Signature-256} header: an HMAC-SHA256 of the raw request
+     * body keyed with the app secret. Fails closed when the secret is not configured.
+     */
+    public boolean isValidSignature(byte[] rawBody, String signatureHeader) {
+        String appSecret = properties.getAppSecret();
+        if (appSecret == null || appSecret.isBlank()) {
+            log.error("Rejecting WhatsApp webhook: WHATSAPP_APP_SECRET is not configured");
+            return false;
+        }
+        if (rawBody == null || signatureHeader == null || !signatureHeader.startsWith(SIGNATURE_PREFIX)) {
+            return false;
+        }
+        byte[] provided;
+        try {
+            provided = HexFormat.of().parseHex(signatureHeader.substring(SIGNATURE_PREFIX.length()).trim());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return MessageDigest.isEqual(mac.doFinal(rawBody), provided);
+        } catch (GeneralSecurityException e) {
+            log.error("HMAC-SHA256 unavailable for WhatsApp signature check", e);
+            return false;
+        }
     }
 
     public void processWebhook(WhatsappWebhookRequest request) {
@@ -75,9 +117,18 @@ public class WhatsappService {
                 continue;
             }
             String body = message.text() != null ? message.text().body() : null;
-            log.info("Received WhatsApp message from='{}' body='{}'", message.from(), body);
+            // Don't log message content or full phone numbers: customer data.
+            log.info("Received WhatsApp text message id='{}' from='{}' length={}",
+                    message.id(), maskPhone(message.from()), body != null ? body.length() : 0);
             // TODO: plug into order/agent workflow as needed
         }
+    }
+
+    private static String maskPhone(String phone) {
+        if (phone == null || phone.length() <= 4) {
+            return "****";
+        }
+        return "****" + phone.substring(phone.length() - 4);
     }
 
     public WhatsappSendMessageResponse sendTextMessage(String to, String body) {

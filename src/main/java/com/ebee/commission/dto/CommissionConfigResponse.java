@@ -11,10 +11,10 @@ public class CommissionConfigResponse {
 
     private UUID id;
     private String name;
-    private Double commissionRate;
+    private java.math.BigDecimal commissionRate;
     private CommissionType type;
-    private Double minAmount;
-    private Double maxAmount;
+    private java.math.BigDecimal minAmount;
+    private java.math.BigDecimal maxAmount;
     private String appliesTo;
     private Boolean isActive;
     private LocalDateTime effectiveFrom;

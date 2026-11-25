@@ -13,15 +13,15 @@ public class CommissionConfigRequest {
 
     @NotNull
     @Positive(message = "Commission rate must be positive")
-    private Double commissionRate;
+    private java.math.BigDecimal commissionRate;
 
     private CommissionType type;
 
     @Positive(message = "Min amount must be positive")
-    private Double minAmount;
+    private java.math.BigDecimal minAmount;
 
     @Positive(message = "Max amount must be positive")
-    private Double maxAmount;
+    private java.math.BigDecimal maxAmount;
 
     @NotNull
     private String appliesTo;

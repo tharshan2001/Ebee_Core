@@ -24,10 +24,10 @@ public class AgentResponse {
     private String district;
     private String country;
     private String phoneNumber;
-    private Double commissionRate;
-    private Double effectiveCommissionRate;
-    private Double totalSales;
-    private Double totalCommission;
+    private java.math.BigDecimal commissionRate;
+    private java.math.BigDecimal effectiveCommissionRate;
+    private java.math.BigDecimal totalSales;
+    private java.math.BigDecimal totalCommission;
     private AgentCommissionType commissionType;
     private Boolean isActive;
     private UserStatus userStatus;

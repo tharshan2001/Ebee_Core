@@ -81,6 +81,7 @@ public class CustomerService {
                 .phoneNumber(request.getPhoneNumber())
                 .email(request.getEmail())
                 .bookNo(request.getBookNo())
+                .vatNumber(blankToNull(request.getVatNumber()))
                 .customerCode(generateCustomerCode(request))
                 .build();
 
@@ -119,6 +120,9 @@ public class CustomerService {
             customer.setEmail(null);
         } else if (request.getEmail() != null) {
             customer.setEmail(request.getEmail().isEmpty() ? null : request.getEmail());
+        }
+        if (request.getVatNumber() != null) {
+            customer.setVatNumber(blankToNull(request.getVatNumber()));
         }
         if (request.getBookNo() != null) {
             customer.setBookNo(request.getBookNo());
@@ -573,6 +577,7 @@ public class CustomerService {
         response.setPhoneNumber(customer.getPhoneNumber());
         response.setEmail(customer.getEmail());
         response.setBookNo(customer.getBookNo());
+        response.setVatNumber(customer.getVatNumber());
         response.setTotalOrders(customer.getTotalOrders());
         response.setCreditLimit(customer.getCreditLimit());
         response.setOutstandingBalance(customer.getOutstandingBalance());
@@ -608,5 +613,9 @@ public class CustomerService {
                 tx.getDescription(),
                 tx.getCreatedAt()
         );
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v.trim();
     }
 }

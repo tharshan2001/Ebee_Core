@@ -108,6 +108,25 @@ class CommissionCalculationServiceTest {
     }
 
     @Test
+    void calculateCommissionForOrder_isOnSalesBeforeVat() {
+        CommissionConfig config = CommissionConfig.builder()
+                .commissionRate(BigDecimal.valueOf(10.0))
+                .type(CommissionType.DEFAULT)
+                .isActive(true)
+                .build();
+        when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT)).thenReturn(Optional.of(config));
+        when(commissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        order.setTotalAmount(new BigDecimal("11800.00"));
+        order.setTaxTotal(new BigDecimal("1800.00"));
+
+        Commission result = commissionCalculationService.calculateCommissionForOrder(order);
+
+        // 10% of 10,000 net, not of the 11,800 the customer paid (VAT isn't revenue).
+        assertThat(result.getOrderAmount()).isEqualByComparingTo("10000.00");
+        assertThat(result.getCommissionAmount()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
     void calculateCommissionForOrder_noConfig_throws() {
         when(configRepository.findFirstByTypeAndIsActiveTrue(CommissionType.DEFAULT))
                 .thenReturn(Optional.empty());

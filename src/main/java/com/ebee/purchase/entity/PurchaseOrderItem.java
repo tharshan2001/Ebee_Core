@@ -46,7 +46,23 @@ public class PurchaseOrderItem {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (unitTax == null) {
+            unitTax = BigDecimal.ZERO;
+        }
     }
+
+    /** Input VAT rate (percent); null = none. */
+    @Column(name = "tax_rate", precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
+    /** Input VAT per unit on top of the net unitPrice. */
+    @Column(name = "unit_tax", nullable = false, precision = 12, scale = 2)
+    private BigDecimal unitTax = BigDecimal.ZERO;
+
+    public BigDecimal getTaxRate() { return taxRate; }
+    public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
+    public BigDecimal getUnitTax() { return unitTax == null ? BigDecimal.ZERO : unitTax; }
+    public void setUnitTax(BigDecimal unitTax) { this.unitTax = unitTax; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

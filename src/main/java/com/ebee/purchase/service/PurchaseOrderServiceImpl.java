@@ -73,6 +73,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final InventoryRepository inventoryRepository;
     private final StoragePort storagePort;
     private final PurchaseOrderPaymentService purchaseOrderPaymentService;
+    private final com.ebee.tax.service.TaxService taxService;
+    private final com.ebee.tax.service.VatService vatService;
 
     public PurchaseOrderServiceImpl(PurchaseOrderRepository purchaseOrderRepository,
                                     PurchaseOrderAttachmentRepository attachmentRepository,
@@ -83,7 +85,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                                     InventoryService inventoryService,
                                     InventoryRepository inventoryRepository,
                                     StoragePort storagePort,
-                                    PurchaseOrderPaymentService purchaseOrderPaymentService) {
+                                    PurchaseOrderPaymentService purchaseOrderPaymentService,
+                                    com.ebee.tax.service.TaxService taxService,
+                                    com.ebee.tax.service.VatService vatService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.attachmentRepository = attachmentRepository;
         this.supplierRepository = supplierRepository;
@@ -94,6 +98,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         this.inventoryRepository = inventoryRepository;
         this.storagePort = storagePort;
         this.purchaseOrderPaymentService = purchaseOrderPaymentService;
+        this.taxService = taxService;
+        this.vatService = vatService;
     }
 
     @Retryable(retryFor = DuplicatePoNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
@@ -127,6 +133,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setCreatedBy(currentUser);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal taxTotal = BigDecimal.ZERO;
+        Map<UUID, BigDecimal> taxRates = inputTaxRates(productMap.values());
         List<PurchaseOrderItem> items = new ArrayList<>();
 
         for (PurchaseOrderItemRequest itemRequest : request.items()) {
@@ -140,6 +148,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             item.setUnitPrice(itemRequest.unitPrice());
             item.setSellingPrice(itemRequest.sellingPrice());
             item.setSubtotal(subtotal);
+            // Supplier prices are net; input VAT goes on top (stock is still costed at the net price).
+            BigDecimal rate = product.getTaxRateId() != null ? taxRates.get(product.getTaxRateId()) : null;
+            BigDecimal unitTax = com.ebee.tax.service.TaxCalculator.taxOnNet(itemRequest.unitPrice(), rate);
+            item.setTaxRate(unitTax.signum() > 0 ? rate : null);
+            item.setUnitTax(unitTax);
+            BigDecimal lineTax = unitTax.multiply(BigDecimal.valueOf(itemRequest.quantity()));
+            taxTotal = taxTotal.add(lineTax);
+            totalAmount = totalAmount.add(lineTax);
 
             items.add(item);
             totalAmount = totalAmount.add(subtotal);
@@ -147,6 +163,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         order.setItems(items);
         order.setTotalAmount(totalAmount);
+        order.setTaxTotal(taxTotal);
 
         if (request.paymentMethod() != null) {
             purchaseOrderPaymentService.initPayment(order, request.paymentMethod(), request.paidAmount());
@@ -192,6 +209,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.getItems().clear();
 
         BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal taxTotal = BigDecimal.ZERO;
+        Map<UUID, BigDecimal> taxRates = inputTaxRates(productMap.values());
         List<PurchaseOrderItem> newItems = new ArrayList<>();
 
         for (PurchaseOrderItemRequest itemRequest : request.items()) {
@@ -205,6 +224,14 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             item.setUnitPrice(itemRequest.unitPrice());
             item.setSellingPrice(itemRequest.sellingPrice());
             item.setSubtotal(subtotal);
+            // Supplier prices are net; input VAT goes on top (stock is still costed at the net price).
+            BigDecimal rate = product.getTaxRateId() != null ? taxRates.get(product.getTaxRateId()) : null;
+            BigDecimal unitTax = com.ebee.tax.service.TaxCalculator.taxOnNet(itemRequest.unitPrice(), rate);
+            item.setTaxRate(unitTax.signum() > 0 ? rate : null);
+            item.setUnitTax(unitTax);
+            BigDecimal lineTax = unitTax.multiply(BigDecimal.valueOf(itemRequest.quantity()));
+            taxTotal = taxTotal.add(lineTax);
+            totalAmount = totalAmount.add(lineTax);
 
             newItems.add(item);
             totalAmount = totalAmount.add(subtotal);
@@ -214,6 +241,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setNotes(request.notes());
         order.getItems().addAll(newItems);
         order.setTotalAmount(totalAmount);
+        order.setTaxTotal(taxTotal);
 
         PurchaseOrder saved = purchaseOrderRepository.save(order);
         return purchaseOrderMapper.toFullResponse(saved);
@@ -276,6 +304,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         List<BigDecimal> unitCosts = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         BigDecimal receivedTotal = BigDecimal.ZERO;
+        BigDecimal receivedTax = BigDecimal.ZERO;
         boolean allFullyReceived = true;
 
         for (ReceiveOrderRequest.ItemReceipt receipt : request.items()) {
@@ -303,7 +332,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             unitCosts.add(uc);
             notes.add("PO " + order.getPoNumber() + " - " + item.getProduct().getName());
 
-            receivedTotal = receivedTotal.add(uc.multiply(BigDecimal.valueOf(receipt.receivedQuantity())));
+            BigDecimal receiptTax = item.getUnitTax().multiply(BigDecimal.valueOf(receipt.receivedQuantity()));
+            receivedTax = receivedTax.add(receiptTax);
+            // Owed to the supplier = net cost + input VAT.
+            receivedTotal = receivedTotal.add(uc.multiply(BigDecimal.valueOf(receipt.receivedQuantity()))).add(receiptTax);
 
             if (newReceived < item.getQuantity()) {
                 allFullyReceived = false;
@@ -311,6 +343,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
 
         recordStockReceipt(productIds, quantities, unitCosts, notes, order.getPoNumber());
+        vatService.post(com.ebee.tax.entity.VatEntry.Direction.INPUT,
+                com.ebee.tax.entity.VatEntry.SourceType.PURCHASE_RECEIPT, order.getId(), order.getPoNumber(),
+                receivedTotal.subtract(receivedTax), receivedTax);
 
         if (order.getReceivedAt() == null) {
             order.setReceivedAt(LocalDateTime.now());
@@ -351,6 +386,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         List<Integer> quantities = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         BigDecimal returnTotal = BigDecimal.ZERO;
+        BigDecimal returnTax = BigDecimal.ZERO;
         boolean allFullyReturned = true;
 
         for (ReturnItemsRequest.ItemReturn ret : request.items()) {
@@ -377,7 +413,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             notes.add("PO " + order.getPoNumber() + " return - " + item.getProduct().getName() + " - " + reason);
 
             BigDecimal uc = item.getUnitPrice() != null ? item.getUnitPrice() : ZERO;
-            returnTotal = returnTotal.add(uc.multiply(BigDecimal.valueOf(ret.returnQuantity())));
+            BigDecimal lineReturnTax = item.getUnitTax().multiply(BigDecimal.valueOf(ret.returnQuantity()));
+            returnTax = returnTax.add(lineReturnTax);
+            returnTotal = returnTotal.add(uc.multiply(BigDecimal.valueOf(ret.returnQuantity()))).add(lineReturnTax);
 
             int newReturned = item.getReturnedQuantity();
             if (newReturned < received) {
@@ -386,6 +424,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
 
         inventoryService.recordOrderStocks(productIds, quantities, StockMovementType.OUT, notes);
+        vatService.post(com.ebee.tax.entity.VatEntry.Direction.INPUT,
+                com.ebee.tax.entity.VatEntry.SourceType.PURCHASE_RETURN, order.getId(), order.getPoNumber(),
+                returnTotal.subtract(returnTax).negate(), returnTax.negate());
 
         order.setOutstandingBalance(order.getOutstandingBalance().subtract(returnTotal));
         purchaseOrderPaymentService.subtractSupplierOutstandingForReturn(
@@ -481,6 +522,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             productsToUpdate.add(product);
         }
         productRepository.saveAll(productsToUpdate);
+    }
+
+    /** Input VAT rates by tax_rate id for these products (empty when VAT is off). */
+    private Map<UUID, BigDecimal> inputTaxRates(java.util.Collection<Product> products) {
+        return taxService.effectiveRates(products.stream().map(Product::getTaxRateId).toList());
     }
 
     private void validateTransition(PurchaseOrderStatus current, PurchaseOrderStatus target) {

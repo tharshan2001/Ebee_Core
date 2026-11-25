@@ -13,5 +13,7 @@ public record PurchaseOrderItemResponse(
         Integer returnedQuantity,
         BigDecimal unitPrice,
         BigDecimal sellingPrice,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        BigDecimal taxRate,
+        BigDecimal unitTax
 ) {}

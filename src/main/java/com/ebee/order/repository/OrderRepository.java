@@ -76,7 +76,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT MAX(o.orderNumber) FROM Order o WHERE o.orderNumber LIKE :pattern")
     String findMaxOrderNumberByPattern(@Param("pattern") String pattern);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
+    /** Net revenue (VAT excluded — VAT collected is owed to the government, not income). */
+    @Query("SELECT COALESCE(SUM(o.totalAmount - o.taxTotal), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")
     BigDecimal sumRevenueByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COALESCE(SUM(o.paidAmount), 0) FROM Order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED', 'RETURN_EXCHANGE') AND o.createdAt >= :start AND o.createdAt < :end")

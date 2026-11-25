@@ -24,6 +24,7 @@ public class ProductResponse {
     private String maxDiscountType;
     private BigDecimal maxDiscountValue;
     private String brand;
+    private java.util.UUID taxRateId;
     private String tags;
     private List<ProductSpecification> specifications;
     private Boolean featured;

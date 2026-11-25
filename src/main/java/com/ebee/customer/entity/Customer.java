@@ -47,6 +47,10 @@ public class Customer {
     @Column(name = "book_no", unique = true, length = 50)
     private String bookNo;
 
+    /** Customer's VAT registration number, printed on tax invoices. */
+    @Column(name = "vat_number", length = 50)
+    private String vatNumber;
+
     @Column(name = "total_orders", nullable = false)
     @Builder.Default
     private Integer totalOrders = 0;

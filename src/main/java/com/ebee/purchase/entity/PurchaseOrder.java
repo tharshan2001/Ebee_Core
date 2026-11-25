@@ -36,6 +36,10 @@ public class PurchaseOrder {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    /** Input VAT included in totalAmount. */
+    @Column(name = "tax_total", nullable = false, precision = 12, scale = 2)
+    private BigDecimal taxTotal = BigDecimal.ZERO;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -100,6 +104,8 @@ public class PurchaseOrder {
     public PurchaseOrderStatus getStatus() { return status; }
     public void setStatus(PurchaseOrderStatus status) { this.status = status; }
     public BigDecimal getTotalAmount() { return totalAmount; }
+    public BigDecimal getTaxTotal() { return taxTotal == null ? BigDecimal.ZERO : taxTotal; }
+    public void setTaxTotal(BigDecimal taxTotal) { this.taxTotal = taxTotal; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

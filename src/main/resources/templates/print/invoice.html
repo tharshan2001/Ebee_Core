@@ -43,6 +43,7 @@
           <div th:text="${company.phone}">Phone</div>
           <div th:text="${company.email}">Email</div>
           <div th:if="${company.registration}" th:text="'Reg: ' + ${company.registration}">Reg</div>
+          <div th:if="${vatRegistrationNumber}" th:text="'VAT Reg No: ' + ${vatRegistrationNumber}">VAT</div>
         </div>
       </td>
       <td style="width: 140px; text-align: right; vertical-align: middle;">
@@ -66,6 +67,7 @@
       <div class="value" th:text="${customerName}">Customer Name</div>
       <div class="value" th:if="${customerPhone}" th:text="${customerPhone}">Phone</div>
       <div class="value" th:if="${customerAddress}" th:text="${customerAddress}">Address</div>
+      <div class="value" th:if="${customerVatNumber}" th:text="'VAT No: ' + ${customerVatNumber}">VAT No</div>
     </td>
   </tr>
 </table>
@@ -102,6 +104,14 @@
     <tr th:if="${discountTotal > 0}">
       <td>Discount</td>
       <td class="right" th:text="'-' + ${#numbers.formatDecimal(discountTotal, 1, 2)}">0.00</td>
+    </tr>
+    <tr th:if="${taxTotal != null}">
+      <td>Amount excl. VAT</td>
+      <td class="right" th:text="${#numbers.formatDecimal(netTotal, 1, 2)}">0.00</td>
+    </tr>
+    <tr th:if="${taxTotal != null}">
+      <td>VAT</td>
+      <td class="right" th:text="${#numbers.formatDecimal(taxTotal, 1, 2)}">0.00</td>
     </tr>
     <tr class="grand-total">
       <td>Total</td>

@@ -22,6 +22,7 @@ public class OrderPdfService {
 
     private final OrderRepository orderRepository;
     private final PrintTemplateService printTemplateService;
+    private final com.ebee.tax.service.TaxService taxService;
 
     @Transactional(readOnly = true)
     public byte[] generateInvoicePdf(UUID id) {
@@ -47,8 +48,8 @@ public class OrderPdfService {
             subtotal = subtotal.add(itemSubtotal);
             discountTotal = discountTotal.add(discount);
             lineItems.add(new InvoiceData.LineItem(
-                    item.getProduct().getName(),
-                    item.getProduct().getItemCode(),
+                    lineName(item),
+                    lineCode(item),
                     item.getQuantity(),
                     item.getUnitPrice(),
                     itemSubtotal,
@@ -72,7 +73,17 @@ public class OrderPdfService {
                 order.getNotes()
         );
 
-        return printTemplateService.renderToPdf("invoice", toMap(data));
+        Map<String, Object> vars = toMap(data);
+        var settings = taxService.getSettings();
+        if (settings.isVatRegistered() || order.getTaxTotal().signum() > 0) {
+            // Tax invoice: seller and buyer VAT numbers, net amount and VAT shown separately.
+            vars.put("title", "TAX INVOICE");
+            vars.put("vatRegistrationNumber", settings.getVatRegistrationNumber());
+            vars.put("customerVatNumber", order.getCustomer() != null ? order.getCustomer().getVatNumber() : null);
+            vars.put("taxTotal", order.getTaxTotal());
+            vars.put("netTotal", order.getTotalAmount().subtract(order.getTaxTotal()));
+        }
+        return printTemplateService.renderToPdf("invoice", vars);
     }
 
     @Transactional(readOnly = true)
@@ -99,8 +110,8 @@ public class OrderPdfService {
             subtotal = subtotal.add(itemSubtotal);
             discountTotal = discountTotal.add(discount);
             lineItems.add(new InvoiceData.LineItem(
-                    item.getProduct().getName(),
-                    item.getProduct().getItemCode(),
+                    lineName(item),
+                    lineCode(item),
                     item.getQuantity(),
                     item.getUnitPrice(),
                     itemSubtotal,
@@ -153,6 +164,21 @@ public class OrderPdfService {
         );
 
         return printTemplateService.renderToPdf("shipping-label", toMap(data));
+    }
+
+    /** Combo lines have no product; name them after the combo. */
+    private static String lineName(com.ebee.order.entity.OrderItem item) {
+        if (item.getCombo() != null) {
+            return item.getCombo().getName();
+        }
+        return item.getProduct() != null ? item.getProduct().getName() : "Item";
+    }
+
+    private static String lineCode(com.ebee.order.entity.OrderItem item) {
+        if (item.getCombo() != null) {
+            return "COMBO";
+        }
+        return item.getProduct() != null ? item.getProduct().getItemCode() : "";
     }
 
     private String formatAddress(String line1, String line2, String city, String postalCode,

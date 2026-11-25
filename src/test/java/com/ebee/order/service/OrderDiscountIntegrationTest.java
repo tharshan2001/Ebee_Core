@@ -74,6 +74,8 @@ class OrderDiscountIntegrationTest {
     @Mock private com.ebee.accounting.service.LedgerService ledgerService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @org.mockito.Mock private com.ebee.tax.service.TaxService taxService;
+    @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -88,6 +90,7 @@ class OrderDiscountIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
         lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
             java.util.List<Integer> qtys = inv.getArgument(1);

@@ -26,6 +26,8 @@ public class CustomerRequest {
 
     private String bookNo;
 
+    private String vatNumber;
+
     @Valid
     @jakarta.validation.constraints.NotNull(message = "Address is required")
     private AddressRequest address;

@@ -96,6 +96,11 @@ class OrderServiceComboTest {
 
     @BeforeEach
     void setUp() {
+        // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
+        lenient().when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<Integer> qtys = inv.getArgument(1);
+            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+        });
         adminUserId = UUID.randomUUID();
 
         adminUser = User.builder()
@@ -239,7 +244,6 @@ class OrderServiceComboTest {
     void createOrder_comboWithNullRule_ordersSuccessfully() {
         mockOrderSave();
         when(comboRepository.findByIdWithDetails(combo.getId())).thenReturn(Optional.of(combo));
-        when(inventoryService.getAverageCosts(anyList())).thenReturn(Map.of());
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
         OrderRequest request = buildComboRequest(combo.getId());
@@ -261,10 +265,6 @@ class OrderServiceComboTest {
     void createOrder_comboWithFreeProduct_addsFreeItem() {
         mockOrderSave();
         when(comboRepository.findByIdWithDetails(comboWithFree.getId())).thenReturn(Optional.of(comboWithFree));
-        when(inventoryService.getAverageCosts(anyList())).thenReturn(Map.of(
-                product1.getId(), new BigDecimal("300.00"),
-                freeProduct.getId(), new BigDecimal("100.00")
-        ));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
         OrderRequest request = buildComboRequest(comboWithFree.getId());
@@ -294,7 +294,6 @@ class OrderServiceComboTest {
     void createOrder_comboWithFixedDiscount_appliesDiscount() {
         mockOrderSave();
         when(comboRepository.findByIdWithDetails(comboWithDiscount.getId())).thenReturn(Optional.of(comboWithDiscount));
-        when(inventoryService.getAverageCosts(anyList())).thenReturn(Map.of());
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
         OrderRequest request = buildComboRequest(comboWithDiscount.getId());
@@ -380,7 +379,6 @@ class OrderServiceComboTest {
     void createOrder_comboAndRegularItems_ordersBoth() {
         mockOrderSave();
         when(comboRepository.findByIdWithDetails(combo.getId())).thenReturn(Optional.of(combo));
-        when(inventoryService.getAverageCosts(anyList())).thenReturn(Map.of());
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
         when(productRepository.findByItemCodeIn(anyList())).thenReturn(List.of(product1));
@@ -405,6 +403,39 @@ class OrderServiceComboTest {
         Order saved = orderCaptor.getValue();
         assertThat(saved.getItems()).hasSize(2);
         assertThat(saved.getTotalAmount()).isEqualByComparingTo(new BigDecimal("2250.00"));
+    }
+
+    @Test
+    void createOrder_eachLineGetsTheFifoCostOfItsOwnStockRows() {
+        mockOrderSave();
+        when(comboRepository.findByIdWithDetails(combo.getId())).thenReturn(Optional.of(combo));
+        when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
+        when(productRepository.findByItemCodeIn(anyList())).thenReturn(List.of(product1));
+        // Stock rows in order: [regular product1 ×3], [combo: product1 ×2], [combo: product2 ×1]
+        when(inventoryService.deductStock(anyList(), anyList(), anyList())).thenReturn(List.of(
+                new BigDecimal("333.00"), new BigDecimal("444.00"), new BigDecimal("555.00")));
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerPhoneNumber("0771234567");
+        request.setPaymentMethod(PaymentMethod.CASH);
+        OrderItemRequest regularItem = new OrderItemRequest();
+        regularItem.setProductItemCode("PROD-001");
+        regularItem.setQuantity(3);
+        OrderItemRequest comboItemReq = new OrderItemRequest();
+        comboItemReq.setComboId(combo.getId());
+        comboItemReq.setQuantity(1);
+        request.setItems(List.of(regularItem, comboItemReq));
+
+        orderService.createOrder(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        Order saved = orderCaptor.getValue();
+        OrderItem regular = saved.getItems().stream().filter(i -> i.getCombo() == null).findFirst().orElseThrow();
+        OrderItem comboLine = saved.getItems().stream().filter(i -> i.getCombo() != null).findFirst().orElseThrow();
+        // Regular line: 333 for 3 units → 111 per unit. Regular items used to get no cost at all.
+        assertThat(regular.getCostPrice()).isEqualByComparingTo("111.00");
+        // Combo line: sum of its component rows.
+        assertThat(comboLine.getCostPrice()).isEqualByComparingTo("999.00");
     }
 
     private OrderRequest buildComboRequest(UUID comboId) {

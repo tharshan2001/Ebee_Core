@@ -119,14 +119,10 @@ public class InventoryService {
         int change = request.getQuantityChange();
         if (change < 0) {
             consumeFifoLayers(inventory, -change);
-            updateCostFromLatestLayer(inventory);
+            recalculateAverageCost(inventory);
         } else if (change > 0) {
-            BigDecimal layerCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
-                    .map(InventoryLayer::getUnitCost)
-                    .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
-                    .orElse(BigDecimal.ZERO);
-            inventoryLayerRepository.save(new InventoryLayer(inventory, change, change, layerCost, LocalDateTime.now()));
-            updateCostFromLatestLayer(inventory);
+            addLayer(inventory, change, resolveReturnCost(inventory, null));
+            recalculateAverageCost(inventory);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -164,15 +160,10 @@ public class InventoryService {
 
         if (movementType == StockMovementType.OUT) {
             consumeFifoLayers(inventory, quantity);
-            updateCostFromLatestLayer(inventory);
+            recalculateAverageCost(inventory);
         } else if (movementType == StockMovementType.RETURN) {
-            BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
-                    .map(InventoryLayer::getUnitCost)
-                    .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
-                    .orElse(BigDecimal.ZERO);
-            InventoryLayer returnLayer = new InventoryLayer(inventory, quantity, quantity, returnCost, LocalDateTime.now());
-            inventoryLayerRepository.save(returnLayer);
-            updateCostFromLatestLayer(inventory);
+            addLayer(inventory, quantity, resolveReturnCost(inventory, null));
+            recalculateAverageCost(inventory);
         }
 
         inventory.setQuantity(quantityAfter);
@@ -183,30 +174,75 @@ public class InventoryService {
         return stockMapper.toResponse(stock);
     }
 
-    @Retryable(retryFor = ObjectOptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 100, multiplier = 2))
+    /**
+     * OUT or RETURN for several lines at once. Rows are locked (PESSIMISTIC_WRITE, in product-id
+     * order) so concurrent orders for the same product wait instead of failing on a version conflict.
+     * RETURN lines go back in at the current average cost; use {@link #returnStock} to pass the
+     * original cost.
+     */
     @Transactional
     public List<StockResponse> recordOrderStocks(List<UUID> productIds, List<Integer> quantities,
                                                   StockMovementType movementType, List<String> notes) {
-        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdIn(productIds)
+        return applyMovements(productIds, quantities, movementType, notes, null, null);
+    }
+
+    /**
+     * Deducts stock FIFO and returns the actual cost of the layers consumed for each line
+     * (same order as the input). Used for order-line cost of goods.
+     */
+    @Transactional
+    public List<BigDecimal> deductStock(List<UUID> productIds, List<Integer> quantities, List<String> notes) {
+        List<BigDecimal> lineCosts = new ArrayList<>();
+        applyMovements(productIds, quantities, StockMovementType.OUT, notes, null, lineCosts);
+        return lineCosts;
+    }
+
+    /**
+     * Puts stock back. {@code unitCosts} entries are the cost each unit originally left at
+     * (null = use the current average cost).
+     */
+    @Transactional
+    public List<StockResponse> returnStock(List<UUID> productIds, List<Integer> quantities,
+                                           List<BigDecimal> unitCosts, List<String> notes) {
+        return applyMovements(productIds, quantities, StockMovementType.RETURN, notes, unitCosts, null);
+    }
+
+    private List<StockResponse> applyMovements(List<UUID> productIds, List<Integer> quantities,
+                                               StockMovementType movementType, List<String> notes,
+                                               List<BigDecimal> returnUnitCosts, List<BigDecimal> lineCostsOut) {
+        if (movementType != StockMovementType.OUT && movementType != StockMovementType.RETURN) {
+            throw new IllegalArgumentException("Only OUT and RETURN are supported here, got " + movementType);
+        }
+        Map<UUID, Inventory> inventoryMap = inventoryRepository.findByProductIdInWithLock(new TreeSet<>(productIds))
                 .stream()
                 .collect(Collectors.toMap(inv -> inv.getProduct().getId(), Function.identity()));
 
+        // Validate against the combined quantity per product (the same product can appear on several
+        // lines, e.g. a regular item and inside a combo).
+        Map<UUID, Integer> netChange = new LinkedHashMap<>();
         for (int i = 0; i < productIds.size(); i++) {
-            Inventory inv = inventoryMap.get(productIds.get(i));
-            if (inv == null) {
-                throw new ResourceNotFoundException("Inventory", "productId", productIds.get(i));
+            UUID pid = productIds.get(i);
+            if (!inventoryMap.containsKey(pid)) {
+                throw new ResourceNotFoundException("Inventory", "productId", pid);
+            }
+            if (quantities.get(i) == null || quantities.get(i) <= 0) {
+                throw new IllegalArgumentException("Quantity must be positive");
             }
             int change = movementType == StockMovementType.OUT ? -quantities.get(i) : quantities.get(i);
-            int projectedQuantity = inv.getQuantity() + change;
-            if (projectedQuantity < 0) {
+            netChange.merge(pid, change, Integer::sum);
+        }
+        for (Map.Entry<UUID, Integer> e : netChange.entrySet()) {
+            Inventory inv = inventoryMap.get(e.getKey());
+            int projected = inv.getQuantity() + e.getValue();
+            if (projected < 0) {
                 throw new IllegalArgumentException(
                         (inv.getQuantity() == 0 ? "Out of stock: " : "Insufficient stock for product: ")
                                 + inv.getProduct().getName());
             }
-            if (projectedQuantity < inv.getReservedQuantity()) {
+            if (projected < inv.getReservedQuantity()) {
                 throw new IllegalArgumentException(
                         "Cannot reduce stock below reserved quantity for product: " + inv.getProduct().getName()
-                                + ". Reserved: " + inv.getReservedQuantity() + ", would leave: " + projectedQuantity);
+                                + ". Reserved: " + inv.getReservedQuantity() + ", would leave: " + projected);
             }
         }
 
@@ -219,17 +255,15 @@ public class InventoryService {
             int after = before + change;
 
             if (movementType == StockMovementType.OUT) {
-                consumeFifoLayers(inv, qty);
-                updateCostFromLatestLayer(inv);
-            } else if (movementType == StockMovementType.RETURN) {
-                BigDecimal returnCost = inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inv.getId())
-                        .map(InventoryLayer::getUnitCost)
-                        .filter(c -> c.compareTo(BigDecimal.ZERO) > 0)
-                        .orElse(BigDecimal.ZERO);
-                InventoryLayer returnLayer = new InventoryLayer(inv, qty, qty, returnCost, LocalDateTime.now());
-                inventoryLayerRepository.save(returnLayer);
-                updateCostFromLatestLayer(inv);
+                BigDecimal cost = consumeFifoLayers(inv, qty);
+                if (lineCostsOut != null) {
+                    lineCostsOut.add(cost);
+                }
+            } else {
+                BigDecimal unitCost = returnUnitCosts != null ? returnUnitCosts.get(i) : null;
+                addLayer(inv, qty, resolveReturnCost(inv, unitCost));
             }
+            recalculateAverageCost(inv);
 
             inv.setQuantity(after);
             Stock stock = stockMovementRecorder.record(inv, change, before, after, movementType, notes.get(i));
@@ -300,7 +334,7 @@ public class InventoryService {
         int reservedBefore = inventory.getReservedQuantity();
 
         consumeFifoLayers(inventory, quantity);
-        updateCostFromLatestLayer(inventory);
+        recalculateAverageCost(inventory);
 
         inventory.setReservedQuantity(reservedBefore - quantity);
         inventory.setQuantity(quantityBefore - quantity);
@@ -391,7 +425,7 @@ public class InventoryService {
             InventoryLayer layer = new InventoryLayer(inv, qty, qty, unitCost, LocalDateTime.now());
             inventoryLayerRepository.save(layer);
 
-            updateCostFromLatestLayer(inv);
+            recalculateAverageCost(inv);
 
             inv.setQuantity(after);
 
@@ -435,15 +469,18 @@ public class InventoryService {
                         layer.getReceivedAt()));
     }
 
-    private void consumeFifoLayers(Inventory inventory, int quantity) {
+    /** Consumes the oldest layers first and returns the total cost of what was consumed. */
+    private BigDecimal consumeFifoLayers(Inventory inventory, int quantity) {
         List<InventoryLayer> layers = inventoryLayerRepository
                 .findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(inventory.getId(), 0);
 
         int toConsume = quantity;
+        BigDecimal cost = BigDecimal.ZERO;
         for (InventoryLayer layer : layers) {
             if (toConsume <= 0) break;
             int consumable = Math.min(toConsume, layer.getRemainingQuantity());
             layer.setRemainingQuantity(layer.getRemainingQuantity() - consumable);
+            cost = cost.add(layer.getUnitCost().multiply(BigDecimal.valueOf(consumable)));
             toConsume -= consumable;
         }
         inventoryLayerRepository.saveAll(layers);
@@ -452,14 +489,43 @@ public class InventoryService {
             throw new IllegalArgumentException(
                     "Insufficient stock layers for product: " + inventory.getProduct().getName());
         }
+        return cost;
     }
 
-    private void updateCostFromLatestLayer(Inventory inventory) {
-        inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
-                .ifPresentOrElse(
-                        layer -> inventory.setAverageCost(layer.getUnitCost()),
-                        () -> inventory.setAverageCost(BigDecimal.ZERO)
-                );
+    private void addLayer(Inventory inventory, int quantity, BigDecimal unitCost) {
+        inventoryLayerRepository.save(new InventoryLayer(inventory, quantity, quantity, unitCost, LocalDateTime.now()));
+    }
+
+    /** Cost for stock coming back: the original cost if known, else the current average, else the last receipt. */
+    private BigDecimal resolveReturnCost(Inventory inventory, BigDecimal originalUnitCost) {
+        if (originalUnitCost != null && originalUnitCost.signum() > 0) {
+            return originalUnitCost;
+        }
+        if (inventory.getAverageCost() != null && inventory.getAverageCost().signum() > 0) {
+            return inventory.getAverageCost();
+        }
+        return inventoryLayerRepository.findTopByInventoryIdOrderByReceivedAtDesc(inventory.getId())
+                .map(InventoryLayer::getUnitCost)
+                .filter(c -> c.signum() > 0)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * Weighted average cost of the stock still on hand: Σ(remaining × unitCost) / Σ remaining.
+     * When nothing is left, the last average is kept so new returns/adjustments have a sensible cost.
+     */
+    private void recalculateAverageCost(Inventory inventory) {
+        List<InventoryLayer> layers = inventoryLayerRepository
+                .findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(inventory.getId(), 0);
+        long units = 0;
+        BigDecimal value = BigDecimal.ZERO;
+        for (InventoryLayer layer : layers) {
+            units += layer.getRemainingQuantity();
+            value = value.add(layer.getUnitCost().multiply(BigDecimal.valueOf(layer.getRemainingQuantity())));
+        }
+        if (units > 0) {
+            inventory.setAverageCost(value.divide(BigDecimal.valueOf(units), 4, java.math.RoundingMode.HALF_UP));
+        }
     }
 
 }

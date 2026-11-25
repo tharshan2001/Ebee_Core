@@ -58,7 +58,7 @@ public class OrderItem {
     @Column(name = "discount_value", precision = 10, scale = 2)
     private BigDecimal discountValue;
 
-    @Column(name = "cost_price", precision = 12, scale = 2)
+    @Column(name = "cost_price", precision = 14, scale = 4)
     private BigDecimal costPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)

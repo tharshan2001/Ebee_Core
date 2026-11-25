@@ -6,7 +6,6 @@ import com.ebee.combo.entity.ComboItem;
 import com.ebee.customer.entity.Customer;
 import com.ebee.customer.enums.AdvanceReferenceType;
 import com.ebee.customer.service.CustomerService;
-import com.ebee.stock.enums.StockMovementType;
 import com.ebee.inventory.service.InventoryService;
 import com.ebee.order.entity.Order;
 import com.ebee.order.entity.OrderItem;
@@ -172,6 +171,7 @@ public class OrderSettlementService {
     public void restoreStock(Order order, List<ReturnLine> lines, String reason) {
         List<UUID> productIds = new ArrayList<>();
         List<Integer> quantities = new ArrayList<>();
+        List<BigDecimal> unitCosts = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         String note = reason + " - Order " + order.getOrderNumber();
 
@@ -181,16 +181,18 @@ public class OrderSettlementService {
                 for (ComboItem ci : item.getCombo().getItems()) {
                     productIds.add(ci.getProduct().getId());
                     quantities.add(ci.getQuantity() * line.quantity());
+                    unitCosts.add(null); // per-component cost isn't stored; goes back at current average
                     notes.add(note + " (combo " + item.getCombo().getName() + ")");
                 }
             } else if (item.getProduct() != null) {
                 productIds.add(item.getProduct().getId());
                 quantities.add(line.quantity());
+                unitCosts.add(item.getCostPrice()); // back in at the cost it left at
                 notes.add(note);
             }
         }
         if (!productIds.isEmpty()) {
-            inventoryService.recordOrderStocks(productIds, quantities, StockMovementType.RETURN, notes);
+            inventoryService.returnStock(productIds, quantities, unitCosts, notes);
         }
     }
 

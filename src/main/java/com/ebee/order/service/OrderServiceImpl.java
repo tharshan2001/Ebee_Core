@@ -24,7 +24,6 @@ import com.ebee.inventory.service.InventoryService;
 import com.ebee.commission.entity.Commission;
 import com.ebee.product.entity.Product;
 import com.ebee.product.repository.ProductRepository;
-import com.ebee.stock.enums.StockMovementType;
 import com.ebee.user.entity.User;
 import com.ebee.user.repository.UserRepository;
 import com.ebee.order.dto.OrderItemRequest;
@@ -128,8 +127,8 @@ public class OrderServiceImpl implements OrderService {
         processRegularItems(split.regularItems(), ctx);
         processComboItems(split.comboItems(), ctx);
 
-        inventoryService.recordOrderStocks(ctx.stockProductIds, ctx.stockQuantities,
-                StockMovementType.OUT, ctx.stockNotes);
+        List<BigDecimal> rowCosts = inventoryService.deductStock(ctx.stockProductIds, ctx.stockQuantities, ctx.stockNotes);
+        applyLineCosts(ctx, rowCosts);
 
         ctx.order.setTotalAmount(ctx.totalAmount);
         orderPaymentService.initPayment(ctx.order, request.getPaymentMethod(),
@@ -160,6 +159,19 @@ public class OrderServiceImpl implements OrderService {
         List<Integer> stockQuantities = new ArrayList<>();
         List<String> stockNotes = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        /** Which stock rows (indexes into stockProductIds) belong to each order line. */
+        Map<OrderItem, List<Integer>> lineRows = new java.util.IdentityHashMap<>();
+    }
+
+    /** costPrice = actual FIFO cost of the stock this line consumed, per unit of the line. */
+    private static void applyLineCosts(CreationContext ctx, List<BigDecimal> rowCosts) {
+        ctx.lineRows.forEach((item, rows) -> {
+            BigDecimal total = BigDecimal.ZERO;
+            for (int row : rows) {
+                total = total.add(rowCosts.get(row));
+            }
+            item.setCostPrice(total.divide(BigDecimal.valueOf(item.getQuantity()), 4, RoundingMode.HALF_UP));
+        });
     }
 
     private record ItemProcessing(List<OrderItemRequest> regularItems, List<OrderItemRequest> comboItems) {}
@@ -257,6 +269,7 @@ public class OrderServiceImpl implements OrderService {
             ctx.order.getItems().add(item);
             ctx.totalAmount = ctx.totalAmount.add(subtotal);
 
+            ctx.lineRows.put(item, List.of(ctx.stockProductIds.size()));
             ctx.stockProductIds.add(product.getId());
             ctx.stockQuantities.add(itemRequest.getQuantity());
             ctx.stockNotes.add("Order " + ctx.orderNumber + " - Item " + (i + 1));
@@ -290,13 +303,14 @@ public class OrderServiceImpl implements OrderService {
             }
 
             inventoryService.checkStockAvailability(comboStockProductIds, comboStockQuantities);
+            int firstRow = ctx.stockProductIds.size();
+            int componentRows = combo.getItems().size();
             ctx.stockProductIds.addAll(comboStockProductIds);
             ctx.stockQuantities.addAll(comboStockQuantities);
             ctx.stockNotes.addAll(comboStockNotes);
 
             BigDecimal comboPrice = combo.calculateComboPrice();
             BigDecimal unitPrice = calculateComboUnitPrice(combo, rule, itemRequest, comboPrice);
-            BigDecimal comboCostPrice = calculateComboCostPrice(combo);
 
             OrderItem comboItem = OrderItem.builder()
                     .order(ctx.order)
@@ -306,16 +320,17 @@ public class OrderServiceImpl implements OrderService {
                     .unitPrice(unitPrice)
                     .originalUnitPrice(comboPrice)
                     .subtotal(unitPrice)
-                    .costPrice(comboCostPrice.setScale(2, RoundingMode.HALF_UP))
                     .build();
             ctx.order.getItems().add(comboItem);
+            List<Integer> comboRows = new ArrayList<>();
+            for (int r = 0; r < componentRows; r++) {
+                comboRows.add(firstRow + r);
+            }
+            ctx.lineRows.put(comboItem, comboRows);
             ctx.totalAmount = ctx.totalAmount.add(unitPrice);
 
             if (rule != null && rule.getRuleType() == ComboRuleType.FREE_PRODUCT
                     && !Boolean.TRUE.equals(itemRequest.getApplyFreeProductAsDiscount())) {
-                Map<UUID, BigDecimal> avgCosts = inventoryService.getAverageCosts(
-                        List.of(rule.getFreeProduct().getId()));
-                BigDecimal freeProductAvgCost = avgCosts.getOrDefault(rule.getFreeProduct().getId(), BigDecimal.ZERO);
                 OrderItem freeItem = OrderItem.builder()
                         .order(ctx.order)
                         .product(rule.getFreeProduct())
@@ -323,10 +338,10 @@ public class OrderServiceImpl implements OrderService {
                         .unitPrice(BigDecimal.ZERO)
                         .originalUnitPrice(rule.getFreeProduct().getPrice())
                         .subtotal(BigDecimal.ZERO)
-                        .costPrice(freeProductAvgCost.setScale(2, RoundingMode.HALF_UP))
                         .isFreeProduct(true)
                         .build();
                 ctx.order.getItems().add(freeItem);
+                ctx.lineRows.put(freeItem, List.of(firstRow + componentRows));
             }
         }
     }
@@ -370,17 +385,6 @@ public class OrderServiceImpl implements OrderService {
             };
         }
         return comboPrice;
-    }
-
-    private BigDecimal calculateComboCostPrice(Combo combo) {
-        BigDecimal costPrice = BigDecimal.ZERO;
-        for (ComboItem ci : combo.getItems()) {
-            costPrice = costPrice.add(
-                    inventoryService.getAverageCosts(List.of(ci.getProduct().getId()))
-                            .getOrDefault(ci.getProduct().getId(), BigDecimal.ZERO)
-                            .multiply(BigDecimal.valueOf(ci.getQuantity())));
-        }
-        return costPrice;
     }
 
     private void recordPostSaveOperations(Order savedOrder, CreationContext ctx, OrderRequest request) {

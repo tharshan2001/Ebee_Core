@@ -297,6 +297,14 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - Tests: `OrderSettlementLedgerScenarioTest` runs the real LedgerService + settlement on an in-memory ledger and asserts the invariant per scenario.
 - Existing production rows written under the old rules are NOT corrected by this change — run the reconciliation report, review, then post dated `ADJUSTMENT` entries.
 
+### FIFO Costing & Cost of Goods (Phase B fix)
+- `InventoryService.deductStock()` returns the actual FIFO cost of the layers consumed per stock row; `createOrder` sets `order_items.cost_price` (per unit, 4 dp) on **every** line — regular, combo (sum of component rows) and free item. Previously only combo/free lines had a cost, so the P&L overstated profit.
+- `InventoryService.returnStock()` puts stock back at the line's original `costPrice` (combo components: current average).
+- `inventory.average_cost` is a true weighted average of remaining layers (was: last receipt's unit cost).
+- Batch stock movements lock rows with `findByProductIdInWithLock` (ordered by product id) and validate the **combined** quantity when a product appears on several lines. `@Retryable` removed from the batch method (it can't retry inside the caller's transaction).
+- V123 widens `order_items.cost_price` and `inventory.average_cost` to NUMERIC(14,4).
+- COGS = `SUM(cost_price × (quantity − returned_quantity))`, excluding CANCELLED/RETURNED/RETURN_EXCHANGE (same as revenue). `FinancialReport.linesMissingCost` counts sold lines with no cost (pre-fix orders) — backfill is part of the data repair.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

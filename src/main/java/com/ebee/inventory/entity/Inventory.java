@@ -49,7 +49,7 @@ public class Inventory {
     @Column(name = "reorder_level")
     private Integer reorderLevel;
 
-    @Column(name = "average_cost", nullable = false, precision = 12, scale = 2)
+    @Column(name = "average_cost", nullable = false, precision = 14, scale = 4)
     @Builder.Default
     private BigDecimal averageCost = BigDecimal.ZERO;
 

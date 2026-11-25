@@ -305,6 +305,23 @@ public class InventoryService {
                 null, null);
     }
 
+    /** Opening stock at a location: one batch per row at its cost, with optional lot / expiry. */
+    @Transactional
+    public List<StockResponse> addOpeningStock(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                               List<BigDecimal> unitCosts, List<com.ebee.inventory.dto.LotInfo> lots,
+                                               List<String> notes) {
+        return applyMovements(locationId, productIds, quantities, StockMovementType.OPENING, notes, unitCosts, lots,
+                null, null);
+    }
+
+    /** Whether a product already has stock (or ever had stock moved) at a location — opening stock is refused then. */
+    @Transactional(readOnly = true)
+    public boolean hasStockHistory(UUID productId, UUID locationId) {
+        return inventoryRepository.findByProductIdAndLocationId(productId, loc(locationId))
+                .map(inv -> inv.getQuantity() > 0 || stockRepository.existsByInventoryId(inv.getId()))
+                .orElse(false);
+    }
+
     /** Inbound move (RETURN or TRANSFER_IN) at a location, each row at the given unit cost. */
     @Transactional
     public List<StockResponse> addStock(UUID locationId, StockMovementType type, List<UUID> productIds,
@@ -330,7 +347,8 @@ public class InventoryService {
                                                List<BigDecimal> lineCostsOut,
                                                List<List<com.ebee.inventory.dto.LotAllocation>> allocationsOut) {
         if (movementType != StockMovementType.OUT && movementType != StockMovementType.RETURN
-                && movementType != StockMovementType.TRANSFER_OUT && movementType != StockMovementType.TRANSFER_IN) {
+                && movementType != StockMovementType.TRANSFER_OUT && movementType != StockMovementType.TRANSFER_IN
+                && movementType != StockMovementType.OPENING) {
             throw new IllegalArgumentException("Unsupported batch movement: " + movementType);
         }
         boolean outbound = isOutbound(movementType);

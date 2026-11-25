@@ -54,4 +54,6 @@ public interface CustomerLedgerRepository extends JpaRepository<CustomerLedger, 
     @Query("SELECT l.customerId, COALESCE(SUM(l.debit) - SUM(l.credit), 0) FROM CustomerLedger l "
             + "WHERE l.createdAt < :before GROUP BY l.customerId")
     List<Object[]> balancesBefore(@Param("before") LocalDateTime before);
+
+    boolean existsByCustomerIdAndDescription(UUID customerId, String description);
 }

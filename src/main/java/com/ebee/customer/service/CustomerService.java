@@ -71,6 +71,12 @@ public class CustomerService {
 
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest request) {
+        return createCustomer(request, true);
+    }
+
+    /** {@code notify=false} skips the welcome SMS/email (bulk imports). */
+    @Transactional
+    public CustomerResponse createCustomer(CustomerRequest request, boolean notify) {
         request.setPhoneNumber(PhoneUtils.normalize(request.getPhoneNumber()));
         if (customerRepository.existsByPhoneNumber(request.getPhoneNumber())) {
             throw new IllegalArgumentException("A customer with this phone already exists");
@@ -92,7 +98,9 @@ public class CustomerService {
 
         customer = customerRepository.save(customer);
 
-        sendWelcomeNotification(customer);
+        if (notify) {
+            sendWelcomeNotification(customer);
+        }
 
         return toResponse(customer);
     }

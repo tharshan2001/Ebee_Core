@@ -18,4 +18,6 @@ public interface StockRepository extends JpaRepository<Stock, UUID> {
 
     @EntityGraph(attributePaths = {"createdBy", "inventory.product"})
     List<Stock> findByInventoryIdAndMovementTypeOrderByCreatedAtDesc(UUID inventoryId, com.ebee.stock.enums.StockMovementType movementType);
+
+    boolean existsByInventoryId(java.util.UUID inventoryId);
 }

@@ -20,4 +20,6 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID> {
 
     @Query("SELECT s FROM Supplier s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.contactPerson) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.email) LIKE LOWER(CONCAT('%', :search, '%'))")
     List<Supplier> findBySearchTerm(@Param("search") String search);
+
+    java.util.Optional<Supplier> findFirstByNameIgnoreCase(String name);
 }

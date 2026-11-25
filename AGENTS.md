@@ -358,6 +358,15 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - `GET /api/inventory/expiring?days=30&locationId=`, `POST /api/inventory/expired/write-off?locationId=` (movement type `EXPIRED`; never below reserved quantity), `GET /api/inventory/lots/{productId}/{lotNumber}/sales` (recall: orders + customers that got the lot).
 - `ExpiryAlertScheduler` (07:00 daily, ShedLock `expiryAlerts`): in-app `STOCK_EXPIRING` alert to admins for expired batches and batches expiring within 30 days.
 
+### CSV / Excel Import (Feature 5)
+- New `importer` package (controller / entity / repository / service — importers live under `importer.service` so the layered-architecture ArchUnit rule allows them to use services and repositories). Libraries: `commons-csv`, `poi-ooxml` (.xlsx only; .xls is refused).
+- `POST /api/imports/{type}?dryRun=true|false` (multipart `file`, ADMIN), `GET /api/imports/{type}/template` (CSV header + sample row), `GET /api/imports` (history in `import_jobs`, V129). Types: `products`, `opening-stock`, `customers`, `suppliers`.
+- Flow (`ImportService`): read (headers normalised to snake_case, max 5,000 rows) → required columns present → importer validates **every** row → dry run stops here → otherwise `ImportApplier` applies all rows in **one transaction** (any failure → nothing written, status FAILED). Any row error blocks the whole file. Unknown columns are reported, not fatal.
+- Products: upsert by `item_code`; missing categories are created; `vat_rate` matches a tax rate name; `tracks_expiry`.
+- Opening stock: one batch per row at `unit_cost` with lot / expiry (movement type `OPENING`, `InventoryService.addOpeningStock`); refused when the product already has stock or stock history at that location (re-importing can't double stock); expiry required for tracked products.
+- Customers: upsert by normalised phone; created **without** the welcome SMS/email (`createCustomer(request, false)`); `credit_limit`; `opening_balance` posted once as an ADJUSTMENT (positive = owes us, negative = credit) with description "Opening balance (import)".
+- Suppliers: matched by name (existing ones aren't changed); `opening_balance` posted once — positive = supplier invoice (we owe), negative = adjustment (prepaid).
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

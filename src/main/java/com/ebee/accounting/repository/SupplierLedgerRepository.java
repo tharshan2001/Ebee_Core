@@ -37,4 +37,6 @@ public interface SupplierLedgerRepository extends JpaRepository<SupplierLedger, 
     @Query("SELECT l.supplierId, COALESCE(SUM(l.credit) - SUM(l.debit), 0) FROM SupplierLedger l "
             + "WHERE l.createdAt < :before GROUP BY l.supplierId")
     java.util.List<Object[]> balancesBefore(@Param("before") java.time.LocalDateTime before);
+
+    boolean existsBySupplierIdAndDescription(java.util.UUID supplierId, String description);
 }

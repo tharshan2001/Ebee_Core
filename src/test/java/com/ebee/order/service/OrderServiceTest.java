@@ -887,7 +887,7 @@ class OrderServiceTest {
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
         verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
-        verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
+        verify(commissionLifecycleService).adjustCommissionForOrder(order);
         verify(orderNotificationService).sendOrderStatus(any());
     }
 

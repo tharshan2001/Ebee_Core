@@ -53,6 +53,14 @@ public class Agent {
     @Builder.Default
     private BigDecimal totalCommission = BigDecimal.ZERO;
 
+    /** What the agent owes back from commissions clawed back after payment; recovered from future payments. */
+    @Column(name = "clawback_balance", nullable = false, precision = 12, scale = 2)
+    private BigDecimal clawbackBalance;
+
+    public BigDecimal getClawbackBalance() {
+        return clawbackBalance == null ? BigDecimal.ZERO : clawbackBalance;
+    }
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
@@ -123,6 +131,9 @@ public class Agent {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (clawbackBalance == null) {
+            clawbackBalance = BigDecimal.ZERO;
+        }
     }
 
     @PreUpdate

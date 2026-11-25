@@ -272,7 +272,7 @@ class ReturnExchangeServiceTest {
 
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.APPROVED);
         verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
-        verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+        verify(commissionLifecycleService).adjustCommissionForOrder(order);
         verify(customerService).creditToAdvance(eq(customer), any(), any(), eq(order.getId()), any());
         verify(orderNotificationService).sendOrderStatus(any());
         verify(eventPublisher, atLeast(2)).publishEvent(any());
@@ -298,7 +298,7 @@ class ReturnExchangeServiceTest {
 
         assertThat(returnRequest.getStatus()).isEqualTo(ReturnExchangeStatus.APPROVED);
         verify(inventoryService).returnStock(anyList(), anyList(), anyList(), anyList());
-        verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+        verify(commissionLifecycleService).adjustCommissionForOrder(order);
     }
 
     @Test
@@ -394,7 +394,7 @@ class ReturnExchangeServiceTest {
 
         returnExchangeService.reviewReturnExchange(returnRequest.getId(), reviewRequest, adminUserId);
 
-        verify(commissionLifecycleService).cancelCommissionForOrder(order.getId());
+        verify(commissionLifecycleService).adjustCommissionForOrder(order);
     }
 
     @Test

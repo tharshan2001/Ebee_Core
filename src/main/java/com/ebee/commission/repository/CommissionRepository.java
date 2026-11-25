@@ -90,4 +90,10 @@ public interface CommissionRepository extends JpaRepository<Commission, UUID> {
 
     @Query("SELECT COALESCE(SUM(c.commissionAmount), 0) FROM Commission c WHERE c.agent.id = :agentId AND c.status = :status")
     BigDecimal sumCommissionAmountByAgentIdAndStatus(@Param("agentId") UUID agentId, @Param("status") CommissionStatus status);
+
+    /** PAID commissions for these agents that are not on any payout statement yet. */
+    @Query("SELECT c FROM Commission c JOIN FETCH c.agent a JOIN FETCH a.user JOIN FETCH c.order "
+            + "WHERE c.status = com.ebee.commission.enums.CommissionStatus.PAID AND a.id IN :agentIds "
+            + "AND c.id NOT IN (SELECT cid FROM Payout p JOIN p.commissionIds cid)")
+    List<Commission> findPaidNotInPayoutForAgents(@Param("agentIds") java.util.Collection<UUID> agentIds);
 }

@@ -35,6 +35,9 @@ class CommissionLifecycleServiceTest {
     @Mock private CommissionNotificationService commissionNotificationService;
     @Mock private CommissionPaymentService commissionPaymentService;
     @Mock private AuditLogService auditLogService;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
+    @Mock private com.ebee.common.security.SecurityService securityService;
+    @Mock private com.ebee.agent.repository.AgentRepository agentRepository;
 
     @InjectMocks private CommissionLifecycleService commissionLifecycleService;
 
@@ -53,6 +56,7 @@ class CommissionLifecycleServiceTest {
         commission = Commission.builder()
                 .id(commissionId)
                 .order(order)
+                .agent(com.ebee.agent.entity.Agent.builder().id(UUID.randomUUID()).build())
                 .status(CommissionStatus.CALCULATED)
                 .commissionAmount(new BigDecimal("500.00"))
                 .build();
@@ -105,6 +109,9 @@ class CommissionLifecycleServiceTest {
 
         assertThat(commission.getStatus()).isEqualTo(CommissionStatus.REJECTED);
         assertThat(commission.getErrorMessage()).isEqualTo("Invalid documentation");
+        // The calculation credit is reversed so the agent ledger no longer shows it as owed.
+        verify(ledgerService).recordAgentPayout(eq(commission.getAgent().getId()), isNull(),
+                argThat(a -> a.compareTo(new BigDecimal("500.00")) == 0), contains("rejected"), any());
     }
 
     @Test

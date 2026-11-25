@@ -305,6 +305,15 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - V123 widens `order_items.cost_price` and `inventory.average_cost` to NUMERIC(14,4).
 - COGS = `SUM(cost_price × (quantity − returned_quantity))`, excluding CANCELLED/RETURNED/RETURN_EXCHANGE (same as revenue). `FinancialReport.linesMissingCost` counts sold lines with no cost (pre-fix orders) — backfill is part of the data repair.
 
+### Commissions, Clawbacks & Payouts (Phase C fix)
+- Partial return → `CommissionLifecycleService.adjustCommissionForOrder(order)` re-bases the commission on the reduced order total at its stored rate (D1); a full return still cancels it. Called by `OrderServiceImpl.returnOrder` and `ReturnExchangeService` **after** settlement.
+- Already-PAID commission that is reduced or cancelled is **clawed back** (D2): agent-ledger debit (balance goes negative = agent owes), `commissions.clawback_amount` and `agents.clawback_balance` increase, `agent.totalCommission` decreases.
+- Paying a commission (`markAsPaid` / `payBatch`) first recovers the agent's `clawback_balance`; only the cash actually paid is debited and stored in `commissions.paid_amount` (null on rows paid before V124 → treat as `commission_amount`, see `getNetPaidAmount()`).
+- Rejecting a CALCULATED/APPROVED commission now posts the reversing agent-ledger debit.
+- Payout statements (`createBatchPayouts`) only include PAID commissions not already linked in `payout_commission_ids`, total = net paid; an empty batch is rejected. Payouts are statements — money moves when a commission is marked PAID.
+- V124 adds `agents.clawback_balance`, `commissions.clawback_amount`, `commissions.paid_amount`.
+- Tests: `CommissionClawbackScenarioTest` (real lifecycle + payment + ledger on an in-memory agent ledger), `PayoutBatchTest`.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

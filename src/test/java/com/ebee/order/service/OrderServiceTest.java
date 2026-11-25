@@ -95,6 +95,15 @@ class OrderServiceTest {
     @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     @org.mockito.Mock private com.ebee.pricing.service.PricingService pricingService;
     @InjectMocks private OrderServiceImpl orderService;
+    @InjectMocks private OrderLifecycleService orderLifecycleService;
+    @InjectMocks private OrderQueryService orderQueryService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void wireSplitOrderServices() {
+        // OrderServiceImpl delegates status changes and lookups to these (same mocks underneath).
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderLifecycleService", orderLifecycleService);
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderQueryService", orderQueryService);
+    }
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
 
@@ -288,8 +297,9 @@ class OrderServiceTest {
         }).when(orderPaymentService).syncCustomerOutstanding(any());
 
         // Real settlement logic on top of the mocks, so cancel/return tests exercise the actual rules.
-        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderSettlementService",
-                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class), org.mockito.Mockito.mock(com.ebee.order.repository.OrderItemLotRepository.class)));
+        OrderSettlementService settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class), org.mockito.Mockito.mock(com.ebee.order.repository.OrderItemLotRepository.class));
+        // Cancel and return now live in OrderLifecycleService.
+        org.springframework.test.util.ReflectionTestUtils.setField(orderLifecycleService, "orderSettlementService", settlement);
     }
 
     @Test

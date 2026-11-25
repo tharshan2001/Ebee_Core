@@ -62,6 +62,7 @@ public class ProductController {
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
             @RequestParam(value = "taxRateId", required = false) java.util.UUID taxRateId,
+            @RequestParam(value = "tracksExpiry", required = false) Boolean tracksExpiry,
             @RequestParam(value = "tags", required = false) String tags,
             @RequestParam(value = "specifications", required = false) String specificationsJson) {
 
@@ -78,6 +79,7 @@ public class ProductController {
         request.setMaxDiscountValue(maxDiscountValue);
         request.setBrand(brand);
         request.setTaxRateId(taxRateId);
+        request.setTracksExpiry(tracksExpiry);
         request.setTags(tags);
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {
@@ -231,6 +233,7 @@ public class ProductController {
             @RequestParam(value = "maxDiscountValue", required = false) BigDecimal maxDiscountValue,
             @RequestParam(value = "brand", required = false) String brand,
             @RequestParam(value = "taxRateId", required = false) java.util.UUID taxRateId,
+            @RequestParam(value = "tracksExpiry", required = false) Boolean tracksExpiry,
             @RequestParam(value = "tags", required = false) String tags,
             @RequestParam(value = "specifications", required = false) String specificationsJson,
             @RequestParam(value = "removeImageUrls", required = false) List<String> removeImageUrls) {
@@ -250,6 +253,7 @@ public class ProductController {
         request.setMaxDiscountFieldsSet(maxDiscountType != null || maxDiscountValue != null);
         request.setBrand(brand);
         request.setTaxRateId(taxRateId);
+        request.setTracksExpiry(tracksExpiry);
         request.setTags(tags);
         if (specificationsJson != null && !specificationsJson.isBlank()) {
             try {

@@ -25,6 +25,7 @@ public class ProductResponse {
     private BigDecimal maxDiscountValue;
     private String brand;
     private java.util.UUID taxRateId;
+    private Boolean tracksExpiry;
     private String tags;
     private List<ProductSpecification> specifications;
     private Boolean featured;

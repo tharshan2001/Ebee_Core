@@ -31,6 +31,15 @@ public class InventoryLayer {
     @Column(name = "received_at", nullable = false)
     private LocalDateTime receivedAt;
 
+    @Column(name = "lot_number", length = 50)
+    private String lotNumber;
+
+    @Column(name = "expiry_date")
+    private java.time.LocalDate expiryDate;
+
+    @Column(name = "manufactured_date")
+    private java.time.LocalDate manufacturedDate;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -58,4 +67,16 @@ public class InventoryLayer {
     public LocalDateTime getReceivedAt() { return receivedAt; }
     public void setReceivedAt(LocalDateTime receivedAt) { this.receivedAt = receivedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public String getLotNumber() { return lotNumber; }
+    public void setLotNumber(String lotNumber) { this.lotNumber = lotNumber; }
+    public java.time.LocalDate getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(java.time.LocalDate expiryDate) { this.expiryDate = expiryDate; }
+    public java.time.LocalDate getManufacturedDate() { return manufacturedDate; }
+    public void setManufacturedDate(java.time.LocalDate manufacturedDate) { this.manufacturedDate = manufacturedDate; }
+
+    /** True when the batch has an expiry date before {@code today}. */
+    public boolean isExpired(java.time.LocalDate today) {
+        return expiryDate != null && expiryDate.isBefore(today);
+    }
 }

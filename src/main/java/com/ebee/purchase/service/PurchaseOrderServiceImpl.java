@@ -302,6 +302,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         List<UUID> productIds = new ArrayList<>();
         List<Integer> quantities = new ArrayList<>();
         List<BigDecimal> unitCosts = new ArrayList<>();
+        List<com.ebee.inventory.dto.LotInfo> lots = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         BigDecimal receivedTotal = BigDecimal.ZERO;
         BigDecimal receivedTax = BigDecimal.ZERO;
@@ -330,6 +331,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             quantities.add(receipt.receivedQuantity());
             BigDecimal uc = item.getUnitPrice() != null ? item.getUnitPrice() : ZERO;
             unitCosts.add(uc);
+            lots.add(new com.ebee.inventory.dto.LotInfo(receipt.lotNumber(), receipt.expiryDate(), receipt.manufacturedDate()));
             notes.add("PO " + order.getPoNumber() + " - " + item.getProduct().getName());
 
             BigDecimal receiptTax = item.getUnitTax().multiply(BigDecimal.valueOf(receipt.receivedQuantity()));
@@ -342,7 +344,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             }
         }
 
-        recordStockReceipt(poLocationId(order), productIds, quantities, unitCosts, notes, order.getPoNumber());
+        recordStockReceipt(poLocationId(order), productIds, quantities, unitCosts, lots, notes, order.getPoNumber());
         vatService.post(com.ebee.tax.entity.VatEntry.Direction.INPUT,
                 com.ebee.tax.entity.VatEntry.SourceType.PURCHASE_RECEIPT, order.getId(), order.getPoNumber(),
                 receivedTotal.subtract(receivedTax), receivedTax);
@@ -547,8 +549,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     private void recordStockReceipt(UUID locationId, List<UUID> productIds, List<Integer> quantities,
-                                     List<BigDecimal> unitCosts, List<String> notes, String poNumber) {
-        inventoryService.recordPurchaseStocks(locationId, productIds, quantities, unitCosts, notes);
+                                     List<BigDecimal> unitCosts, List<com.ebee.inventory.dto.LotInfo> lots,
+                                     List<String> notes, String poNumber) {
+        inventoryService.recordPurchaseStocks(locationId, productIds, quantities, unitCosts, lots, notes);
 
         List<Inventory> inventories = inventoryRepository.findByProductIdInAndLocationId(productIds, locationId);
         List<Product> productsToUpdate = new ArrayList<>();

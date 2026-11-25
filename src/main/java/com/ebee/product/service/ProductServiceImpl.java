@@ -330,6 +330,9 @@ public class ProductServiceImpl implements ProductService {
         if (request.getTaxRateId() != null) {
             product.setTaxRateId(taxService.requireRate(request.getTaxRateId()).getId());
         }
+        if (request.getTracksExpiry() != null) {
+            product.setTracksExpiry(request.getTracksExpiry());
+        }
         if (request.getTags() != null) {
             product.setTags(request.getTags());
         }

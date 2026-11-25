@@ -92,6 +92,7 @@ class OrderServiceTest {
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
+    @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -118,9 +119,15 @@ class OrderServiceTest {
         lenient().when(locationService.require(any())).thenReturn(mainLocation);
         lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
-        lenient().when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+        lenient().when(inventoryService.deductStockWithLots(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<java.util.UUID> ids = inv.getArgument(1);
             java.util.List<Integer> qtys = inv.getArgument(2);
-            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+            java.util.List<java.util.List<com.ebee.inventory.dto.LotAllocation>> rows = new java.util.ArrayList<>();
+            for (int r = 0; r < qtys.size(); r++) {
+                rows.add(java.util.List.of(new com.ebee.inventory.dto.LotAllocation(ids.get(r), null, qtys.get(r),
+                        new java.math.BigDecimal("100.00"))));
+            }
+            return rows;
         });
         adminUserId = UUID.randomUUID();
         agentUserId = UUID.randomUUID();
@@ -276,7 +283,7 @@ class OrderServiceTest {
 
         // Real settlement logic on top of the mocks, so cancel/return tests exercise the actual rules.
         org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderSettlementService",
-                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class)));
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, org.mockito.Mockito.mock(com.ebee.tax.service.VatService.class), org.mockito.Mockito.mock(com.ebee.finance.service.MoneyAccountService.class), org.mockito.Mockito.mock(com.ebee.order.repository.OrderItemLotRepository.class)));
     }
 
     @Test
@@ -304,7 +311,7 @@ class OrderServiceTest {
 
         assertThat(result).isNotNull();
         // Stock comes from the resolved location (here the default "Main").
-        verify(inventoryService).deductStock(eq(MAIN_LOCATION_ID), anyList(), anyList(), anyList());
+        verify(inventoryService).deductStockWithLots(eq(MAIN_LOCATION_ID), anyList(), anyList(), anyList());
         verify(commissionCalculationService).calculateCommissionForOrder(any());
         verify(auditLogService).record(eq(AuditAction.CREATE), eq("Order"), any(), anyString());
         verify(customerService).incrementTotalOrders(customer.getId());
@@ -777,7 +784,7 @@ class OrderServiceTest {
                 new ReturnOrderItemRequest(null, RefundChoice.REFUND, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only delivered orders can be returned");
-        verify(inventoryService, never()).returnStock(any(), anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService, never()).returnStock(any(), anyList(), anyList(), anyList(), anyList(), anyList());
     }
 
     @Test
@@ -888,7 +895,7 @@ class OrderServiceTest {
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
-        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
         verify(auditLogService).record(eq(AuditAction.STATUS_CHANGE), eq("Order"), eq(orderId), anyString());
         verify(orderNotificationService).sendOrderCancelled(any());
@@ -1027,7 +1034,7 @@ class OrderServiceTest {
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.RETURNED);
-        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList());
+        verify(inventoryService).returnStock(any(), anyList(), anyList(), anyList(), anyList(), anyList());
         verify(commissionLifecycleService).adjustCommissionForOrder(order);
         verify(orderNotificationService).sendOrderStatus(any());
     }

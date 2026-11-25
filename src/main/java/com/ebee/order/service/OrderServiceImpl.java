@@ -97,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.ebee.tax.service.VatService vatService;
     private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
     private final com.ebee.location.service.LocationService locationService;
+    private final com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -138,9 +139,10 @@ public class OrderServiceImpl implements OrderService {
         processRegularItems(split.regularItems(), ctx);
         processComboItems(split.comboItems(), ctx);
 
-        List<BigDecimal> rowCosts = inventoryService.deductStock(ctx.location.getId(),
+        ctx.rowLots = inventoryService.deductStockWithLots(ctx.location.getId(),
                 ctx.stockProductIds, ctx.stockQuantities, ctx.stockNotes);
-        applyLineCosts(ctx, rowCosts);
+        applyLineCosts(ctx, ctx.rowLots.stream().map(row -> row.stream()
+                .map(com.ebee.inventory.dto.LotAllocation::cost).reduce(BigDecimal.ZERO, BigDecimal::add)).toList());
 
         ctx.order.setTotalAmount(ctx.totalAmount);
         ctx.order.setTaxTotal(ctx.taxTotal);
@@ -173,12 +175,36 @@ public class OrderServiceImpl implements OrderService {
         List<String> stockNotes = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
         com.ebee.location.entity.Location location;
+        /** Batches each stock row came from (same order as stockProductIds). */
+        List<List<com.ebee.inventory.dto.LotAllocation>> rowLots = List.of();
         boolean vatOn;
         boolean pricesIncludeTax = true;
         BigDecimal taxTotal = BigDecimal.ZERO;
         Map<UUID, BigDecimal> rateCache = new java.util.HashMap<>();
         /** Which stock rows (indexes into stockProductIds) belong to each order line. */
         Map<OrderItem, List<Integer>> lineRows = new java.util.IdentityHashMap<>();
+    }
+
+    /** Which batches each saved order line took (recalls, and returns back to the same lot). */
+    private void recordSoldLots(CreationContext ctx) {
+        List<com.ebee.order.entity.OrderItemLot> lots = new ArrayList<>();
+        ctx.lineRows.forEach((item, rows) -> {
+            for (int row : rows) {
+                if (row >= ctx.rowLots.size()) {
+                    continue;
+                }
+                for (var a : ctx.rowLots.get(row)) {
+                    lots.add(new com.ebee.order.entity.OrderItemLot(item, a.productId(),
+                            a.layer() != null ? a.layer().getId() : null,
+                            a.layer() != null ? a.layer().getLotNumber() : null,
+                            a.layer() != null ? a.layer().getExpiryDate() : null,
+                            a.quantity(), a.unitCost()));
+                }
+            }
+        });
+        if (!lots.isEmpty()) {
+            orderItemLotRepository.saveAll(lots);
+        }
     }
 
     /** costPrice = actual FIFO cost of the stock this line consumed, per unit of the line. */
@@ -440,6 +466,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void recordPostSaveOperations(Order savedOrder, CreationContext ctx, OrderRequest request) {
+        recordSoldLots(ctx);
         if (ctx.customer != null) {
             ledgerService.recordCustomerInvoice(
                     ctx.customer.getId(), savedOrder.getId(), savedOrder.getTotalAmount(),

@@ -47,6 +47,7 @@ class OrderSettlementLedgerScenarioTest {
     private LedgerService ledgerService;
     private com.ebee.tax.service.VatService vatService;
     private com.ebee.finance.service.MoneyAccountService moneyAccountService;
+    private com.ebee.order.repository.OrderItemLotRepository lotRepository;
     private Customer customer;
 
     @BeforeEach
@@ -80,7 +81,8 @@ class OrderSettlementLedgerScenarioTest {
 
         vatService = mock(com.ebee.tax.service.VatService.class);
         moneyAccountService = mock(com.ebee.finance.service.MoneyAccountService.class);
-        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, vatService, moneyAccountService);
+        lotRepository = mock(com.ebee.order.repository.OrderItemLotRepository.class);
+        settlement = new OrderSettlementService(inventoryService, ledgerService, customerService, securityService, vatService, moneyAccountService, lotRepository);
     }
 
     // ── helpers ────────────────────────────────────────────────────────
@@ -297,6 +299,32 @@ class OrderSettlementLedgerScenarioTest {
                 any(), org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new BigDecimal("-915.24")) == 0));
     }
 
+    // ── lots ───────────────────────────────────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void return_goesBackIntoTheLotsItWasSoldFrom_latestFirst_atTheirCost() {
+        Order order = createOrder(10, "0");
+        OrderItem item = order.getItems().get(0);
+        UUID productId = item.getProduct().getId();
+        var expiry = java.time.LocalDate.now().plusDays(45);
+        var l1 = new com.ebee.order.entity.OrderItemLot(item, productId, UUID.randomUUID(), "L1", expiry, 6, new BigDecimal("100"));
+        var l2 = new com.ebee.order.entity.OrderItemLot(item, productId, UUID.randomUUID(), "L2", expiry, 4, new BigDecimal("120"));
+        org.mockito.Mockito.when(lotRepository.findByOrderItemIdOrderByCreatedAtAsc(item.getId())).thenReturn(List.of(l1, l2));
+
+        settlement.returnLines(order, List.of(line(order, 5)), RefundChoice.REFUND, "Order return");
+
+        var lots = org.mockito.ArgumentCaptor.forClass(List.class);
+        var costs = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(inventoryService).returnStock(any(), eq(List.of(productId, productId)), eq(List.of(4, 1)),
+                costs.capture(), lots.capture(), any());
+        assertThat(costs.getValue()).containsExactly(new BigDecimal("120"), new BigDecimal("100"));
+        assertThat(((List<com.ebee.inventory.dto.LotInfo>) lots.getValue()))
+                .extracting(com.ebee.inventory.dto.LotInfo::lotNumber).containsExactly("L2", "L1");
+        assertThat(l2.getReturnedQuantity()).isEqualTo(4);
+        assertThat(l1.getReturnedQuantity()).isEqualTo(1);
+    }
+
     // ── stock ──────────────────────────────────────────────────────────
 
     @Test
@@ -317,7 +345,7 @@ class OrderSettlementLedgerScenarioTest {
 
         // Combo components go back at the current average cost (null = not known per component).
         verify(inventoryService).returnStock(any(), eq(List.of(a.getId(), b.getId())), eq(List.of(2, 1)),
-                eq(java.util.Arrays.asList(null, null)), any());
+                eq(java.util.Arrays.asList(null, null)), any(), any());
         assertLedgerMatchesOrder(order);
     }
 }

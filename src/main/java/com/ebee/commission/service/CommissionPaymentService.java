@@ -61,20 +61,34 @@ public class CommissionPaymentService {
         Agent agent = commission.getAgent();
         agent.setTotalCommission(agent.getTotalCommission().add(commission.getCommissionAmount()));
         agent.setTotalSales(agent.getTotalSales().add(commission.getOrderAmount()));
-
-        ledgerService.recordAgentPayout(
-                agent.getId(),
-                null,
-                commission.getCommissionAmount(),
-                "Commission paid for Order " + commission.getOrder().getOrderNumber(),
-                securityService.getCurrentUserId()
-        );
+        settlePayout(commission, "Commission paid for Order " + commission.getOrder().getOrderNumber());
+        commissionRepository.save(commission);
 
         commissionNotificationService.sendCommissionNotification(commission, "Paid",
                 "It has been paid. Total earnings to date: LKR "
                 + agent.getTotalCommission().setScale(2, RoundingMode.HALF_UP).toPlainString() + ".");
 
         return mapper.toResponse(commission);
+    }
+
+    /**
+     * Pay a commission net of any clawback the agent still owes (D2). Only the cash actually paid
+     * is debited to the agent ledger — the clawback was already debited when it arose.
+     */
+    private void settlePayout(Commission commission, String description) {
+        Agent agent = commission.getAgent();
+        BigDecimal recovered = commission.getCommissionAmount().min(agent.getClawbackBalance());
+        BigDecimal cash = commission.getCommissionAmount().subtract(recovered);
+        agent.setClawbackBalance(agent.getClawbackBalance().subtract(recovered));
+        commission.setPaidAmount(cash);
+        if (cash.signum() > 0) {
+            ledgerService.recordAgentPayout(agent.getId(), null, cash, description, securityService.getCurrentUserId());
+        }
+        if (recovered.signum() > 0) {
+            auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", commission.getId(),
+                    "Recovered LKR " + recovered + " of earlier clawbacks; paid LKR " + cash
+                    + "; agent still owes LKR " + agent.getClawbackBalance());
+        }
     }
 
     @Transactional
@@ -119,13 +133,7 @@ public class CommissionPaymentService {
             agent.setTotalCommission(agent.getTotalCommission() != null ? agent.getTotalCommission().add(c.getCommissionAmount()) : c.getCommissionAmount());
             agent.setTotalSales(agent.getTotalSales() != null ? agent.getTotalSales().add(c.getOrderAmount()) : c.getOrderAmount());
 
-            ledgerService.recordAgentPayout(
-                    agent.getId(),
-                    null,
-                    c.getCommissionAmount(),
-                    "Commission paid (batch) for Order " + c.getOrder().getOrderNumber(),
-                    securityService.getCurrentUserId()
-            );
+            settlePayout(c, "Commission paid (batch) for Order " + c.getOrder().getOrderNumber());
 
             commissionRepository.save(c);
             auditLogService.record(AuditAction.COMMISSION_PAY, "Commission", c.getId(),
@@ -135,7 +143,7 @@ public class CommissionPaymentService {
                     "It has been paid. Total earnings to date: LKR "
                     + agent.getTotalCommission().setScale(2, RoundingMode.HALF_UP).toPlainString() + ".");
 
-            totalPaid = totalPaid.add(c.getCommissionAmount());
+            totalPaid = totalPaid.add(c.getNetPaidAmount());
             count++;
             paidList.add(mapper.toResponse(c));
         }

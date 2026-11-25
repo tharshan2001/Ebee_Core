@@ -684,14 +684,14 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Nothing left to return on order " + order.getOrderNumber());
         }
 
-        commissionLifecycleService.cancelCommissionForOrder(id);
-
         Customer customer = order.getCustomer();
         BigDecimal previousOutstanding = customer.getOutstandingBalance();
         BigDecimal previousAdvance = customer.getAdvanceBalance();
 
         OrderSettlementService.Settlement settlement = orderSettlementService.returnLines(
                 order, lines, request.refundChoice(), "Order return");
+        // Re-base commission on the reduced total (cancels it when everything came back).
+        commissionLifecycleService.adjustCommissionForOrder(order);
 
         DuesChangeType changeType = !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
                 : settlement.toAdvance().signum() > 0 ? DuesChangeType.RETURN_ADVANCE

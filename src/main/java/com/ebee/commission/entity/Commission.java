@@ -53,6 +53,28 @@ public class Commission {
     @Column(name = "commission_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal commissionAmount;
 
+    /** Amount clawed back after payment because the order was (partly) returned or cancelled. */
+    @Column(name = "clawback_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal clawbackAmount;
+
+    /** Cash actually paid (commissionAmount minus clawback recovered at payment). Null on pre-V124 rows. */
+    @Column(name = "paid_amount", precision = 12, scale = 2)
+    private BigDecimal paidAmount;
+
+    public BigDecimal getClawbackAmount() {
+        return clawbackAmount == null ? BigDecimal.ZERO : clawbackAmount;
+    }
+
+    /** What the agent keeps from this commission after clawbacks. */
+    public BigDecimal getEarnedAmount() {
+        return commissionAmount.subtract(getClawbackAmount());
+    }
+
+    /** Cash paid out for this commission; falls back to commissionAmount for rows paid before V124. */
+    public BigDecimal getNetPaidAmount() {
+        return paidAmount != null ? paidAmount : commissionAmount;
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -80,4 +102,11 @@ public class Commission {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void applyDefaults() {
+        if (clawbackAmount == null) {
+            clawbackAmount = BigDecimal.ZERO;
+        }
+    }
 }

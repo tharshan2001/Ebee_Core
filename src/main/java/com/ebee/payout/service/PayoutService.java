@@ -3,7 +3,6 @@ package com.ebee.payout.service;
 import com.ebee.agent.entity.Agent;
 import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.Commission;
-import com.ebee.commission.enums.CommissionStatus;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.service.PrintTemplateService;
@@ -57,10 +56,14 @@ public class PayoutService {
 
     @Transactional
     public List<PayoutResponse> createBatchPayouts(List<UUID> agentIds) {
-        List<Commission> paidCommissions = commissionRepository.findByStatusWithDetails(CommissionStatus.PAID);
+        // Only PAID commissions not already on a payout — re-running a batch used to include every
+        // paid commission again and produce duplicate payouts.
+        List<Commission> paidCommissions = commissionRepository.findPaidNotInPayoutForAgents(agentIds);
+        if (paidCommissions.isEmpty()) {
+            throw new IllegalArgumentException("No paid commissions left to put on a payout for these agents");
+        }
 
         Map<UUID, List<Commission>> commissionsByAgent = paidCommissions.stream()
-                .filter(c -> agentIds.contains(c.getAgent().getId()))
                 .collect(Collectors.groupingBy(c -> c.getAgent().getId()));
 
         List<Payout> payouts = new ArrayList<>();
@@ -72,8 +75,9 @@ public class PayoutService {
             Agent agent = agentRepository.findById(agentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", agentId));
 
+            // Net cash actually paid (after any clawback recovered at payment time).
             BigDecimal totalAmount = commissions.stream()
-                    .map(Commission::getCommissionAmount)
+                    .map(Commission::getNetPaidAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             List<UUID> commissionIds = commissions.stream()

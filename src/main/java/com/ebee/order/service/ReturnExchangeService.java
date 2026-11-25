@@ -166,8 +166,6 @@ public class ReturnExchangeService {
                 .map(rri -> new OrderSettlementService.ReturnLine(rri.getOrderItem(), rri.getQuantity()))
                 .toList();
 
-        commissionLifecycleService.cancelCommissionForOrder(order.getId());
-
         BigDecimal previousOutstanding = customer.getOutstandingBalance();
         BigDecimal previousAdvance = customer.getAdvanceBalance();
 
@@ -175,6 +173,7 @@ public class ReturnExchangeService {
                 ? RefundChoice.CREDIT_ADVANCE : RefundChoice.REFUND;
         orderSettlementService.returnLines(order, lines, refundChoice,
                 "Return exchange (" + request.resolutionType() + ")");
+        commissionLifecycleService.adjustCommissionForOrder(order);
 
         boolean allReturned = order.getItems().stream().allMatch(OrderItem::isFullyReturned);
         OrderStatus oldStatus = order.getStatus();

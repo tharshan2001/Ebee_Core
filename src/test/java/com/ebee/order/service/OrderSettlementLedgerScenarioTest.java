@@ -299,6 +299,23 @@ class OrderSettlementLedgerScenarioTest {
                 any(), org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new BigDecimal("-915.24")) == 0));
     }
 
+    // ── packs ──────────────────────────────────────────────────────────
+
+    @Test
+    void returningPacks_putsBackStockUnits_atCostPerUnit() {
+        Order order = createOrder(3, "0");            // 3 "units" at 1,000 → treat as 3 boxes of 12
+        OrderItem box = order.getItems().get(0);
+        box.setUnitsPerSalesUnit(12);
+        box.setCostPrice(new BigDecimal("600.0000"));  // per box
+
+        settlement.returnLines(order, List.of(line(order, 1)), RefundChoice.REFUND, "Order return");
+
+        verify(inventoryService).returnStock(any(), eq(List.of(box.getProduct().getId())), eq(List.of(12)),
+                eq(List.of(new BigDecimal("50.0000"))), any(), any());
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("2000");  // money per box
+        assertLedgerMatchesOrder(order);
+    }
+
     // ── lots ───────────────────────────────────────────────────────────
 
     @Test

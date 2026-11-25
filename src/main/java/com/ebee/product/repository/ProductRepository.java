@@ -53,7 +53,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT COUNT(DISTINCT p.category) FROM Product p WHERE p.category IS NOT NULL")
     Long countDistinctCategories();
 
-    @Query(value = "SELECT p.category, COUNT(DISTINCT p.id), COALESCE(SUM(oi.quantity), 0), COALESCE(SUM(oi.subtotal), 0) FROM products p LEFT JOIN order_items oi ON oi.product_id = p.id LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY p.category ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC", nativeQuery = true)
+    @Query(value = "SELECT p.category, COUNT(DISTINCT p.id), COALESCE(SUM(oi.quantity * oi.units_per_sales_unit), 0), COALESCE(SUM(oi.subtotal), 0) FROM products p LEFT JOIN order_items oi ON oi.product_id = p.id LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ('CANCELLED', 'RETURNED') AND o.created_at >= :start AND o.created_at < :end GROUP BY p.category ORDER BY COALESCE(SUM(oi.subtotal), 0) DESC", nativeQuery = true)
     List<Object[]> findProductCategorySummary(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
 
     @Query("SELECT p.id FROM Product p WHERE (LOWER(p.itemCode) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND p.isActive = true ORDER BY p.createdAt DESC")
@@ -82,7 +82,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true AND p.discountType IS NOT NULL AND p.discountValue > 0 ORDER BY p.createdAt DESC")
     Page<UUID> findDealProductIds(Pageable pageable);
 
-    @Query("SELECT oi.product.id FROM OrderItem oi WHERE oi.order.status NOT IN ('CANCELLED', 'RETURNED') AND oi.product.isActive = true GROUP BY oi.product.id ORDER BY SUM(oi.quantity) DESC")
+    @Query("SELECT oi.product.id FROM OrderItem oi WHERE oi.order.status NOT IN ('CANCELLED', 'RETURNED') AND oi.product.isActive = true GROUP BY oi.product.id ORDER BY SUM(oi.quantity * oi.unitsPerSalesUnit) DESC")
     Page<UUID> findBestSellerProductIds(Pageable pageable);
 
     @Query("SELECT p.id FROM Product p WHERE p.isActive = true ORDER BY p.createdAt DESC")

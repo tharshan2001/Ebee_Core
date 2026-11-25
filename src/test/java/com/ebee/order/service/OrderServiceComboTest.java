@@ -86,6 +86,7 @@ class OrderServiceComboTest {
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
+    @org.mockito.Mock private com.ebee.pricing.service.PricingService pricingService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -103,6 +104,11 @@ class OrderServiceComboTest {
 
     @BeforeEach
     void setUp() {
+        // Normal prices, sold by the stock unit (no price groups or packs configured).
+        lenient().when(pricingService.quote(any(), any(), any())).thenAnswer(inv -> {
+            com.ebee.product.entity.Product p = inv.getArgument(0);
+            return new com.ebee.pricing.service.PricingService.Quote(p.getPrice(), 1, null, false);
+        });
         // Single default location, like a fresh V127 database.
         com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
                 com.ebee.location.entity.Location.Type.WAREHOUSE);

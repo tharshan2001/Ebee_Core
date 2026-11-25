@@ -21,10 +21,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     boolean existsByComboId(UUID comboId);
 
-    @Query("SELECT i.product.id AS productId, i.product.name AS productName, i.product.itemCode AS itemCode, i.product.category AS category, SUM(i.quantity) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.id, i.product.name, i.product.itemCode, i.product.category ORDER BY COALESCE(SUM(i.subtotal), 0) DESC")
+    @Query("SELECT i.product.id AS productId, i.product.name AS productName, i.product.itemCode AS itemCode, i.product.category AS category, SUM(i.quantity * i.unitsPerSalesUnit) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.id, i.product.name, i.product.itemCode, i.product.category ORDER BY COALESCE(SUM(i.subtotal), 0) DESC")
     List<ProductSalesProjection> findSalesByProduct(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    @Query("SELECT i.product.category AS category, SUM(i.quantity) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.category")
+    @Query("SELECT i.product.category AS category, SUM(i.quantity * i.unitsPerSalesUnit) AS totalQuantity, COALESCE(SUM(i.subtotal), 0) AS totalRevenue FROM OrderItem i JOIN i.order o WHERE o.status NOT IN ('CANCELLED', 'RETURNED') AND o.createdAt >= :start AND o.createdAt < :end GROUP BY i.product.category")
     List<CategorySalesProjection> findSalesByCategory(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     /** Cost of the units actually kept by customers (returned units excluded), matching revenue's exclusions. */

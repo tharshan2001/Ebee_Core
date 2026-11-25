@@ -136,16 +136,25 @@ public class Product {
     private LocalDateTime updatedAt;
 
     public BigDecimal getEffectivePrice() {
+        return getEffectivePrice(price, 1);
+    }
+
+    /**
+     * Catalog discount applied to {@code listPrice} — the price of one sales unit (a pack of
+     * {@code unitsPerSalesUnit} stock units). FIXED catalog discounts are per stock unit, so they
+     * scale with the pack size.
+     */
+    public BigDecimal getEffectivePrice(BigDecimal listPrice, int unitsPerSalesUnit) {
         if (discountType == null || discountValue == null) {
-            return price;
+            return listPrice;
         }
         return switch (discountType) {
-            case "PERCENTAGE" -> price.multiply(BigDecimal.ONE.subtract(
+            case "PERCENTAGE" -> listPrice.multiply(BigDecimal.ONE.subtract(
                             discountValue.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)))
                     .setScale(2, RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO);
-            case "FIXED" -> price.subtract(discountValue).max(BigDecimal.ZERO);
-            default -> price;
+            case "FIXED" -> listPrice.subtract(discountValue.multiply(BigDecimal.valueOf(unitsPerSalesUnit))).max(BigDecimal.ZERO);
+            default -> listPrice;
         };
     }
 
@@ -168,8 +177,18 @@ public class Product {
      * @throws IllegalArgumentException if custom discount exceeds the cap
      */
     public BigDecimal getPriceWithDiscount(String customType, BigDecimal customValue) {
+        return getPriceWithDiscount(price, 1, customType, customValue);
+    }
+
+    /**
+     * Per-order discount on one sales unit priced {@code listPrice} (a pack of
+     * {@code unitsPerSalesUnit} stock units, or a customer group price). A FIXED discount is for
+     * the whole sales unit, so the product's FIXED maximum (set per stock unit) scales with the pack.
+     */
+    public BigDecimal getPriceWithDiscount(BigDecimal listPrice, int unitsPerSalesUnit, String customType,
+                                           BigDecimal customValue) {
         if (customType == null || customValue == null) {
-            return getEffectivePrice();
+            return getEffectivePrice(listPrice, unitsPerSalesUnit);
         }
         if (maxDiscountType == null || maxDiscountValue == null) {
             throw new IllegalArgumentException(
@@ -197,14 +216,16 @@ public class Product {
         if (customValue.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("discountValue must not be negative");
         }
-        if (customValue.compareTo(maxDiscountValue) > 0) {
+        BigDecimal maxAllowed = "FIXED".equals(customType)
+                ? maxDiscountValue.multiply(BigDecimal.valueOf(unitsPerSalesUnit)) : maxDiscountValue;
+        if (customValue.compareTo(maxAllowed) > 0) {
             throw new IllegalArgumentException(
                     "Discount " + customValue + " " + customType
-                            + " exceeds the maximum allowed (" + maxDiscountValue + " " + maxDiscountType
+                            + " exceeds the maximum allowed (" + maxAllowed + " " + maxDiscountType
                             + ") for product '" + (name != null ? name : itemCode) + "'");
         }
         // Apply per-order discount on top of the product's own (catalog) discount
-        BigDecimal basePrice = getEffectivePrice();
+        BigDecimal basePrice = getEffectivePrice(listPrice, unitsPerSalesUnit);
         return switch (customType) {
             case "PERCENTAGE" -> {
                 // Guard against 100%+ discount: that would make the product free

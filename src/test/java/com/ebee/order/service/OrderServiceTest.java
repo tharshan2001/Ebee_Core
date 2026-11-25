@@ -93,6 +93,7 @@ class OrderServiceTest {
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
     @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
+    @org.mockito.Mock private com.ebee.pricing.service.PricingService pricingService;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -110,6 +111,11 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Normal prices, sold by the stock unit (no price groups or packs configured).
+        lenient().when(pricingService.quote(any(), any(), any())).thenAnswer(inv -> {
+            com.ebee.product.entity.Product p = inv.getArgument(0);
+            return new com.ebee.pricing.service.PricingService.Quote(p.getPrice(), 1, null, false);
+        });
         // Single default location, like a fresh V127 database.
         com.ebee.location.entity.Location mainLocation = new com.ebee.location.entity.Location("MAIN", "Main",
                 com.ebee.location.entity.Location.Type.WAREHOUSE);
@@ -539,6 +545,29 @@ class OrderServiceTest {
         assertThat(orderCaptor.getValue().getTaxTotal()).isZero();
         assertThat(orderCaptor.getValue().getTotalAmount()).isEqualByComparingTo("2000.00");
         verify(taxService, never()).effectiveRates(anyCollection());
+    }
+
+    @Test
+    void createOrder_byThePack_pricesPerPack_andMovesStockInUnits() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD); // quantity 2
+        setupSingleItemCreateMocks(request);
+        UUID boxId = UUID.randomUUID();
+        request.getItems().get(0).setUnitId(boxId);
+        var box = new com.ebee.pricing.entity.ProductUnit(paymentProduct.getId(), new com.ebee.pricing.entity.Unit("Box"), 12,
+                new BigDecimal("11000.00"));
+        org.springframework.test.util.ReflectionTestUtils.setField(box, "id", boxId);
+        org.mockito.Mockito.doReturn(new com.ebee.pricing.service.PricingService.Quote(new BigDecimal("11000.00"), 12, box, false))
+                .when(pricingService).quote(any(), any(), eq(boxId));
+
+        orderService.createOrder(request);
+
+        verify(orderRepository).save(orderCaptor.capture());
+        OrderItem line = orderCaptor.getValue().getItems().get(0);
+        assertThat(line.getQuantity()).isEqualTo(2);                 // 2 boxes
+        assertThat(line.getUnitPrice()).isEqualByComparingTo("11000.00");
+        assertThat(line.getSalesUnitName()).isEqualTo("Box of 12");
+        assertThat(orderCaptor.getValue().getTotalAmount()).isEqualByComparingTo("22000.00");
+        verify(inventoryService).deductStockWithLots(any(), anyList(), eq(List.of(24)), anyList()); // 24 units
     }
 
     @Test

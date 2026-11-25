@@ -13,6 +13,9 @@ public class OrderItemResponse {
     private String productName;
     private String productItemCode;
     private Integer quantity;
+    /** e.g. "Box of 12"; null when sold by the stock unit. quantity is in this unit. */
+    private String salesUnitName;
+    private Integer unitsPerSalesUnit;
     private BigDecimal unitPrice;
     private BigDecimal originalUnitPrice;
     private BigDecimal subtotal;

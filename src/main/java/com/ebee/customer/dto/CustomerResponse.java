@@ -17,6 +17,7 @@ public class CustomerResponse {
     private String email;
     private String bookNo;
     private String vatNumber;
+    private java.util.UUID priceGroupId;
     private Integer totalOrders;
     private BigDecimal creditLimit;
     private BigDecimal outstandingBalance;

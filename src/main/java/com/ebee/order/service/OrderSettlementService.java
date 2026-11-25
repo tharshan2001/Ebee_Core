@@ -213,7 +213,11 @@ public class OrderSettlementService {
                             note + " (combo " + item.getCombo().getName() + ")");
                 }
             } else if (item.getProduct() != null) {
-                returnUnits(rows, soldLots, item.getProduct().getId(), line.quantity(), item.getCostPrice(), note);
+                // Lines sold by the pack: quantity is in packs, stock moves in stock units.
+                int stockUnits = item.toStockUnits(line.quantity());
+                BigDecimal unitCost = item.getCostPrice() == null ? null
+                        : item.getCostPrice().divide(BigDecimal.valueOf(item.getUnitsPerSalesUnit()), 4, java.math.RoundingMode.HALF_UP);
+                returnUnits(rows, soldLots, item.getProduct().getId(), stockUnits, unitCost, note);
             }
         }
         if (!rows.productIds.isEmpty()) {

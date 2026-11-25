@@ -367,6 +367,14 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - Customers: upsert by normalised phone; created **without** the welcome SMS/email (`createCustomer(request, false)`); `credit_limit`; `opening_balance` posted once as an ADJUSTMENT (positive = owes us, negative = credit) with description "Opening balance (import)".
 - Suppliers: matched by name (existing ones aren't changed); `opening_balance` posted once — positive = supplier invoice (we owe), negative = adjustment (prepaid).
 
+### Price Groups & Units (Feature 6)
+- V130: `price_groups`, `product_group_prices` (product × group price, per stock unit), `customers.price_group_id`; `units` (seeded Box, Pack, Dozen, Carton, Bundle), `product_units` (product × unit, `units_per_pack` > 1, optional fixed pack `price`, `is_active`); `order_items.sales_unit_id / sales_unit_name / units_per_sales_unit` (default 1).
+- `PricingService.quote(product, priceGroupId, productUnitId)` is the one price lookup for order lines: per-unit price = the active group's price for the product, else `product.price`; a pack = its own price if set, else per-unit × `units_per_pack`. A pack of another product or an inactive pack is rejected.
+- Order lines are counted **in the unit they were sold in**: `quantity` = packs, `unit_price` = per pack (`OrderItemRequest.unitId` picks the pack). Stock moves `quantity × units_per_sales_unit` (`OrderItem.toStockUnits`); returns put back stock units at line cost ÷ pack size (lot returns unchanged). FIXED catalog discounts and FIXED per-order discount limits scale with the pack size; PERCENTAGE ones don't need to.
+- Sales-quantity report queries (`OrderItemRepository`, `ProductRepository` best-sellers) sum `quantity × units_per_sales_unit`. The invoice PDF shows "(Box of 12)" on pack lines.
+- API under `/api/pricing`: `/groups` (list/create/update), `PUT|DELETE /groups/{groupId}/products/{productId}?price=`, `GET /products/{productId}/group-prices`, `PUT /customers/{customerId}/group?groupId=` (omit to clear), `/units` (list/create), `GET /products/{productId}/units`, `PUT /products/{productId}/units/{unitId}`, `GET /quote?productId&customerId&productUnitId`.
+- Tests: `PricingServiceTest`, pack cases in `ProductDiscountTest`, `OrderServiceTest`, `OrderSettlementLedgerScenarioTest`.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

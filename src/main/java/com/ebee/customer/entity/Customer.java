@@ -51,6 +51,10 @@ public class Customer {
     @Column(name = "vat_number", length = 50)
     private String vatNumber;
 
+    /** Price group (e.g. Wholesale); null = normal prices. */
+    @Column(name = "price_group_id")
+    private UUID priceGroupId;
+
     @Column(name = "total_orders", nullable = false)
     @Builder.Default
     private Integer totalOrders = 0;

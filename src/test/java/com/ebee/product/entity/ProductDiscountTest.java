@@ -135,4 +135,26 @@ class ProductDiscountTest {
 
         assertThat(product.getEffectivePrice()).isEqualByComparingTo("100.00");
     }
+
+    // ── packs (units of measure) ───────────────────────────────────────
+
+    @Test
+    void fixedCatalogDiscount_scalesWithPackSize() {
+        com.ebee.product.entity.Product p = com.ebee.product.entity.Product.builder().name("Oil")
+                .price(new java.math.BigDecimal("100.00")).discountType("FIXED").discountValue(new java.math.BigDecimal("5.00")).build();
+        // Box of 12 listed at 1,200: the 5/unit catalog discount is 60 off the box.
+        org.assertj.core.api.Assertions.assertThat(p.getEffectivePrice(new java.math.BigDecimal("1200.00"), 12))
+                .isEqualByComparingTo("1140.00");
+    }
+
+    @Test
+    void fixedPerOrderDiscountLimit_scalesWithPackSize() {
+        com.ebee.product.entity.Product p = com.ebee.product.entity.Product.builder().name("Oil")
+                .price(new java.math.BigDecimal("100.00")).maxDiscountType("FIXED").maxDiscountValue(new java.math.BigDecimal("10.00")).build();
+        // Up to 10/unit → up to 120 off a box of 12.
+        org.assertj.core.api.Assertions.assertThat(p.getPriceWithDiscount(new java.math.BigDecimal("1200.00"), 12, "FIXED",
+                new java.math.BigDecimal("120.00"))).isEqualByComparingTo("1080.00");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> p.getPriceWithDiscount(new java.math.BigDecimal("1200.00"), 12,
+                "FIXED", new java.math.BigDecimal("121.00"))).hasMessageContaining("exceeds the maximum allowed (120");
+    }
 }

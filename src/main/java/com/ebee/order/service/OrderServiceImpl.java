@@ -95,6 +95,7 @@ public class OrderServiceImpl implements OrderService {
     private final LedgerService ledgerService;
     private final com.ebee.tax.service.TaxService taxService;
     private final com.ebee.tax.service.VatService vatService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -456,6 +457,10 @@ public class OrderServiceImpl implements OrderService {
                     ctx.customer.getId(), initialPayment.getId(), savedOrder.getPaidAmount(),
                     "Upfront payment for Order " + savedOrder.getOrderNumber() + " via " + savedOrder.getPaymentMethod(),
                     ctx.currentUser.getId());
+            moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.IN, savedOrder.getPaidAmount(),
+                    savedOrder.getPaymentMethod() != null ? savedOrder.getPaymentMethod().name() : null,
+                    request.getAccountId(), com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_RECEIPT,
+                    "PAYMENT", initialPayment.getId(), "Upfront payment for Order " + savedOrder.getOrderNumber());
         }
 
         if (ctx.customer != null) {

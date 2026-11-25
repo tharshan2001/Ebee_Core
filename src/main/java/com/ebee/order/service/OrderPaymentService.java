@@ -50,6 +50,7 @@ public class OrderPaymentService {
     private final SecurityService securityService;
     private final ApplicationEventPublisher eventPublisher;
     private final LedgerService ledgerService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
     private com.ebee.customer.service.CustomerService customerService;
 
     @Autowired
@@ -189,6 +190,9 @@ public class OrderPaymentService {
                 .recordedByName(currentUserName)
                 .build();
         paymentRepository.save(payment);
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.IN, request.amount(), request.paymentMethod().name(),
+                request.accountId(), com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_RECEIPT, "PAYMENT", payment.getId(),
+                "Payment for Order " + order.getOrderNumber() + " via " + request.paymentMethod());
 
         ledgerService.recordCustomerPayment(
                 order.getCustomer().getId(),

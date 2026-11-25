@@ -24,4 +24,8 @@ public interface CustomerAdvanceTransactionRepository extends JpaRepository<Cust
 
     @Query("SELECT t FROM CustomerAdvanceTransaction t WHERE t.customer.id = :customerId ORDER BY t.createdAt DESC LIMIT 1")
     CustomerAdvanceTransaction findLatestByCustomerId(@Param("customerId") UUID customerId);
+
+    /** Total customer advance (wallet) balances before the cutoff — money we hold for customers. */
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM CustomerAdvanceTransaction t WHERE t.createdAt < :before")
+    BigDecimal sumAllBefore(@Param("before") java.time.LocalDateTime before);
 }

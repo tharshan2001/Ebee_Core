@@ -32,4 +32,9 @@ public interface SupplierLedgerRepository extends JpaRepository<SupplierLedger, 
 
     @Query("SELECT l FROM SupplierLedger l WHERE l.supplierId = :supplierId ORDER BY l.createdAt DESC LIMIT 1")
     Optional<SupplierLedger> findLatestBySupplierId(@Param("supplierId") UUID supplierId);
+
+    /** Rows: [supplierId, credit − debit] before the cutoff (positive = we owe the supplier). */
+    @Query("SELECT l.supplierId, COALESCE(SUM(l.credit) - SUM(l.debit), 0) FROM SupplierLedger l "
+            + "WHERE l.createdAt < :before GROUP BY l.supplierId")
+    java.util.List<Object[]> balancesBefore(@Param("before") java.time.LocalDateTime before);
 }

@@ -44,15 +44,17 @@ public class OrderSettlementService {
     private final CustomerService customerService;
     private final SecurityService securityService;
     private final VatService vatService;
+    private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
 
     public OrderSettlementService(InventoryService inventoryService, LedgerService ledgerService,
                                   CustomerService customerService, SecurityService securityService,
-                                  VatService vatService) {
+                                  VatService vatService, com.ebee.finance.service.MoneyAccountService moneyAccountService) {
         this.inventoryService = inventoryService;
         this.ledgerService = ledgerService;
         this.customerService = customerService;
         this.securityService = securityService;
         this.vatService = vatService;
+        this.moneyAccountService = moneyAccountService;
     }
 
     /** A quantity of one order line being taken back. */
@@ -160,6 +162,10 @@ public class OrderSettlementService {
             } else {
                 ledgerService.recordCustomerRefund(customer.getId(), order.getId(), overpaid,
                         "Refund: " + label, actor);
+                // Cash/bank goes out of the account the order was paid through (REFUND default otherwise).
+                moneyAccountService.recordPayout(overpaid,
+                        order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null, null,
+                        com.ebee.finance.entity.AccountTransaction.Type.CUSTOMER_REFUND, "ORDER", order.getId(), "Refund: " + label);
                 refunded = overpaid;
             }
             paid = paid.subtract(overpaid);

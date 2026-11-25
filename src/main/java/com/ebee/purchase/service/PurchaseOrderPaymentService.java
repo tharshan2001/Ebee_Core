@@ -66,23 +66,28 @@ public class PurchaseOrderPaymentService {
         }
 
         order.setPaymentMethod(paymentMethod);
+        // Money paid when the order is placed is a supplier payment like any other: on the ledger
+        // now (the ledger goes negative = prepaid) and netted when the stock is invoiced on receipt.
+        if (order.getPaidAmount() != null && order.getPaidAmount().signum() > 0) {
+            subtractSupplierOutstandingWithLedger(order.getSupplier(), order.getPaidAmount(), order.getId(),
+                    "Paid at order: PO " + order.getPoNumber() + " via " + paymentMethod,
+                    "PO Payment: " + order.getPoNumber());
+        }
         moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, order.getPaidAmount(), paymentMethod.name(), null,
                 com.ebee.finance.entity.AccountTransaction.Type.SUPPLIER_PAYMENT, "PURCHASE_ORDER", order.getId(), "Paid at order: PO " + order.getPoNumber());
     }
 
+    /** A PO placed without a payment method becomes an unpaid credit order when stock first arrives. */
     public void initPaymentOnReceipt(PurchaseOrder order) {
-        if (order.getPaymentStatus() != PurchasePaymentStatus.UNPAID) {
+        if (order.getPaymentMethod() != null) {
             return;
         }
-
+        BigDecimal paid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
         order.setPaymentMethod(PurchasePaymentMethod.CREDIT);
-        order.setPaymentStatus(PurchasePaymentStatus.UNPAID);
-        order.setOutstandingBalance(order.getTotalAmount());
-
-        addSupplierOutstandingWithLedger(
-                order.getSupplier(), order.getOutstandingBalance(),
-                order.getId(), order.getPoNumber(),
-                "PO Received: " + order.getPoNumber());
+        order.setPaidAmount(paid);
+        order.setOutstandingBalance(order.getTotalAmount().subtract(paid).max(BigDecimal.ZERO));
+        order.setPaymentStatus(order.getOutstandingBalance().signum() == 0 ? PurchasePaymentStatus.PAID
+                : paid.signum() > 0 ? PurchasePaymentStatus.PARTIALLY_PAID : PurchasePaymentStatus.UNPAID);
     }
 
     public PurchaseOrder recordPayment(UUID orderId, RecordPaymentRequest request) {
@@ -125,29 +130,11 @@ public class PurchaseOrderPaymentService {
         return purchaseOrderRepository.save(order);
     }
 
-    public void releaseSupplierOutstanding(PurchaseOrder order) {
-        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) > 0) {
-            subtractSupplierOutstandingWithLedger(order.getSupplier(), order.getOutstandingBalance(),
-                    null, "Outstanding released on order cancellation", null);
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
-    }
 
-    public Supplier addSupplierOutstanding(Supplier supplier, BigDecimal amount) {
-        supplier.setOutstandingBalance(supplier.getOutstandingBalance().add(amount));
-        return supplierRepository.save(supplier);
-    }
 
-    public Supplier subtractSupplierOutstanding(Supplier supplier, BigDecimal amount) {
-        BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
-        supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
-        return supplierRepository.save(supplier);
-    }
 
     public Supplier addSupplierOutstandingWithLedger(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
                                                      String poNumber, String description) {
-        supplier.setOutstandingBalance(supplier.getOutstandingBalance().add(amount));
-        Supplier saved = supplierRepository.save(supplier);
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             ledgerService.recordSupplierInvoice(
                     supplier.getId(),
@@ -159,14 +146,11 @@ public class PurchaseOrderPaymentService {
                     securityService.getCurrentUserId()
             );
         }
-        return saved;
+        return syncSupplierBalance(supplier);
     }
 
     public Supplier subtractSupplierOutstandingWithLedger(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
                                                          String description, String reference) {
-        BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
-        supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
-        Supplier saved = supplierRepository.save(supplier);
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             ledgerService.recordSupplierPayment(
                     supplier.getId(),
@@ -178,14 +162,11 @@ public class PurchaseOrderPaymentService {
                     securityService.getCurrentUserId()
             );
         }
-        return saved;
+        return syncSupplierBalance(supplier);
     }
 
     public Supplier subtractSupplierOutstandingForReturn(Supplier supplier, BigDecimal amount, UUID purchaseOrderId,
                                                         String poNumber, String description) {
-        BigDecimal newBalance = supplier.getOutstandingBalance().subtract(amount);
-        supplier.setOutstandingBalance(newBalance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBalance);
-        Supplier saved = supplierRepository.save(supplier);
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             ledgerService.recordSupplierExpense(
                     supplier.getId(),
@@ -197,6 +178,16 @@ public class PurchaseOrderPaymentService {
                     securityService.getCurrentUserId()
             );
         }
-        return saved;
+        return syncSupplierBalance(supplier);
+    }
+
+    /**
+     * The supplier's cached outstanding balance is what the ledger says we owe (never negative:
+     * a prepaid supplier shows 0 here and a negative ledger balance). It used to be added to and
+     * clamped separately, so it drifted from the ledger whenever a supplier was prepaid.
+     */
+    private Supplier syncSupplierBalance(Supplier supplier) {
+        supplier.setOutstandingBalance(ledgerService.getSupplierBalance(supplier.getId()).max(BigDecimal.ZERO));
+        return supplierRepository.save(supplier);
     }
 }

@@ -40,14 +40,14 @@ public class AccountingPeriodAudit {
     private Integer year;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "previous_status")
     private PeriodStatus previousStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PeriodStatus newStatus;
 
-    @Column(name = "changed_by", nullable = false)
+    @Column(name = "changed_by")  // null for system actions (auto-opened periods)
     private UUID changedBy;
 
     @Column(name = "changed_at", nullable = false)

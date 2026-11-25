@@ -29,6 +29,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountingPeriodService {
 
+    static final String SNAPSHOT_TYPE = "PERIOD_SNAPSHOT";
+
+
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final AccountingPeriodAuditRepository accountingPeriodAuditRepository;
     private final AccountingPeriodTransactionRepository accountingPeriodTransactionRepository;
@@ -94,6 +97,8 @@ public class AccountingPeriodService {
                 .month(month)
                 .year(year)
                 .status(PeriodStatus.OPEN)
+                .startDate(LocalDate.of(year, month, 1))
+                .endDate(LocalDate.of(year, month, 1).plusMonths(1).minusDays(1))
                 .openedAt(LocalDateTime.now())
                 .build();
 
@@ -129,8 +134,12 @@ public class AccountingPeriodService {
 
     private void captureBalanceSnapshot(AccountingPeriod period, UUID closedBy) {
         // Record period summary as a snapshot transaction
+        // Earlier snapshots (from a previous close before a reopen) aren't postings: leave them out,
+        // or every re-close would add the old totals again.
         List<AccountingPeriodTransaction> transactions =
-                accountingPeriodTransactionRepository.findByPeriodIdOrderByRecordedAtDesc(period.getId());
+                accountingPeriodTransactionRepository.findByPeriodIdOrderByRecordedAtDesc(period.getId()).stream()
+                        .filter(t -> !SNAPSHOT_TYPE.equals(t.getTransactionType()))
+                        .toList();
 
         BigDecimal totalDebits = transactions.stream()
                 .map(AccountingPeriodTransaction::getDebit)
@@ -144,7 +153,7 @@ public class AccountingPeriodService {
                 .fiscalYear(period.getYear())
                 .month(period.getMonth())
                 .year(period.getYear())
-                .transactionType("PERIOD_SNAPSHOT")
+                .transactionType(SNAPSHOT_TYPE)
                 .debit(totalDebits)
                 .credit(totalCredits)
                 .description("Period-end snapshot: " + transactions.size() + " transactions, "
@@ -205,6 +214,7 @@ public class AccountingPeriodService {
                 .periodId(periodId)
                 .fiscalYear(period.getYear())
                 .month(period.getMonth())
+                .year(period.getYear())
                 .previousStatus(oldStatus)
                 .newStatus(newStatus)
                 .changedBy(changedBy)
@@ -218,6 +228,23 @@ public class AccountingPeriodService {
     @Transactional(readOnly = true)
     public List<AccountingPeriodAudit> getPeriodHistory(UUID periodId) {
         return accountingPeriodAuditRepository.findByPeriodIdOrderByChangedAtDesc(periodId);
+    }
+
+    /**
+     * The current month's period, created on first use; throws {@link PeriodClosedException} when it
+     * is CLOSED/ARCHIVED. Ledgers call this before writing their own row, so a closed period
+     * rejects the posting before anything is written.
+     */
+    @Transactional
+    public AccountingPeriod requireOpenCurrentPeriod(String transactionType) {
+        LocalDate today = LocalDate.now();
+        AccountingPeriod period = ensurePeriod(today);
+        if (period.getStatus() != PeriodStatus.OPEN) {
+            throw new PeriodClosedException("Accounting period " + today.getYear() + "-"
+                    + String.format("%02d", today.getMonthValue()) + " is " + period.getStatus()
+                    + "; reopen it before recording " + transactionType);
+        }
+        return period;
     }
 
     @Transactional
@@ -236,11 +263,7 @@ public class AccountingPeriodService {
 
         // The period is created on first use, so nothing is lost before the monthly job runs.
         // A closed period rejects the whole operation (it used to drop the entry silently).
-        AccountingPeriod period = ensurePeriod(today);
-        if (period.getStatus() != PeriodStatus.OPEN) {
-            throw new PeriodClosedException("Accounting period " + year + "-" + String.format("%02d", month)
-                    + " is " + period.getStatus() + "; reopen it before recording " + transactionType);
-        }
+        AccountingPeriod period = requireOpenCurrentPeriod(transactionType);
 
         AccountingPeriodTransaction transaction = AccountingPeriodTransaction.builder()
                 .periodId(period.getId())

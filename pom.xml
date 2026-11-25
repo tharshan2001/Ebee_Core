@@ -359,7 +359,40 @@
 								<rule>
 									<element>BUNDLE</element>
 									<limits>
-										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.10</minimum></limit>
+										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.25</minimum></limit>
+									</limits>
+								</rule>
+								<!-- Where money moves: floors a few points under today's coverage (Phase 3), so it can only go up. -->
+								<rule>
+									<element>PACKAGE</element>
+									<includes>
+										<include>com.ebee.accounting.service</include>
+										<include>com.ebee.tax.service</include>
+									</includes>
+									<limits>
+										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
+									</limits>
+								</rule>
+								<rule>
+									<element>PACKAGE</element>
+									<includes>
+										<include>com.ebee.order.service</include>
+										<include>com.ebee.inventory.service</include>
+										<include>com.ebee.finance.service</include>
+									</includes>
+									<limits>
+										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.60</minimum></limit>
+									</limits>
+								</rule>
+								<rule>
+									<element>PACKAGE</element>
+									<includes>
+										<include>com.ebee.payout.service</include>
+										<include>com.ebee.commission.service</include>
+										<include>com.ebee.purchase.service</include>
+									</includes>
+									<limits>
+										<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.50</minimum></limit>
 									</limits>
 								</rule>
 							</rules>

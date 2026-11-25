@@ -169,10 +169,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setTotalAmount(totalAmount);
         order.setTaxTotal(taxTotal);
 
-        if (request.paymentMethod() != null) {
-            purchaseOrderPaymentService.initPayment(order, request.paymentMethod(), request.paidAmount());
-        }
-
         PurchaseOrder saved;
         try {
             saved = purchaseOrderRepository.save(order);
@@ -181,6 +177,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 throw new DuplicatePoNumberException("Duplicate PO number: " + poNumber, ex);
             }
             throw ex;
+        }
+
+        // After saving, so the upfront payment's ledger entry and money movement carry the PO id.
+        if (request.paymentMethod() != null) {
+            purchaseOrderPaymentService.initPayment(saved, request.paymentMethod(), request.paidAmount());
         }
 
         return purchaseOrderMapper.toFullResponse(saved);
@@ -296,6 +297,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             throw new IllegalArgumentException("Cannot receive order in status: " + status);
         }
 
+        boolean firstReceipt = order.getReceivedAt() == null;
         Map<UUID, PurchaseOrderItem> itemMap = order.getItems().stream()
                 .collect(Collectors.toMap(PurchaseOrderItem::getId, Function.identity()));
 
@@ -353,17 +355,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             order.setReceivedAt(LocalDateTime.now());
         }
 
-        if (order.getOutstandingBalance().compareTo(BigDecimal.ZERO) == 0) {
-            order.setOutstandingBalance(receivedTotal);
-            purchaseOrderPaymentService.addSupplierOutstandingWithLedger(
-                    order.getSupplier(), receivedTotal, order.getId(),
-                    order.getPoNumber(), "PO " + order.getPoNumber() + " - Stock received");
-        } else {
-            order.setOutstandingBalance(order.getOutstandingBalance().add(receivedTotal));
-            purchaseOrderPaymentService.addSupplierOutstandingWithLedger(
-                    order.getSupplier(), receivedTotal, order.getId(),
-                    order.getPoNumber(), "PO " + order.getPoNumber() + " - Additional stock received");
-        }
+        // The PO's outstanding balance is already "total − paid" from when it was placed, so receiving
+        // doesn't change it (it used to add the received value again: a 1,000 PO showed 2,000 owed).
+        // Orders placed without a payment method start their balance at the first receipt.
+        purchaseOrderPaymentService.initPaymentOnReceipt(order);
+        // The supplier ledger gets the received value as an invoice; payments (upfront or later) are
+        // already on it as payments, so the ledger balance is what we really owe.
+        purchaseOrderPaymentService.addSupplierOutstandingWithLedger(
+                order.getSupplier(), receivedTotal, order.getId(), order.getPoNumber(),
+                "PO " + order.getPoNumber() + (firstReceipt ? " - Stock received" : " - Additional stock received"));
 
         order.setStatus(allFullyReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED);
 
@@ -398,8 +398,13 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
         order.setTotalAmount(receivedTotal);
         order.setTaxTotal(receivedTax);
-        if (order.getOutstandingBalance().signum() == 0 && order.getPaidAmount().signum() > 0) {
+        // We only owe for what arrived (the balance still reflected the original total).
+        order.setOutstandingBalance(receivedTotal.subtract(order.getPaidAmount()));
+        if (order.getOutstandingBalance().signum() == 0) {
             order.setPaymentStatus(PurchasePaymentStatus.PAID);
+            if (order.getPaidAt() == null) {
+                order.setPaidAt(LocalDateTime.now());
+            }
         }
         order.setStatus(PurchaseOrderStatus.RECEIVED);
         String note = "Closed short" + (reason != null && !reason.isBlank() ? ": " + reason.trim() : "");

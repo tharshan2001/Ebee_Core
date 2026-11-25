@@ -270,4 +270,28 @@ class OrderPaymentServiceTest {
         );
     }
 
+
+    // ── Guards added with the ledger-rules fix ──────────────────────────
+
+    @Test
+    void initPayment_moreThanTotal_isRejected() {
+        Order order = unpaidOrder(new BigDecimal("1000.00"), PaymentMethod.CASH);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        orderPaymentService.initPayment(order, PaymentMethod.CASH, new BigDecimal("1500.00"), null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("more than the order total");
+    }
+
+    @Test
+    void useAdvanceForOrder_moreThanOutstanding_isRejected() {
+        Order order = unpaidOrder(new BigDecimal("2000.00"), PaymentMethod.CREDIT);
+        customer.setAdvanceBalance(new BigDecimal("10000.00"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        orderPaymentService.useAdvanceForOrder(order, new BigDecimal("10000.00")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceeds the order's outstanding balance");
+        org.assertj.core.api.Assertions.assertThat(customer.getAdvanceBalance()).isEqualByComparingTo("10000.00");
+    }
 }

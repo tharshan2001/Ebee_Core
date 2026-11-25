@@ -248,67 +248,16 @@ class OrderServiceTest {
         }).when(orderPaymentService).initPayment(any(), any(), any(), any(), any());
 
         lenient().doAnswer(invocation -> {
-            Order order = invocation.getArgument(0);
-            BigDecimal refundAmount = order.getPaidAmount();
-            boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
-
-            if (order.getPaymentMethod() == PaymentMethod.CREDIT) {
-                Customer customer = order.getCustomer();
-                if (customer != null) {
-                    BigDecimal newBalance = customer.getOutstandingBalance()
-                            .subtract(order.getOutstandingBalance());
-                    if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                        newBalance = BigDecimal.ZERO;
-                    }
-                    customer.setOutstandingBalance(newBalance);
-                }
-            }
-
-            if (hasRefund) {
-                order.setPaymentStatus(PaymentStatus.REFUNDED);
-                order.setPaidAmount(BigDecimal.ZERO);
-                order.setOutstandingBalance(BigDecimal.ZERO);
-            } else {
-                order.setOutstandingBalance(BigDecimal.ZERO);
-            }
-            return null;
-        }).when(orderPaymentService).handlePaymentRefund(any());
-
-        lenient().doAnswer(invocation -> {
-            Order order = invocation.getArgument(0);
-            RefundChoice choice = invocation.getArgument(1);
-            DuesChangeType changeType = invocation.getArgument(2);
-            BigDecimal paidAmount = order.getPaidAmount();
-            BigDecimal remainingOutstanding = order.getOutstandingBalance();
-
-            if (choice == RefundChoice.CREDIT_ADVANCE && paidAmount.compareTo(BigDecimal.ZERO) > 0) {
-                order.getCustomer().setAdvanceBalance(
-                        order.getCustomer().getAdvanceBalance().add(paidAmount));
-            } else if (choice == RefundChoice.REFUND) {
-                order.setPaymentStatus(PaymentStatus.REFUNDED);
-                order.setPaidAmount(BigDecimal.ZERO);
-            }
-
-            if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal newBalance = order.getCustomer().getOutstandingBalance()
-                        .subtract(remainingOutstanding);
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                    newBalance = BigDecimal.ZERO;
-                }
-                order.getCustomer().setOutstandingBalance(newBalance);
-            }
-
-            order.setOutstandingBalance(BigDecimal.ZERO);
-            return null;
-        }).when(orderPaymentService).handleOrderSettlement(any(), any(), any());
-
-        lenient().doAnswer(invocation -> {
             Customer customer = invocation.getArgument(0);
             if (customer != null) {
                 customer.setOutstandingBalance(BigDecimal.ZERO);
             }
             return null;
         }).when(orderPaymentService).syncCustomerOutstanding(any());
+
+        // Real settlement logic on top of the mocks, so cancel/return tests exercise the actual rules.
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "orderSettlementService",
+                new OrderSettlementService(inventoryService, ledgerService, customerService, securityService));
     }
 
     @Test
@@ -495,6 +444,31 @@ class OrderServiceTest {
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(new BigDecimal("2000.00"));
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void createOrder_withUpfrontPayment_postsPaymentToLedger() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.CREDIT);
+        request.setPaidAmount(new BigDecimal("2000.00"));
+        setupSingleItemCreateMocks(request);
+
+        orderService.createOrder(request);
+
+        // Invoice and upfront payment both reach the receivable ledger, so the customer owes 0.
+        verify(ledgerService).recordCustomerInvoice(any(), any(),
+                argThat(a -> a.compareTo(new BigDecimal("2000.00")) == 0), anyString(), any());
+        verify(ledgerService).recordCustomerPayment(any(), any(),
+                argThat(a -> a.compareTo(new BigDecimal("2000.00")) == 0), contains("Upfront"), any());
+    }
+
+    @Test
+    void createOrder_codOrder_postsNoPayment() {
+        OrderRequest request = createSingleItemRequest(PaymentMethod.COD);
+        setupSingleItemCreateMocks(request);
+
+        orderService.createOrder(request);
+
+        verify(ledgerService, never()).recordCustomerPayment(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -757,11 +731,15 @@ class OrderServiceTest {
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
 
-        orderService.cancelOrder(orderId, any());
+        orderService.cancelOrder(orderId, new OrderSettlementRequest(RefundChoice.REFUND, null));
 
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // Unpaid cancellation must reverse the invoice, or the customer keeps owing for it.
+        verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(orderId),
+                argThat(a -> a.compareTo(order.getTotalAmount()) == 0), anyString(), any());
+        verify(ledgerService, never()).recordCustomerRefund(any(), any(), any(), any(), any());
         assertThat(saved.getPaidAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
@@ -850,7 +828,13 @@ class OrderServiceTest {
 
         orderService.cancelOrder(order.getId(), new OrderSettlementRequest(RefundChoice.CREDIT_ADVANCE, null));
 
-        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        // Nothing was paid: only the invoice is reversed, no money moves to the advance wallet.
+        verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(order.getId()),
+                argThat(a -> a.compareTo(new BigDecimal("6500.00")) == 0), anyString(), any());
+        verify(ledgerService, never()).recordCustomerAdvanceTransfer(any(), any(), any(), any(), any());
+        verify(customerService, never()).creditToAdvance(any(), any(), any(), any(), any());
+        verify(customerService).syncAllBalances(customer);
+        assertThat(order.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
@@ -867,7 +851,11 @@ class OrderServiceTest {
 
         orderService.cancelOrder(order.getId(), new OrderSettlementRequest(RefundChoice.REFUND, null));
 
-        assertThat(customer.getOutstandingBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(order.getId()),
+                argThat(a -> a.compareTo(order.getTotalAmount()) == 0), anyString(), any());
+        verify(ledgerService).recordCustomerRefund(eq(customer.getId()), eq(order.getId()),
+                argThat(a -> a.compareTo(new BigDecimal("2500.00")) == 0), anyString(), any());
+        verify(customerService).syncAllBalances(customer);
         verify(orderRepository).save(orderCaptor.capture());
         Order saved = orderCaptor.getValue();
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
@@ -1289,11 +1277,13 @@ class OrderServiceTest {
         ReturnOrderItemRequest request = new ReturnOrderItemRequest(null, RefundChoice.REFUND, null);
         orderService.returnOrder(orderId, request);
 
+        verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(orderId),
+                argThat(a -> a.compareTo(new BigDecimal("6500.00")) == 0), anyString(), any(UUID.class));
         verify(ledgerService).recordCustomerRefund(
                 eq(customer.getId()),
                 eq(orderId),
-                any(BigDecimal.class),
-                contains("Return"),
+                argThat(a -> a.compareTo(new BigDecimal("6500.00")) == 0),
+                contains("return"),
                 any(UUID.class)
         );
     }

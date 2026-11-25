@@ -59,6 +59,8 @@ class DeliveryServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private DeliveryStateTransition deliveryStateTransition;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private com.ebee.accounting.service.LedgerService ledgerService;
+    @Mock private com.ebee.customer.service.CustomerService customerService;
 
     @InjectMocks private DeliveryService deliveryService;
 
@@ -72,6 +74,8 @@ class DeliveryServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(deliveryService, "orderSettlementService",
+                new com.ebee.order.service.OrderSettlementService(inventoryService, ledgerService, customerService, securityService));
         orderId = UUID.randomUUID();
         driverUserId = UUID.randomUUID();
 
@@ -199,9 +203,48 @@ class DeliveryServiceTest {
 
         deliveryService.updateDeliveryStatus(orderId, request);
 
-        verify(inventoryService).recordOrderStock(
-                eq(product.getId()), eq(1), eq(StockMovementType.RETURN), anyString());
+        verify(inventoryService).recordOrderStocks(
+                eq(java.util.List.of(product.getId())), eq(java.util.List.of(1)), eq(StockMovementType.RETURN), anyList());
         verify(commissionLifecycleService).cancelCommissionForOrder(orderId);
+        // The cancelled order's invoice is reversed.
+        verify(ledgerService).recordCustomerCreditNote(eq(customer.getId()), eq(orderId), any(), anyString(), any());
+    }
+
+    @Test
+    void updateDeliveryStatus_permanentlyFailed_paidOrder_requiresRefundChoice() {
+        order.setDeliveryStatus(DeliveryStatus.FAILED);
+        order.setPaidAmount(new java.math.BigDecimal("1000.00"));
+        DeliveryStatusUpdateRequest request = new DeliveryStatusUpdateRequest();
+        request.setStatus(DeliveryStatus.FAILED_PERMANENT);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(securityService.isAdmin()).thenReturn(true);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> deliveryService.updateDeliveryStatus(orderId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("refundChoice");
+        verify(deliveryStateTransition, never()).transition(any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void updateDeliveryStatus_permanentlyFailed_paidOrder_refundsPaidAmount() {
+        order.setDeliveryStatus(DeliveryStatus.FAILED);
+        order.setPaidAmount(new java.math.BigDecimal("1000.00"));
+        DeliveryStatusUpdateRequest request = new DeliveryStatusUpdateRequest();
+        request.setStatus(DeliveryStatus.FAILED_PERMANENT);
+        request.setRefundChoice(com.ebee.order.enums.RefundChoice.REFUND);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(securityService.isAdmin()).thenReturn(true);
+        when(deliveryStateTransition.transition(eq(order), eq(DeliveryStatus.FAILED_PERMANENT), any(), eq(true)))
+                .thenReturn(new DeliveryStateTransition.TransitionResult(false, true, DeliveryStatus.FAILED));
+        when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        deliveryService.updateDeliveryStatus(orderId, request);
+
+        verify(ledgerService).recordCustomerRefund(eq(customer.getId()), eq(orderId),
+                argThat(a -> a.compareTo(new java.math.BigDecimal("1000.00")) == 0), anyString(), any());
+        org.assertj.core.api.Assertions.assertThat(order.getPaidAmount()).isZero();
     }
 
     @Test

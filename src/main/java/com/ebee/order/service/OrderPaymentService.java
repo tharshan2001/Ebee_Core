@@ -20,7 +20,6 @@ import com.ebee.order.entity.Order;
 import com.ebee.order.entity.Payment;
 import com.ebee.order.enums.PaymentMethod;
 import com.ebee.order.enums.PaymentStatus;
-import com.ebee.order.enums.RefundChoice;
 import com.ebee.order.mapper.OrderMapper;
 import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
@@ -60,6 +59,11 @@ public class OrderPaymentService {
     }
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
+        if (paymentMethod != PaymentMethod.COD && paidAmount != null
+                && paidAmount.compareTo(order.getTotalAmount()) > 0) {
+            throw new IllegalArgumentException("Paid amount " + paidAmount
+                    + " is more than the order total of " + order.getTotalAmount());
+        }
         if (paymentMethod == PaymentMethod.CHEQUE
                 && (chequeNumber == null || chequeNumber.isBlank())) {
             throw new IllegalArgumentException("Cheque number is required for CHEQUE payment method");
@@ -220,70 +224,6 @@ public class OrderPaymentService {
                 .toList();
     }
 
-    public void handlePaymentRefund(Order order) {
-        BigDecimal refundAmount = order.getPaidAmount();
-        BigDecimal remainingOutstanding = order.getOutstandingBalance();
-        boolean hasRefund = refundAmount.compareTo(BigDecimal.ZERO) > 0;
-
-        if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
-            updateCustomerOutstandingBalance(order.getCustomer(), remainingOutstanding, false);
-        }
-
-        if (hasRefund) {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order.setPaidAmount(BigDecimal.ZERO);
-            order.setOutstandingBalance(BigDecimal.ZERO);
-
-            ledgerService.recordCustomerRefund(
-                    order.getCustomer().getId(),
-                    order.getId(),
-                    refundAmount,
-                    "Refund for Order " + order.getOrderNumber(),
-                    securityService.getCurrentUserId()
-            );
-        } else {
-            order.setOutstandingBalance(BigDecimal.ZERO);
-        }
-        syncCustomerOutstanding(order.getCustomer());
-        customerRepository.save(order.getCustomer());
-    }
-
-    public void handleOrderSettlement(Order order, RefundChoice choice, DuesChangeType changeType) {
-        BigDecimal paidAmount = order.getPaidAmount();
-
-        if (choice == RefundChoice.CREDIT_ADVANCE && paidAmount.compareTo(BigDecimal.ZERO) > 0) {
-            String description = "Credited from " + (changeType == DuesChangeType.CANCEL_ADVANCE
-                    ? "order cancellation"
-                    : "order return")
-                    + " - Order #" + order.getOrderNumber();
-            creditToAdvance(order.getCustomer(), paidAmount,
-                    changeType == DuesChangeType.CANCEL_ADVANCE
-                            ? AdvanceReferenceType.ORDER_CANCELLED
-                            : AdvanceReferenceType.ORDER_RETURNED,
-                    order.getId(), description);
-        } else if (choice == RefundChoice.REFUND) {
-            if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.recordCustomerRefund(
-                        order.getCustomer().getId(),
-                        order.getId(),
-                        paidAmount,
-                        "Refund on " + (changeType == DuesChangeType.CANCEL_REFUND
-                                ? "order cancellation" : "order return")
-                                + " - Order #" + order.getOrderNumber(),
-                        securityService.getCurrentUserId()
-                );
-            }
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            order.setPaidAmount(BigDecimal.ZERO);
-        }
-
-        BigDecimal remainingOutstanding = order.getOutstandingBalance();
-        if (remainingOutstanding.compareTo(BigDecimal.ZERO) > 0) {
-            updateCustomerOutstandingBalance(order.getCustomer(), remainingOutstanding, false);
-        }
-
-        order.setOutstandingBalance(BigDecimal.ZERO);
-    }
     @Transactional
     public void useAdvanceForOrder(Order order, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -293,6 +233,10 @@ public class OrderPaymentService {
         Customer customer = order.getCustomer();
         if (customer.getAdvanceBalance().compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient advance balance");
+        }
+        if (amount.compareTo(order.getOutstandingBalance()) > 0) {
+            throw new IllegalArgumentException("Advance amount " + amount
+                    + " exceeds the order's outstanding balance of " + order.getOutstandingBalance());
         }
 
         BigDecimal previousOutstanding = customer.getOutstandingBalance();
@@ -351,33 +295,6 @@ public class OrderPaymentService {
         publishDuesChange(customer, previousOutstanding, previousAdvance, DuesChangeType.ADVANCE_USED);
     }
 
-    private void creditToAdvance(Customer customer, BigDecimal amount,
-                                 AdvanceReferenceType refType, UUID referenceId, String description) {
-        BigDecimal previousAdvance = customer.getAdvanceBalance();
-        BigDecimal newBalance = previousAdvance.add(amount);
-
-        CustomerAdvanceTransaction transaction = CustomerAdvanceTransaction.builder()
-                .customer(customer)
-                .amount(amount)
-                .balanceAfter(newBalance)
-                .transactionType(AdvanceTransactionType.ADVANCE_CREDIT)
-                .referenceType(refType)
-                .referenceId(referenceId)
-                .description(description)
-                .build();
-
-        customer.setAdvanceBalance(newBalance);
-        advanceTransactionRepository.save(transaction);
-
-        ledgerService.recordCustomerAdvance(
-                customer.getId(),
-                referenceId,
-                amount,
-                description,
-                securityService.getCurrentUserId()
-        );
-    }
-
     private void publishDuesChange(Customer customer, BigDecimal previousOutstanding,
                                    BigDecimal previousAdvance, DuesChangeType changeType) {
         eventPublisher.publishEvent(new CustomerDuesChangedEvent(
@@ -386,18 +303,6 @@ public class OrderPaymentService {
                 previousAdvance, customer.getAdvanceBalance(),
                 changeType
         ));
-    }
-
-    private void updateCustomerOutstandingBalance(Customer customer, BigDecimal outstandingBalance, boolean isAdd) {
-        if (customer == null) return;
-        if (isAdd) {
-            customer.setOutstandingBalance(customer.getOutstandingBalance().add(outstandingBalance));
-        } else {
-            customer.setOutstandingBalance(customer.getOutstandingBalance().subtract(outstandingBalance));
-            if (customer.getOutstandingBalance().compareTo(BigDecimal.ZERO) < 0) {
-                customer.setOutstandingBalance(BigDecimal.ZERO);
-            }
-        }
     }
 
     void syncCustomerOutstanding(Customer customer) {

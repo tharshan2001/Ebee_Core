@@ -26,10 +26,26 @@ public class AllAgentsRecipientResolver implements RecipientResolver {
 
     @Override
     public List<MessageRecipient> resolve(Message message, RecipientResolutionContext context) {
-        // TODO: For large agent bases, use paginated or streaming queries instead of loading all into memory
         return agentRepository.findAllWithUser().stream()
                 .map(agent -> buildRecipient(message, agent))
                 .toList();
+    }
+
+    @Override
+    public void resolveInBatches(Message message, RecipientResolutionContext context, int batchSize,
+                                 java.util.function.Consumer<List<MessageRecipient>> batch) {
+        // A page at a time, in id order so pages don't shift while we read them.
+        for (int pageNo = 0; ; pageNo++) {
+            var page = org.springframework.data.domain.PageRequest.of(pageNo, batchSize,
+                    org.springframework.data.domain.Sort.by("id"));
+            var rows = agentRepository.findAllWithUser(page).getContent();
+            if (!rows.isEmpty()) {
+                batch.accept(rows.stream().map(agent -> buildRecipient(message, agent)).toList());
+            }
+            if (rows.size() < batchSize) {
+                return;
+            }
+        }
     }
 
     private MessageRecipient buildRecipient(Message message, Agent agent) {

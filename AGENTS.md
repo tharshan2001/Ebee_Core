@@ -397,6 +397,10 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - **No circular dependencies.** The last two `@Lazy` setters are gone (`AccountingPeriodService` never used its `LedgerService`; `OrderPaymentService` reads the customer's balance from `LedgerService` instead of calling back into `CustomerService`). Spring Boot's default ban on circular references now catches new cycles at startup — don't add `@Lazy` or `allow-circular-references` to get around one; publish an event or move the shared piece down.
 - **One `/api/reports` controller:** the old `reporting` package (`/summary`, `/trial-balance`, `/aging`) is merged into `report` (`report/controller/ReportsController`). Same URLs.
 - **Dependabot** (`.github/dependabot.yml`): weekly Maven, GitHub Actions and Docker updates; Spring / test libraries grouped; Spring Boot major versions ignored (planned upgrades).
+### Bulk messaging in batches
+- `MessageService.sendMessage` and `MessageDispatcher.dispatch` handle recipients `MessageService.BATCH_SIZE` (500) at a time and flush + clear the persistence context after each batch, so a message to every customer never holds them all in memory. Pages are read in id order.
+- `RecipientResolver.resolveInBatches` is the entry point; `AllCustomersRecipientResolver` / `AllAgentsRecipientResolver` page the database. Selected / manual lists use the default (split a bounded list). A new whole-population resolver must override `resolveInBatches` — don't load the population with `findAll()`.
+- Tests: `BulkMessagingBatchesTest` (paging, dispatcher), `BulkMessagingIntegrationTest` (real DB, > 1 batch).
 
 ## Agent Workflow
 

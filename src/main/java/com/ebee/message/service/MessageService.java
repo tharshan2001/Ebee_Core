@@ -35,6 +35,9 @@ public class MessageService {
     private final MessageRecipientRepository recipientRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final List<RecipientResolver> resolvers;
+    private final jakarta.persistence.EntityManager entityManager;
+
+    static final int BATCH_SIZE = 500;
 
     private Map<MessageTargetType, RecipientResolver> resolverMap;
 
@@ -59,21 +62,29 @@ public class MessageService {
             throw new IllegalArgumentException("Unsupported target type: " + request.getTargetType());
         }
 
-        List<MessageRecipient> recipients = resolver.resolve(message, RecipientResolutionContext.from(request));
+        Message saved = messageRepository.save(message);
+        // Recipients are read and written BATCH_SIZE at a time and flushed out of the persistence
+        // context after each batch, so sending to every customer doesn't hold them all in memory.
+        int[] total = {0};
+        resolver.resolveInBatches(saved, RecipientResolutionContext.from(request), BATCH_SIZE, batch -> {
+            recipientRepository.saveAll(batch);
+            entityManager.flush();
+            entityManager.clear();
+            total[0] += batch.size();
+        });
 
-        message.setTotalRecipients(recipients.size());
-        message = messageRepository.save(message);
+        saved = messageRepository.findById(saved.getId()).orElseThrow();
+        saved.setTotalRecipients(total[0]);
+        saved = messageRepository.save(saved);
 
-        recipientRepository.saveAll(recipients);
-
-        eventPublisher.publishEvent(message);
+        eventPublisher.publishEvent(saved);
 
         return MessageResponse.builder()
-                .id(message.getId())
-                .subject(message.getSubject())
-                .targetType(message.getTargetType())
-                .totalRecipients(recipients.size())
-                .sentAt(message.getSentAt())
+                .id(saved.getId())
+                .subject(saved.getSubject())
+                .targetType(saved.getTargetType())
+                .totalRecipients(total[0])
+                .sentAt(saved.getSentAt())
                 .build();
     }
 

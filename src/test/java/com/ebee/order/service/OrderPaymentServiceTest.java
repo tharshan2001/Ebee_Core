@@ -44,17 +44,12 @@ class OrderPaymentServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private SecurityService securityService;
     @Mock private com.ebee.accounting.service.LedgerService ledgerService;
-    @Mock private CustomerService customerService;
 
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @InjectMocks private OrderPaymentService orderPaymentService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
 
-    @BeforeEach
-    void setUp() {
-        org.springframework.test.util.ReflectionTestUtils.setField(orderPaymentService, "customerService", customerService);
-    }
 
     private Customer customer;
 
@@ -84,10 +79,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
-        doAnswer(invocation -> {
-            customer.setOutstandingBalance(BigDecimal.ZERO);
-            return null;
-        }).when(customerService).syncCustomerOutstanding(customer);
+        when(ledgerService.getCustomerBalance(customer.getId())).thenReturn(BigDecimal.ZERO);
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
@@ -114,10 +106,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
-        doAnswer(invocation -> {
-            customer.setOutstandingBalance(new BigDecimal("1200.00"));
-            return null;
-        }).when(customerService).syncCustomerOutstanding(customer);
+        when(ledgerService.getCustomerBalance(customer.getId())).thenReturn(new BigDecimal("1200.00"));
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
@@ -139,10 +128,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
-        doAnswer(invocation -> {
-            customer.setOutstandingBalance(new BigDecimal("1200.00"));
-            return null;
-        }).when(customerService).syncCustomerOutstanding(customer);
+        when(ledgerService.getCustomerBalance(customer.getId())).thenReturn(new BigDecimal("1200.00"));
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
@@ -174,10 +160,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
-        doAnswer(invocation -> {
-            customer.setOutstandingBalance(BigDecimal.ZERO);
-            return null;
-        }).when(customerService).syncCustomerOutstanding(customer);
+        when(ledgerService.getCustomerBalance(customer.getId())).thenReturn(BigDecimal.ZERO);
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
 
@@ -246,10 +229,7 @@ class OrderPaymentServiceTest {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
-        doAnswer(invocation -> {
-            customer.setOutstandingBalance(BigDecimal.ZERO);
-            return null;
-        }).when(customerService).syncCustomerOutstanding(customer);
+        when(ledgerService.getCustomerBalance(customer.getId())).thenReturn(BigDecimal.ZERO);
         when(securityService.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(securityService.getCurrentUserEmail()).thenReturn("test@ebee.lk");
         when(paymentRepository.save(any())).thenAnswer(invocation -> {

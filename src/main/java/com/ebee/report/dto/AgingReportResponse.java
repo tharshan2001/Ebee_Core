@@ -1,4 +1,4 @@
-package com.ebee.reporting.dto;
+package com.ebee.report.dto;
 
 import lombok.Builder;
 import lombok.Data;

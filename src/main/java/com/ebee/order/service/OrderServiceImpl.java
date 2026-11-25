@@ -84,13 +84,11 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryService inventoryService;
     private final OrderNumberService orderNumberService;
     private final CommissionCalculationService commissionCalculationService;
-    private final CommissionLifecycleService commissionLifecycleService;
     private final CustomerRepository customerRepository;
     private final CustomerService customerService;
     private final OrderNotificationService orderNotificationService;
     private final AuditLogService auditLogService;
     private final OrderPaymentService orderPaymentService;
-    private final OrderSettlementService orderSettlementService;
     private final OrderPdfService orderPdfService;
     private final LedgerService ledgerService;
     private final com.ebee.tax.service.TaxService taxService;
@@ -102,6 +100,8 @@ public class OrderServiceImpl implements OrderService {
     private final ComboRepository comboRepository;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderQueryService orderQueryService;
+    private final OrderLifecycleService orderLifecycleService;
 
     @Retryable(retryFor = DuplicateOrderNumberException.class, maxAttempts = 5, backoff = @Backoff(delay = 50, multiplier = 2))
     @Transactional
@@ -540,317 +540,92 @@ public class OrderServiceImpl implements OrderService {
         eventPublisher.publishEvent(new OrderStatusChangedEvent(this, savedOrder, null, LocalDateTime.now()));
     }
 
-    @Transactional(readOnly = true)
     @Override
     public OrderResponse getOrderById(UUID id) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-        return orderMapper.toResponse(order);
+        return orderQueryService.getOrderById(id);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public OrderResponse getOrderByOrderNumber(String orderNumber) {
-        Order order = orderRepository.findByOrderNumberWithDetails(orderNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "orderNumber", orderNumber));
-        return orderMapper.toResponse(order);
+        return orderQueryService.getOrderByOrderNumber(orderNumber);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getOrdersByAgentId(UUID agentId) {
-        agentRepository.findById(agentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agent", "id", agentId));
-        List<Order> orders = orderRepository.findByAgentIdWithDetails(agentId);
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getOrdersByAgentId(agentId);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getMyOrders() {
-        UUID userId = securityService.getCurrentUserId();
-        Agent agent = agentRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Agent", "userId", userId));
-        List<Order> orders = orderRepository.findByAgentIdWithDetails(agent.getId());
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getMyOrders();
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getOrdersByCustomerId(UUID customerId) {
-        customerService.getCustomerById(customerId);
-        List<Order> orders = orderRepository.findByCustomerIdWithDetails(customerId);
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getOrdersByCustomerId(customerId);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getOrdersByCustomerId(UUID customerId, List<PaymentStatus> paymentStatuses) {
-        List<OrderResponse> allOrders = getOrdersByCustomerId(customerId);
-        if (paymentStatuses == null || paymentStatuses.isEmpty()) return allOrders;
-        Set<PaymentStatus> statuses = EnumSet.copyOf(paymentStatuses);
-        return allOrders.stream()
-                .filter(o -> statuses.contains(o.getPaymentStatus()))
-                .toList();
+        return orderQueryService.getOrdersByCustomerId(customerId, paymentStatuses);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getAllOrders() {
-        List<Order> orders = orderRepository.findAllWithDetails();
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getAllOrders();
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getUnassignedOrders() {
-        List<Order> orders = orderRepository.findByTripIsNull();
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getUnassignedOrders();
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getUnassignedOrdersByStatus(OrderStatus status) {
-        List<Order> orders = orderRepository.findByTripIsNullAndStatus(status);
-        return orderMapper.toResponseList(orders);
+        return orderQueryService.getUnassignedOrdersByStatus(status);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public List<OrderResponse> getUnassignedOrdersIncludingFailed() {
-        List<Order> shipped = orderRepository.findByTripIsNullAndStatus(OrderStatus.SHIPPED);
-        return orderMapper.toResponseList(shipped);
+        return orderQueryService.getUnassignedOrdersIncludingFailed();
     }
 
-    @Transactional(readOnly = true)
     @Override
     public PageResponse<OrderResponse> getUnassignedOrdersPaginated(Pageable pageable) {
-        Page<Order> ordersPage = orderRepository.findUnassignedOrdersPaged(pageable);
-        return PageResponse.from(ordersPage.map(orderMapper::toResponse));
+        return orderQueryService.getUnassignedOrdersPaginated(pageable);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public Page<OrderResponse> getAllOrdersPaginated(Pageable pageable) {
-        Page<Order> orders = orderRepository.findAllWithDetails(pageable);
-        return orders.map(orderMapper::toResponse);
+        return orderQueryService.getAllOrdersPaginated(pageable);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public Page<OrderResponse> getOrdersByStatusPaginated(OrderStatus status, Pageable pageable) {
-        Page<Order> orders = orderRepository.findByStatusWithDetails(status, pageable);
-        return orders.map(orderMapper::toResponse);
+        return orderQueryService.getOrdersByStatusPaginated(status, pageable);
     }
 
-    @Transactional(readOnly = true)
     @Override
     public Page<OrderResponse> getCustomerOrdersPaginated(UUID customerId, Pageable pageable) {
-        customerService.getCustomerById(customerId);
-        Page<Order> orders = orderRepository.findByCustomerIdWithDetailsFull(customerId, pageable);
-        return orders.map(orderMapper::toResponse);
+        return orderQueryService.getCustomerOrdersPaginated(customerId, pageable);
     }
 
-    @Transactional
+
     @Override
     public OrderResponse updateOrderStatus(UUID id, OrderStatus status) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        if (order.getStatus() == OrderStatus.CANCELLED
-                || order.getStatus() == OrderStatus.DELIVERED
-                || order.getStatus() == OrderStatus.RETURNED) {
-            throw new IllegalArgumentException("Cannot update status of a " + order.getStatus().name().toLowerCase() + " order");
-        }
-
-        if (status == OrderStatus.DELIVERED
-                || status == OrderStatus.RETURNED
-                || status == OrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("Use delivery or cancel endpoints after shipping");
-        }
-        validateForwardTransition(order, status);
-
-        OrderStatus oldStatus = order.getStatus();
-        order.setStatus(status);
-        if (status == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
-            order.setDeliveryStatus(DeliveryStatus.PENDING);
-            order.setDeliveryFailureReason(null);
-            order.setDeliveryPhotoUrl(null);
-            order.setDeliverySignatureUrl(null);
-            order.setDeliveryScheduledDate(null);
-            order.setDeliveryNotes(null);
-            order.setTrip(null);
-            order.setDeliveryAssignedTo(null);
-        }
-        Order updatedOrder = orderRepository.save(order);
-
-        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " status changed from "
-                + oldStatus + " to " + status);
-
-        orderNotificationService.sendOrderStatus(updatedOrder);
-
-        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
-
-        return orderMapper.toResponse(updatedOrder);
+        return orderLifecycleService.updateOrderStatus(id, status);
     }
 
-    /** Fulfilment order a manual status update may move along (forward only; steps may be skipped). */
-    private static final List<OrderStatus> FULFILMENT_STEPS =
-            List.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED);
-
-    /**
-     * Manual updates only move forward: PENDING → CONFIRMED → PROCESSING → SHIPPED. Going back
-     * (e.g. SHIPPED → PENDING while the order is on a trip) would desync delivery and stock.
-     * Exception kept from before: SHIPPED again on a shipped order whose delivery record was
-     * cleared, which re-initialises its delivery so it can be put on a trip.
-     */
-    private static void validateForwardTransition(Order order, OrderStatus target) {
-        OrderStatus current = order.getStatus();
-        if (current == OrderStatus.SHIPPED && target == OrderStatus.SHIPPED && order.getDeliveryStatus() == null) {
-            return;
-        }
-        int from = FULFILMENT_STEPS.indexOf(current);
-        int to = FULFILMENT_STEPS.indexOf(target);
-        if (to < 0) {
-            throw new IllegalArgumentException("Status " + target + " can't be set manually");
-        }
-        if (from < 0 || to <= from) {
-            throw new IllegalArgumentException("Order " + order.getOrderNumber() + " can't go from " + current
-                    + " to " + target + "; order status only moves forward (PENDING → CONFIRMED → PROCESSING → SHIPPED)");
-        }
-    }
-
-    @Transactional
     @Override
     public OrderResponse cancelOrder(UUID id, OrderSettlementRequest request) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("Order is already cancelled");
-        }
-
-        if (order.getStatus() == OrderStatus.SHIPPED
-                || order.getStatus() == OrderStatus.DELIVERED
-                || order.getStatus() == OrderStatus.RETURNED) {
-            throw new IllegalArgumentException("Cannot cancel a " + order.getStatus().name().toLowerCase() + " order");
-        }
-
-        boolean stockAlreadyRestored = order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT;
-
-        commissionLifecycleService.cancelCommissionForOrder(id);
-
-        BigDecimal previousOutstanding = order.getCustomer().getOutstandingBalance();
-        BigDecimal previousAdvance = order.getCustomer().getAdvanceBalance();
-
-        OrderSettlementService.Settlement settlement = orderSettlementService.cancel(
-                order, request.refundChoice(), !stockAlreadyRestored, "Order cancelled");
-
-        DuesChangeType changeType = !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
-                : settlement.toAdvance().signum() > 0 ? DuesChangeType.CANCEL_ADVANCE
-                : DuesChangeType.CANCEL_REFUND;
-
-        OrderStatus oldStatus = order.getStatus();
-        order.setStatus(OrderStatus.CANCELLED);
-        Order updatedOrder = orderRepository.save(order);
-        customerRepository.save(order.getCustomer());
-
-        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
-                this, order.getCustomer(),
-                previousOutstanding, order.getCustomer().getOutstandingBalance(),
-                previousAdvance, order.getCustomer().getAdvanceBalance(),
-                changeType
-        ));
-
-        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " cancelled");
-
-        orderNotificationService.sendOrderCancelled(updatedOrder);
-
-        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
-
-        return orderMapper.toResponse(updatedOrder);
+        return orderLifecycleService.cancelOrder(id, request);
     }
 
-    @Transactional
     @Override
     public OrderResponse returnOrder(UUID id, ReturnOrderItemRequest request) {
-        Order order = orderRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-
-        if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cannot return an order that is already " + order.getStatus());
-        }
-        // Same rule as return/exchange requests: only goods the customer actually received come back.
-        // Orders that haven't been delivered yet are cancelled instead.
-        if (order.getStatus() != OrderStatus.DELIVERED) {
-            throw new IllegalArgumentException("Only delivered orders can be returned (order " + order.getOrderNumber()
-                    + " is " + order.getStatus() + "); cancel it instead");
-        }
-
-        Map<UUID, OrderItem> orderItemMap = order.getItems().stream()
-                .collect(Collectors.toMap(OrderItem::getId, oi -> oi));
-
-        List<OrderSettlementService.ReturnLine> lines = new ArrayList<>();
-        if (request.items() == null || request.items().isEmpty()) {
-            order.getItems().stream()
-                    .filter(oi -> oi.getReturnableQuantity() > 0)
-                    .forEach(oi -> lines.add(new OrderSettlementService.ReturnLine(oi, oi.getReturnableQuantity())));
-        } else {
-            for (ReturnItemRequest itemReq : request.items()) {
-                OrderItem orderItem = orderItemMap.get(itemReq.orderItemId());
-                if (orderItem == null) {
-                    throw new IllegalArgumentException("Order item " + itemReq.orderItemId() + " does not belong to this order");
-                }
-                if (orderItem.getCombo() != null && itemReq.quantity() != orderItem.getQuantity()) {
-                    throw new IllegalArgumentException("Combo items must be returned in full quantity");
-                }
-                lines.add(new OrderSettlementService.ReturnLine(orderItem, itemReq.quantity()));
-            }
-        }
-        if (lines.isEmpty()) {
-            throw new IllegalArgumentException("Nothing left to return on order " + order.getOrderNumber());
-        }
-
-        Customer customer = order.getCustomer();
-        BigDecimal previousOutstanding = customer.getOutstandingBalance();
-        BigDecimal previousAdvance = customer.getAdvanceBalance();
-
-        OrderSettlementService.Settlement settlement = orderSettlementService.returnLines(
-                order, lines, request.refundChoice(), "Order return");
-        // Re-base commission on the reduced total (cancels it when everything came back).
-        commissionLifecycleService.adjustCommissionForOrder(order);
-
-        DuesChangeType changeType = !settlement.moneyReturned() ? DuesChangeType.CANCEL_UNPAID
-                : settlement.toAdvance().signum() > 0 ? DuesChangeType.RETURN_ADVANCE
-                : DuesChangeType.RETURN_REFUND;
-
-        boolean allReturned = order.getItems().stream().allMatch(OrderItem::isFullyReturned);
-        OrderStatus oldStatus = order.getStatus();
-        if (allReturned) {
-            order.setStatus(OrderStatus.RETURNED);
-        }
-
-        Order updatedOrder = orderRepository.save(order);
-        customerRepository.save(customer);
-
-        eventPublisher.publishEvent(new CustomerDuesChangedEvent(
-                this, customer,
-                previousOutstanding, customer.getOutstandingBalance(),
-                previousAdvance, customer.getAdvanceBalance(),
-                changeType
-        ));
-
-        auditLogService.record(AuditAction.STATUS_CHANGE, "Order", updatedOrder.getId(),
-                "Order " + updatedOrder.getOrderNumber() + " returned");
-
-        orderNotificationService.sendOrderStatus(updatedOrder);
-
-        eventPublisher.publishEvent(new OrderStatusChangedEvent(this, updatedOrder, oldStatus, LocalDateTime.now()));
-
-        return orderMapper.toResponse(updatedOrder);
+        return orderLifecycleService.returnOrder(id, request);
     }
+
 
     @Transactional(readOnly = true)
     @Override

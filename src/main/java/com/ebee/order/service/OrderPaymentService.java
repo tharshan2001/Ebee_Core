@@ -25,9 +25,7 @@ import com.ebee.order.repository.OrderRepository;
 import com.ebee.order.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,13 +49,7 @@ public class OrderPaymentService {
     private final ApplicationEventPublisher eventPublisher;
     private final LedgerService ledgerService;
     private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
-    private com.ebee.customer.service.CustomerService customerService;
 
-    @Autowired
-    @Lazy
-    public void setCustomerService(com.ebee.customer.service.CustomerService customerService) {
-        this.customerService = customerService;
-    }
 
     public void initPayment(Order order, PaymentMethod paymentMethod, BigDecimal paidAmount, String chequeNumber, String proofFileUrl) {
         if (paymentMethod != PaymentMethod.COD && paidAmount != null
@@ -307,9 +299,10 @@ public class OrderPaymentService {
         ));
     }
 
+    /** The customer's stored outstanding balance is what their ledger says. */
     void syncCustomerOutstanding(Customer customer) {
         if (customer == null) return;
-        customerService.syncCustomerOutstanding(customer);
+        customer.setOutstandingBalance(ledgerService.getCustomerBalance(customer.getId()));
     }
 
     public List<PaymentResponse> getPaymentsByOrderId(UUID orderId) {

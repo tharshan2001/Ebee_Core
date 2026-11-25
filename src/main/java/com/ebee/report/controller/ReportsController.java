@@ -1,4 +1,4 @@
-package com.ebee.report;
+package com.ebee.report.controller;
 
 import com.ebee.common.response.ApiResponse;
 import com.ebee.report.dto.*;
@@ -30,6 +30,7 @@ public class ReportsController {
     private final InventoryReportService inventoryReportService;
     private final FinancialReportService financialReportService;
     private final ActivityReportService activityReportService;
+    private final ReportsService reportsService;
 
     @GetMapping("/sales/summary")
     public ResponseEntity<ApiResponse<SalesSummaryReport>> getSalesSummary(
@@ -274,5 +275,25 @@ public class ReportsController {
         PeriodRange range = PeriodUtils.resolve(period, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Audit activity summary retrieved",
                 activityReportService.getAuditSummary(range)));
+    }
+
+    // ── Accounting overview (was UnifiedReportsController in the old reporting package) ──
+
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<ReportSummaryResponse>> getSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        ReportSummaryResponse response = reportsService.getSummary(startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success("Report summary retrieved successfully", response));
+    }
+
+    @GetMapping("/trial-balance")
+    public ResponseEntity<ApiResponse<TrialBalanceResponse>> getTrialBalance() {
+        return ResponseEntity.ok(ApiResponse.success("Trial balance retrieved successfully", reportsService.getTrialBalance()));
+    }
+
+    @GetMapping("/aging")
+    public ResponseEntity<ApiResponse<AgingReportResponse>> getAgingReport() {
+        return ResponseEntity.ok(ApiResponse.success("Aging report retrieved successfully", reportsService.getAgingReport()));
     }
 }

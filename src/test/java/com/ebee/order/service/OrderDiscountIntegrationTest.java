@@ -80,6 +80,7 @@ class OrderDiscountIntegrationTest {
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
+    @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -103,9 +104,15 @@ class OrderDiscountIntegrationTest {
         lenient().when(locationService.require(any())).thenReturn(mainLocation);
         lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
-        lenient().when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+        lenient().when(inventoryService.deductStockWithLots(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<java.util.UUID> ids = inv.getArgument(1);
             java.util.List<Integer> qtys = inv.getArgument(2);
-            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+            java.util.List<java.util.List<com.ebee.inventory.dto.LotAllocation>> rows = new java.util.ArrayList<>();
+            for (int r = 0; r < qtys.size(); r++) {
+                rows.add(java.util.List.of(new com.ebee.inventory.dto.LotAllocation(ids.get(r), null, qtys.get(r),
+                        new java.math.BigDecimal("100.00"))));
+            }
+            return rows;
         });
         adminUserId = UUID.randomUUID();
 
@@ -392,7 +399,7 @@ class OrderDiscountIntegrationTest {
         assertThat(notifiedCommission.getCommissionAmount()).isEqualByComparingTo("180.00");
 
         // Stock comes from the resolved location (here the default "Main").
-        verify(inventoryService).deductStock(eq(MAIN_LOCATION_ID), anyList(), anyList(), anyList());
+        verify(inventoryService).deductStockWithLots(eq(MAIN_LOCATION_ID), anyList(), anyList(), anyList());
         verify(customerService).incrementTotalOrders(customer.getId());
         verify(auditLogService).record(any(), any(), any(), anyString());
     }

@@ -64,6 +64,9 @@ public class ProductRequest {
     /** VAT rate (tax_rates.id); omit to leave unchanged on update. */
     private java.util.UUID taxRateId;
 
+    /** Batches must carry an expiry date and are sold earliest-expiry first. */
+    private Boolean tracksExpiry;
+
     private String tags;
 
     private List<ProductSpecification> specifications;

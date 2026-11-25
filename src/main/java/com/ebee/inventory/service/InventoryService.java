@@ -284,6 +284,27 @@ public class InventoryService {
         return addStock(locationId, StockMovementType.RETURN, productIds, quantities, unitCosts, notes);
     }
 
+    /**
+     * FIFO / earliest-expiry deduction that also says which batches each row came from
+     * (for recording the lots an order took).
+     */
+    @Transactional
+    public List<List<com.ebee.inventory.dto.LotAllocation>> deductStockWithLots(UUID locationId, List<UUID> productIds,
+                                                                              List<Integer> quantities, List<String> notes) {
+        List<List<com.ebee.inventory.dto.LotAllocation>> out = new ArrayList<>();
+        applyMovements(locationId, productIds, quantities, StockMovementType.OUT, notes, null, null, null, out);
+        return out;
+    }
+
+    /** Return stock as batches carrying the given lot details and unit costs (null entries = unknown). */
+    @Transactional
+    public List<StockResponse> returnStock(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                           List<BigDecimal> unitCosts, List<com.ebee.inventory.dto.LotInfo> lots,
+                                           List<String> notes) {
+        return applyMovements(locationId, productIds, quantities, StockMovementType.RETURN, notes, unitCosts, lots,
+                null, null);
+    }
+
     /** Inbound move (RETURN or TRANSFER_IN) at a location, each row at the given unit cost. */
     @Transactional
     public List<StockResponse> addStock(UUID locationId, StockMovementType type, List<UUID> productIds,
@@ -298,6 +319,16 @@ public class InventoryService {
     private List<StockResponse> applyMovements(UUID locationId, List<UUID> productIds, List<Integer> quantities,
                                                StockMovementType movementType, List<String> notes,
                                                List<BigDecimal> returnUnitCosts, List<BigDecimal> lineCostsOut) {
+        return applyMovements(locationId, productIds, quantities, movementType, notes, returnUnitCosts, null,
+                lineCostsOut, null);
+    }
+
+    private List<StockResponse> applyMovements(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                               StockMovementType movementType, List<String> notes,
+                                               List<BigDecimal> returnUnitCosts,
+                                               List<com.ebee.inventory.dto.LotInfo> inboundLots,
+                                               List<BigDecimal> lineCostsOut,
+                                               List<List<com.ebee.inventory.dto.LotAllocation>> allocationsOut) {
         if (movementType != StockMovementType.OUT && movementType != StockMovementType.RETURN
                 && movementType != StockMovementType.TRANSFER_OUT && movementType != StockMovementType.TRANSFER_IN) {
             throw new IllegalArgumentException("Unsupported batch movement: " + movementType);
@@ -343,13 +374,17 @@ public class InventoryService {
             int after = before + change;
 
             if (outbound) {
-                BigDecimal cost = consumeFifoLayers(inv, qty);
+                List<com.ebee.inventory.dto.LotAllocation> taken = consumeLayers(inv, qty);
                 if (lineCostsOut != null) {
-                    lineCostsOut.add(cost);
+                    lineCostsOut.add(taken.stream().map(com.ebee.inventory.dto.LotAllocation::cost)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add));
+                }
+                if (allocationsOut != null) {
+                    allocationsOut.add(taken);
                 }
             } else {
                 BigDecimal unitCost = returnUnitCosts != null ? returnUnitCosts.get(i) : null;
-                addLayer(inv, qty, resolveReturnCost(inv, unitCost));
+                addLayer(inv, qty, resolveReturnCost(inv, unitCost), inboundLots != null ? inboundLots.get(i) : null);
             }
             recalculateAverageCost(inv);
 
@@ -487,6 +522,14 @@ public class InventoryService {
     @Transactional
     public List<StockResponse> recordPurchaseStocks(UUID locationId, List<UUID> productIds, List<Integer> quantities,
                                                      List<BigDecimal> unitCosts, List<String> notes) {
+        return recordPurchaseStocks(locationId, productIds, quantities, unitCosts, null, notes);
+    }
+
+    /** Receive purchased stock with lot / expiry details per row (required for products that track expiry). */
+    @Transactional
+    public List<StockResponse> recordPurchaseStocks(UUID locationId, List<UUID> productIds, List<Integer> quantities,
+                                                     List<BigDecimal> unitCosts, List<com.ebee.inventory.dto.LotInfo> lots,
+                                                     List<String> notes) {
         Map<UUID, Inventory> inventoryMap = lockRows(productIds, locationId, true);
 
         for (int i = 0; i < productIds.size(); i++) {
@@ -517,6 +560,7 @@ public class InventoryService {
             int after = before + qty;
 
             InventoryLayer layer = new InventoryLayer(inv, qty, qty, unitCost, LocalDateTime.now());
+            applyLot(layer, inv, lots != null ? lots.get(i) : null);
             inventoryLayerRepository.save(layer);
 
             recalculateAverageCost(inv);
@@ -560,31 +604,129 @@ public class InventoryService {
                         layer.getReceivedAt()));
     }
 
-    /** Consumes the oldest layers first and returns the total cost of what was consumed. */
+    // ── expiry ─────────────────────────────────────────────────────────
+
+    /** Batches with stock that expire within {@code days} days (or already have), optionally at one location. */
+    @Transactional(readOnly = true)
+    public List<com.ebee.inventory.dto.ExpiringStockResponse> expiringStock(int days, UUID locationId) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate until = today.plusDays(Math.max(days, 0));
+        List<InventoryLayer> layers = locationId != null
+                ? inventoryLayerRepository.findExpiringByAtLocation(until, locationId)
+                : inventoryLayerRepository.findExpiringBy(until);
+        return layers.stream().map(l -> {
+            Inventory inv = l.getInventory();
+            return new com.ebee.inventory.dto.ExpiringStockResponse(l.getId(), inv.getProduct().getId(),
+                    inv.getProduct().getName(), inv.getProduct().getItemCode(),
+                    inv.getLocation() != null ? inv.getLocation().getId() : null,
+                    inv.getLocation() != null ? inv.getLocation().getName() : null,
+                    l.getLotNumber(), l.getExpiryDate(),
+                    java.time.temporal.ChronoUnit.DAYS.between(today, l.getExpiryDate()),
+                    l.getRemainingQuantity(), l.getUnitCost(),
+                    l.getUnitCost().multiply(BigDecimal.valueOf(l.getRemainingQuantity())));
+        }).toList();
+    }
+
+    /**
+     * Remove every expired batch's remaining stock (movement type EXPIRED). Units still needed for
+     * reservations are kept and reported, never pushed below the reserved quantity.
+     */
+    @Transactional
+    public com.ebee.inventory.dto.WriteOffResult writeOffExpired(UUID locationId) {
+        java.time.LocalDate yesterday = java.time.LocalDate.now().minusDays(1);
+        List<InventoryLayer> expired = locationId != null
+                ? inventoryLayerRepository.findExpiringByAtLocation(yesterday, locationId)
+                : inventoryLayerRepository.findExpiringBy(yesterday);
+        int batches = 0;
+        int units = 0;
+        int kept = 0;
+        BigDecimal value = BigDecimal.ZERO;
+        for (InventoryLayer layer : expired) {
+            Inventory inv = inventoryRepository.findByProductIdWithLock(layer.getInventory().getProduct().getId(),
+                    layer.getInventory().getLocation().getId()).orElse(layer.getInventory());
+            int removable = Math.min(layer.getRemainingQuantity(), inv.getQuantity() - inv.getReservedQuantity());
+            kept += layer.getRemainingQuantity() - Math.max(removable, 0);
+            if (removable <= 0) {
+                continue;
+            }
+            int before = inv.getQuantity();
+            layer.setRemainingQuantity(layer.getRemainingQuantity() - removable);
+            inventoryLayerRepository.save(layer);
+            inv.setQuantity(before - removable);
+            recalculateAverageCost(inv);
+            inventoryRepository.save(inv);
+            stockMovementRecorder.record(inv, -removable, before, inv.getQuantity(), StockMovementType.EXPIRED,
+                    "Expired" + (layer.getLotNumber() != null ? " lot " + layer.getLotNumber() : "")
+                            + " (expiry " + layer.getExpiryDate() + ")");
+            inventoryAlertService.checkAndNotify(inv);
+            batches++;
+            units += removable;
+            value = value.add(layer.getUnitCost().multiply(BigDecimal.valueOf(removable)));
+        }
+        return new com.ebee.inventory.dto.WriteOffResult(batches, units, value, kept);
+    }
+
+    /** Total cost of the batches consumed (see {@link #consumeLayers}). */
     private BigDecimal consumeFifoLayers(Inventory inventory, int quantity) {
-        List<InventoryLayer> layers = inventoryLayerRepository
-                .findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(inventory.getId(), 0);
+        return consumeLayers(inventory, quantity).stream().map(com.ebee.inventory.dto.LotAllocation::cost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Takes {@code quantity} units from the batches and says which batches they came from.
+     * Products that track expiry: earliest expiry first, expired batches skipped (never sold).
+     * Other products: oldest received first (FIFO).
+     */
+    private List<com.ebee.inventory.dto.LotAllocation> consumeLayers(Inventory inventory, int quantity) {
+        List<InventoryLayer> layers = new ArrayList<>(inventoryLayerRepository
+                .findByInventoryIdAndRemainingQuantityGreaterThanOrderByReceivedAtAsc(inventory.getId(), 0));
+        boolean byExpiry = inventory.getProduct() != null && inventory.getProduct().tracksExpiry();
+        if (byExpiry) {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            layers.removeIf(l -> l.isExpired(today));
+            layers.sort(Comparator.comparing(InventoryLayer::getExpiryDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(InventoryLayer::getReceivedAt));
+        }
 
         int toConsume = quantity;
-        BigDecimal cost = BigDecimal.ZERO;
+        List<com.ebee.inventory.dto.LotAllocation> taken = new ArrayList<>();
         for (InventoryLayer layer : layers) {
             if (toConsume <= 0) break;
             int consumable = Math.min(toConsume, layer.getRemainingQuantity());
             layer.setRemainingQuantity(layer.getRemainingQuantity() - consumable);
-            cost = cost.add(layer.getUnitCost().multiply(BigDecimal.valueOf(consumable)));
+            taken.add(new com.ebee.inventory.dto.LotAllocation(inventory.getProduct().getId(), layer, consumable,
+                    layer.getUnitCost()));
             toConsume -= consumable;
         }
         inventoryLayerRepository.saveAll(layers);
 
         if (toConsume > 0) {
-            throw new IllegalArgumentException(
-                    "Insufficient stock layers for product: " + inventory.getProduct().getName());
+            throw new IllegalArgumentException((byExpiry ? "Not enough unexpired stock for product: "
+                    : "Insufficient stock layers for product: ") + inventory.getProduct().getName());
         }
-        return cost;
+        return taken;
     }
 
     private void addLayer(Inventory inventory, int quantity, BigDecimal unitCost) {
-        inventoryLayerRepository.save(new InventoryLayer(inventory, quantity, quantity, unitCost, LocalDateTime.now()));
+        addLayer(inventory, quantity, unitCost, null);
+    }
+
+    private void addLayer(Inventory inventory, int quantity, BigDecimal unitCost, com.ebee.inventory.dto.LotInfo lot) {
+        InventoryLayer layer = new InventoryLayer(inventory, quantity, quantity, unitCost, LocalDateTime.now());
+        applyLot(layer, inventory, lot);
+        inventoryLayerRepository.save(layer);
+    }
+
+    /** Copies lot details onto a new batch; products that track expiry must have an expiry date. */
+    private static void applyLot(InventoryLayer layer, Inventory inventory, com.ebee.inventory.dto.LotInfo lot) {
+        if (lot != null) {
+            layer.setLotNumber(lot.lotNumber() != null && !lot.lotNumber().isBlank() ? lot.lotNumber().trim() : null);
+            layer.setExpiryDate(lot.expiryDate());
+            layer.setManufacturedDate(lot.manufacturedDate());
+        }
+        if (inventory.getProduct() != null && inventory.getProduct().tracksExpiry() && layer.getExpiryDate() == null) {
+            throw new IllegalArgumentException("An expiry date is required for " + inventory.getProduct().getName());
+        }
     }
 
     /** Cost for stock coming back: the original cost if known, else the current average, else the last receipt. */

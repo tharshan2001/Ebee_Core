@@ -165,4 +165,96 @@ class InventoryFifoCostingTest {
         verify(inventoryRepository).findByProductIdInWithLock(any(), eq(MAIN_LOCATION_ID));
         verify(inventoryRepository, never()).findByProductIdInAndLocationId(any(), any());
     }
+
+    // ── lots & expiry ──────────────────────────────────────────────────
+
+    private InventoryLayer receiveLot(int qty, String unitCost, int minutesAgo, String lot, java.time.LocalDate expiry) {
+        InventoryLayer l = new InventoryLayer(inventory, qty, qty, new BigDecimal(unitCost), LocalDateTime.now().minusMinutes(minutesAgo));
+        l.setLotNumber(lot);
+        l.setExpiryDate(expiry);
+        layers.add(l);
+        inventory.setQuantity(inventory.getQuantity() + qty);
+        return l;
+    }
+
+    @Test
+    void trackedProduct_sellsEarliestExpiryFirst_andNeverSellsExpired() {
+        inventory.getProduct().setTracksExpiry(true);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        InventoryLayer expired = receiveLot(5, "90.00", 30, "OLD", today.minusDays(1));
+        InventoryLayer late = receiveLot(5, "100.00", 20, "LATE", today.plusDays(90));   // received first
+        InventoryLayer soon = receiveLot(5, "110.00", 10, "SOON", today.plusDays(10));   // received later, expires sooner
+
+        var rows = inventoryService.deductStockWithLots(null, List.of(productId), List.of(7), List.of("order"));
+
+        // 5 from SOON (expires first), then 2 from LATE; the expired lot is untouched.
+        assertThat(rows.get(0)).extracting(a -> a.layer().getLotNumber(), com.ebee.inventory.dto.LotAllocation::quantity)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("SOON", 5), org.assertj.core.groups.Tuple.tuple("LATE", 2));
+        assertThat(expired.getRemainingQuantity()).isEqualTo(5);
+        assertThat(soon.getRemainingQuantity()).isZero();
+        assertThat(late.getRemainingQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    void trackedProduct_onlyExpiredLeft_isRejected() {
+        inventory.getProduct().setTracksExpiry(true);
+        receiveLot(5, "90.00", 30, "OLD", java.time.LocalDate.now().minusDays(1));
+
+        assertThatThrownBy(() -> inventoryService.deductStock(List.of(productId), List.of(1), List.of("order")))
+                .hasMessageContaining("Not enough unexpired stock");
+    }
+
+    @Test
+    void untrackedProduct_staysFifo_evenWithExpiryDates() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        receiveLot(5, "100.00", 20, "FIRST", today.plusDays(90));
+        receiveLot(5, "110.00", 10, "SECOND", today.plusDays(10));
+
+        var rows = inventoryService.deductStockWithLots(null, List.of(productId), List.of(3), List.of("order"));
+
+        assertThat(rows.get(0)).singleElement().satisfies(a -> assertThat(a.layer().getLotNumber()).isEqualTo("FIRST"));
+    }
+
+    @Test
+    void trackedProduct_receiptWithoutExpiry_isRejected() {
+        inventory.getProduct().setTracksExpiry(true);
+
+        assertThatThrownBy(() -> inventoryService.recordPurchaseStocks(null, List.of(productId), List.of(10),
+                List.of(new BigDecimal("50.00")), List.of(new com.ebee.inventory.dto.LotInfo("L1", null, null)), List.of("PO")))
+                .hasMessageContaining("expiry date is required");
+    }
+
+    @Test
+    void returnWithLot_comesBackAsABatchWithTheSameLotExpiryAndCost() {
+        java.time.LocalDate expiry = java.time.LocalDate.now().plusDays(60);
+
+        inventoryService.returnStock(null, List.of(productId), List.of(2), List.of(new BigDecimal("123.45")),
+                List.of(new com.ebee.inventory.dto.LotInfo("LOT-7", expiry, null)), List.of("return"));
+
+        InventoryLayer back = layers.get(layers.size() - 1);
+        assertThat(back.getLotNumber()).isEqualTo("LOT-7");
+        assertThat(back.getExpiryDate()).isEqualTo(expiry);
+        assertThat(back.getUnitCost()).isEqualByComparingTo("123.45");
+    }
+
+    @Test
+    void writeOff_removesExpiredStock_butKeepsWhatReservationsNeed() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        InventoryLayer expired = receiveLot(6, "80.00", 30, "OLD", today.minusDays(2));
+        receiveLot(4, "100.00", 10, "GOOD", today.plusDays(30));
+        inventory.setReservedQuantity(6); // 10 on hand, 6 reserved → only 4 can go
+        when(inventoryLayerRepository.findExpiringBy(any())).thenReturn(List.of(expired));
+        when(inventoryRepository.findByProductIdWithLock(any(), any())).thenReturn(java.util.Optional.of(inventory));
+        org.springframework.test.util.ReflectionTestUtils.setField(inventory, "location", new com.ebee.location.entity.Location("MAIN", "Main", com.ebee.location.entity.Location.Type.WAREHOUSE));
+
+        var result = inventoryService.writeOffExpired(null);
+
+        assertThat(result.units()).isEqualTo(4);
+        assertThat(result.value()).isEqualByComparingTo("320.00");
+        assertThat(result.unitsKeptForReservations()).isEqualTo(2);
+        assertThat(inventory.getQuantity()).isEqualTo(6);
+        assertThat(expired.getRemainingQuantity()).isEqualTo(2);
+        verify(stockMovementRecorder).record(any(), org.mockito.ArgumentMatchers.eq(-4), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.eq(com.ebee.stock.enums.StockMovementType.EXPIRED), any());
+    }
 }

@@ -45,16 +45,19 @@ public class OrderSettlementService {
     private final SecurityService securityService;
     private final VatService vatService;
     private final com.ebee.finance.service.MoneyAccountService moneyAccountService;
+    private final com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
 
     public OrderSettlementService(InventoryService inventoryService, LedgerService ledgerService,
                                   CustomerService customerService, SecurityService securityService,
-                                  VatService vatService, com.ebee.finance.service.MoneyAccountService moneyAccountService) {
+                                  VatService vatService, com.ebee.finance.service.MoneyAccountService moneyAccountService,
+                                  com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository) {
         this.inventoryService = inventoryService;
         this.ledgerService = ledgerService;
         this.customerService = customerService;
         this.securityService = securityService;
         this.vatService = vatService;
         this.moneyAccountService = moneyAccountService;
+        this.orderItemLotRepository = orderItemLotRepository;
     }
 
     /** A quantity of one order line being taken back. */
@@ -196,32 +199,69 @@ public class OrderSettlementService {
 
     /** Restore stock for the given lines. Combo lines expand to their component products. */
     public void restoreStock(Order order, List<ReturnLine> lines, String reason) {
-        List<UUID> productIds = new ArrayList<>();
-        List<Integer> quantities = new ArrayList<>();
-        List<BigDecimal> unitCosts = new ArrayList<>();
-        List<String> notes = new ArrayList<>();
+        StockRows rows = new StockRows();
         String note = reason + " - Order " + order.getOrderNumber();
 
         for (ReturnLine line : lines) {
             OrderItem item = line.item();
+            List<com.ebee.order.entity.OrderItemLot> soldLots = item.getId() != null
+                    ? orderItemLotRepository.findByOrderItemIdOrderByCreatedAtAsc(item.getId()) : List.of();
             if (item.getCombo() != null) {
                 for (ComboItem ci : item.getCombo().getItems()) {
-                    productIds.add(ci.getProduct().getId());
-                    quantities.add(ci.getQuantity() * line.quantity());
-                    unitCosts.add(null); // per-component cost isn't stored; goes back at current average
-                    notes.add(note + " (combo " + item.getCombo().getName() + ")");
+                    // Per-component cost is only known when the sold lots were recorded.
+                    returnUnits(rows, soldLots, ci.getProduct().getId(), ci.getQuantity() * line.quantity(), null,
+                            note + " (combo " + item.getCombo().getName() + ")");
                 }
             } else if (item.getProduct() != null) {
-                productIds.add(item.getProduct().getId());
-                quantities.add(line.quantity());
-                unitCosts.add(item.getCostPrice()); // back in at the cost it left at
-                notes.add(note);
+                returnUnits(rows, soldLots, item.getProduct().getId(), line.quantity(), item.getCostPrice(), note);
             }
         }
-        if (!productIds.isEmpty()) {
+        if (!rows.productIds.isEmpty()) {
             // Back to where it was shipped from (pre-V127 orders were backfilled to the default location).
             UUID locationId = order.getLocation() != null ? order.getLocation().getId() : null;
-            inventoryService.returnStock(locationId, productIds, quantities, unitCosts, notes);
+            inventoryService.returnStock(locationId, rows.productIds, rows.quantities, rows.unitCosts, rows.lots, rows.notes);
+        }
+    }
+
+    /** Stock rows to put back, one per (product, lot). */
+    private static final class StockRows {
+        final List<UUID> productIds = new ArrayList<>();
+        final List<Integer> quantities = new ArrayList<>();
+        final List<BigDecimal> unitCosts = new ArrayList<>();
+        final List<com.ebee.inventory.dto.LotInfo> lots = new ArrayList<>();
+        final List<String> notes = new ArrayList<>();
+
+        void add(UUID productId, int qty, BigDecimal unitCost, com.ebee.inventory.dto.LotInfo lot, String note) {
+            productIds.add(productId);
+            quantities.add(qty);
+            unitCosts.add(unitCost);
+            lots.add(lot);
+            notes.add(note);
+        }
+    }
+
+    /**
+     * Put {@code qty} units of a product back. Units go back into the lots they were sold from
+     * (latest taken first) at their exact cost, lot number and expiry; any units without a
+     * recorded lot (orders before V128) go back at {@code fallbackUnitCost}.
+     */
+    private void returnUnits(StockRows rows, List<com.ebee.order.entity.OrderItemLot> soldLots, UUID productId, int qty,
+                             BigDecimal fallbackUnitCost, String note) {
+        int remaining = qty;
+        for (int i = soldLots.size() - 1; i >= 0 && remaining > 0; i--) {
+            com.ebee.order.entity.OrderItemLot lot = soldLots.get(i);
+            if (!lot.getProductId().equals(productId) || lot.getReturnable() <= 0) {
+                continue;
+            }
+            int back = Math.min(remaining, lot.getReturnable());
+            lot.setReturnedQuantity(lot.getReturnedQuantity() + back);
+            rows.add(productId, back, lot.getUnitCost(),
+                    new com.ebee.inventory.dto.LotInfo(lot.getLotNumber(), lot.getExpiryDate(), null),
+                    note + (lot.getLotNumber() != null ? " (lot " + lot.getLotNumber() + ")" : ""));
+            remaining -= back;
+        }
+        if (remaining > 0) {
+            rows.add(productId, remaining, fallbackUnitCost, null, note);
         }
     }
 

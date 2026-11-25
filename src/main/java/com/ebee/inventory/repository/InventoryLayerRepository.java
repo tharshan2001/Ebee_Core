@@ -29,4 +29,17 @@ public interface InventoryLayerRepository extends JpaRepository<InventoryLayer, 
     @org.springframework.data.jpa.repository.Query(
             "SELECT COALESCE(SUM(l.remainingQuantity * l.unitCost), 0) FROM InventoryLayer l WHERE l.remainingQuantity > 0")
     java.math.BigDecimal currentStockValue();
+
+    /** Batches with stock left that expire on or before {@code until}, all locations. */
+    @org.springframework.data.jpa.repository.Query("SELECT l FROM InventoryLayer l JOIN FETCH l.inventory i "
+            + "JOIN FETCH i.product JOIN FETCH i.location WHERE l.remainingQuantity > 0 AND l.expiryDate IS NOT NULL "
+            + "AND l.expiryDate <= :until ORDER BY l.expiryDate, i.product.name")
+    List<InventoryLayer> findExpiringBy(@org.springframework.data.repository.query.Param("until") java.time.LocalDate until);
+
+    /** Same, for one location. */
+    @org.springframework.data.jpa.repository.Query("SELECT l FROM InventoryLayer l JOIN FETCH l.inventory i "
+            + "JOIN FETCH i.product JOIN FETCH i.location WHERE l.remainingQuantity > 0 AND l.expiryDate IS NOT NULL "
+            + "AND l.expiryDate <= :until AND i.location.id = :locationId ORDER BY l.expiryDate, i.product.name")
+    List<InventoryLayer> findExpiringByAtLocation(@org.springframework.data.repository.query.Param("until") java.time.LocalDate until,
+                                                  @org.springframework.data.repository.query.Param("locationId") UUID locationId);
 }

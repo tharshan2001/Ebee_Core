@@ -29,6 +29,7 @@ import java.util.UUID;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final com.ebee.order.service.LotTraceService lotTraceService;
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
@@ -128,5 +129,32 @@ public class InventoryController {
             @RequestParam Integer quantity) {
         InventoryResponse response = inventoryService.confirmOrderStock(productId, quantity);
         return ResponseEntity.ok(ApiResponse.success("Order stock confirmed successfully", response));
+    }
+
+    // ── lots & expiry ──────────────────────────────────────────────────
+
+    /** Batches that have expired or expire within {@code days} days (default 30), optionally at one location. */
+    @GetMapping("/expiring")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<com.ebee.inventory.dto.ExpiringStockResponse>>> expiring(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(required = false) java.util.UUID locationId) {
+        return ResponseEntity.ok(ApiResponse.success("Expiring stock", inventoryService.expiringStock(days, locationId)));
+    }
+
+    /** Write off all expired stock (optionally at one location). */
+    @PostMapping("/expired/write-off")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<com.ebee.inventory.dto.WriteOffResult>> writeOffExpired(
+            @RequestParam(required = false) java.util.UUID locationId) {
+        return ResponseEntity.ok(ApiResponse.success("Expired stock written off", inventoryService.writeOffExpired(locationId)));
+    }
+
+    /** Recall: every order that received this product's lot. */
+    @GetMapping("/lots/{productId}/{lotNumber}/sales")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<com.ebee.order.service.LotTraceService.LotSale>>> lotSales(
+            @PathVariable java.util.UUID productId, @PathVariable String lotNumber) {
+        return ResponseEntity.ok(ApiResponse.success("Sales of lot", lotTraceService.salesOfLot(productId, lotNumber)));
     }
 }

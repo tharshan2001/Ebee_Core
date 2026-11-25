@@ -78,6 +78,21 @@ public class Product {
     @Column(length = 100)
     private String brand;
 
+    /** Batches must carry an expiry date; sold earliest-expiry first; expired batches are never sold. */
+    @Column(name = "tracks_expiry", nullable = false)
+    private Boolean tracksExpiry;
+
+    public boolean tracksExpiry() {
+        return Boolean.TRUE.equals(tracksExpiry);
+    }
+
+    @PrePersist
+    protected void applyExpiryDefault() {
+        if (tracksExpiry == null) {
+            tracksExpiry = Boolean.FALSE;
+        }
+    }
+
     /** VAT rate for this product (tax_rates.id); null = exempt. */
     @Column(name = "tax_rate_id")
     private UUID taxRateId;

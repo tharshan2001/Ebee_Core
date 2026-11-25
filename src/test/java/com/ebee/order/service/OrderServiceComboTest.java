@@ -85,6 +85,7 @@ class OrderServiceComboTest {
     @org.mockito.Mock private com.ebee.tax.service.VatService vatService;
     @org.mockito.Mock private com.ebee.finance.service.MoneyAccountService moneyAccountService;
     @org.mockito.Mock private com.ebee.location.service.LocationService locationService;
+    @org.mockito.Mock private com.ebee.order.repository.OrderItemLotRepository orderItemLotRepository;
     @InjectMocks private OrderServiceImpl orderService;
 
     @Captor private ArgumentCaptor<Order> orderCaptor;
@@ -111,9 +112,15 @@ class OrderServiceComboTest {
         lenient().when(locationService.require(any())).thenReturn(mainLocation);
         lenient().when(taxService.getSettings()).thenReturn(new com.ebee.tax.entity.BusinessSettings());
         // FIFO deduction returns one cost per stock row; default each row to 100.00 per unit.
-        lenient().when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+        lenient().when(inventoryService.deductStockWithLots(any(), anyList(), anyList(), anyList())).thenAnswer(inv -> {
+            java.util.List<java.util.UUID> ids = inv.getArgument(1);
             java.util.List<Integer> qtys = inv.getArgument(2);
-            return qtys.stream().map(q -> new java.math.BigDecimal("100.00").multiply(java.math.BigDecimal.valueOf(q))).toList();
+            java.util.List<java.util.List<com.ebee.inventory.dto.LotAllocation>> rows = new java.util.ArrayList<>();
+            for (int r = 0; r < qtys.size(); r++) {
+                rows.add(java.util.List.of(new com.ebee.inventory.dto.LotAllocation(ids.get(r), null, qtys.get(r),
+                        new java.math.BigDecimal("100.00"))));
+            }
+            return rows;
         });
         adminUserId = UUID.randomUUID();
 
@@ -426,8 +433,10 @@ class OrderServiceComboTest {
         when(orderMapper.toResponse(any())).thenReturn(new OrderResponse());
         when(productRepository.findByItemCodeIn(anyList())).thenReturn(List.of(product1));
         // Stock rows in order: [regular product1 ×3], [combo: product1 ×2], [combo: product2 ×1]
-        when(inventoryService.deductStock(any(), anyList(), anyList(), anyList())).thenReturn(List.of(
-                new BigDecimal("333.00"), new BigDecimal("444.00"), new BigDecimal("555.00")));
+        when(inventoryService.deductStockWithLots(any(), anyList(), anyList(), anyList())).thenReturn(List.of(
+                List.of(new com.ebee.inventory.dto.LotAllocation(product1.getId(), null, 3, new BigDecimal("111.00"))),
+                List.of(new com.ebee.inventory.dto.LotAllocation(product1.getId(), null, 2, new BigDecimal("222.00"))),
+                List.of(new com.ebee.inventory.dto.LotAllocation(product2.getId(), null, 1, new BigDecimal("555.00")))));
 
         OrderRequest request = new OrderRequest();
         request.setCustomerPhoneNumber("0771234567");

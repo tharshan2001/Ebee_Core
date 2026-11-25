@@ -349,6 +349,15 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - **Payments:** customer-level bulk payments apply to combo-only orders too (LEFT JOIN product) and skip CANCELLED/RETURNED orders and orders with nothing outstanding. `recordPayment` no longer overwrites `order.paymentMethod` (each `Payment` row records its own method).
 - **Order status:** manual updates only move forward (PENDING → CONFIRMED → PROCESSING → SHIPPED, steps may be skipped); FAILED / RETURN_EXCHANGE can't be set manually. Re-shipping a SHIPPED order whose delivery was cleared is still allowed. `OrderStatus.RETURN_EXCHANGE` is never set by the code; it's kept for existing rows.
 
+### Lots & Expiry (Feature 4)
+- V128: `products.tracks_expiry`; `inventory_layers.lot_number / expiry_date / manufactured_date`; `order_item_lots` (which batch each order line took: product, layer, lot, expiry, qty, unit cost, returned qty).
+- PO receipt: `ReceiveOrderRequest.ItemReceipt` takes optional `lotNumber`, `expiryDate`, `manufacturedDate`; `expiryDate` is **required** for products with `tracksExpiry` (product create/update param). Same rule for any inbound batch with lot info.
+- Consumption (`InventoryService.consumeLayers`): tracked products are taken **earliest expiry first** and expired batches are skipped (never sold — "Not enough unexpired stock"); untracked products stay FIFO by receipt time.
+- Order creation uses `deductStockWithLots` and saves an `OrderItemLot` per batch per line (combo lines: one per component batch).
+- Settlement returns put units back **into the lots they were sold from** (latest taken first) at that lot's cost, lot number and expiry, and bump `order_item_lots.returned_quantity`; units without a recorded lot (pre-V128 orders) fall back to the line cost.
+- `GET /api/inventory/expiring?days=30&locationId=`, `POST /api/inventory/expired/write-off?locationId=` (movement type `EXPIRED`; never below reserved quantity), `GET /api/inventory/lots/{productId}/{lotNumber}/sales` (recall: orders + customers that got the lot).
+- `ExpiryAlertScheduler` (07:00 daily, ShedLock `expiryAlerts`): in-app `STOCK_EXPIRING` alert to admins for expired batches and batches expiring within 30 days.
+
 ## Agent Workflow
 
 1. Before editing, run `./mvnw clean compile` to verify the baseline.

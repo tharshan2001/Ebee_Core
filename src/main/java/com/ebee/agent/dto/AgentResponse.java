@@ -24,6 +24,9 @@ public class AgentResponse {
     private String district;
     private String country;
     private String phoneNumber;
+    /** Home location: the agent's orders ship from here unless another is chosen (null = default location). */
+    private java.util.UUID locationId;
+    private String locationName;
     private java.math.BigDecimal commissionRate;
     private java.math.BigDecimal effectiveCommissionRate;
     private java.math.BigDecimal totalSales;

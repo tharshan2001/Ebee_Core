@@ -5,6 +5,7 @@ import com.ebee.agent.repository.AgentRepository;
 import com.ebee.commission.entity.Commission;
 import com.ebee.commission.repository.CommissionRepository;
 import com.ebee.common.exception.ResourceNotFoundException;
+import com.ebee.common.security.SecurityService;
 import com.ebee.common.service.PrintTemplateService;
 import com.ebee.payout.dto.PayoutResponse;
 import com.ebee.payout.entity.Payout;
@@ -13,6 +14,7 @@ import com.ebee.payout.mapper.PayoutMapper;
 import com.ebee.payout.repository.PayoutRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ public class PayoutService {
     private final AgentRepository agentRepository;
     private final PayoutMapper payoutMapper;
     private final PrintTemplateService printTemplateService;
+    private final SecurityService securityService;
 
     @Transactional(readOnly = true)
     public List<PayoutResponse> getAllPayouts() {
@@ -120,6 +123,16 @@ public class PayoutService {
     public byte[] getPayoutPdf(UUID id) {
         Payout payout = payoutRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payout", "id", id));
+
+        // Agents may only download their own payout statements.
+        if (!securityService.isAdmin()) {
+            UUID userId = securityService.getCurrentUserId();
+            UUID ownAgentId = userId == null ? null
+                    : agentRepository.findByUserId(userId).map(Agent::getId).orElse(null);
+            if (ownAgentId == null || !ownAgentId.equals(payout.getAgentId())) {
+                throw new AccessDeniedException("You can only download your own payout statements");
+            }
+        }
 
         log.info("PDF requested for payout {}", id);
 

@@ -331,7 +331,7 @@ The advance balance is a separate wallet (`customer_advance_transactions`) and i
 - API (ADMIN) under `/api/finance`: accounts CRUD with balances (`?asOf`), `/accounts/{id}/statement?from&to`, `/transfers`, `/cheque-deposits` (cheques-in-hand → bank only), `/owner-deposits`, `/owner-withdrawals`, `/account-defaults`, `/balance-sheet?asOf`, `/cash-flow?from&to`.
 - Balance sheet: assets = account balances + customer receivables + stock at cost (**current** FIFO value, not as of the date) + agent clawbacks + supplier advances + VAT refundable; liabilities = supplier payables + commission payable + customer advance wallets + customer credits + VAT payable; equity = difference. Each party's ledger balance is split by sign.
 - Cash flow: operating (customers, refunds, suppliers, expenses, commissions), financing (owner money, opening balances), other (adjustments); transfers and cheque deposits excluded.
-- Accounts start at zero: money received before V126 isn't in them, so enter real opening balances per account before relying on the balance sheet.
+- Accounts start at zero: money received before V126 isn't in them, so enter real opening balances per account before relying on the balance sheet. `PUT /api/finance/accounts/{id}/opening-balance` `{amount, date}` sets or corrects it (replaces the account's OPENING transaction; 0 removes it; negative = overdrawn) — the seeded accounts had no other way to get one.
 
 ### Locations & Stock Transfers (Feature 3)
 - New `location` package. V127 adds `locations` (WAREHOUSE / SHOP, exactly one `is_default`), creates **"Main"** as the default, and moves all existing stock, orders and POs to it. Behaviour is unchanged until a second location is added.

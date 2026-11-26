@@ -28,6 +28,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
            countQuery = "SELECT COUNT(e) FROM Expense e")
     Page<Expense> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    Page<Expense> findByStatusOrderByCreatedAtDesc(com.ebee.expense.enums.ExpenseStatus status, Pageable pageable);
+
     long countByStatus(ExpenseStatus status);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred <= :end")

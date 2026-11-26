@@ -176,6 +176,24 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void approveExpense_withAccount_paysFromThatAccount() {
+        UUID expenseId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        Expense expense = Expense.builder().id(expenseId).status(ExpenseStatus.PENDING)
+                .category(ExpenseCategory.PARKING).amount(new BigDecimal("300")).build();
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+        when(securityService.getCurrentUserId()).thenReturn(currentUserId);
+        when(userRepository.findById(currentUserId)).thenReturn(Optional.of(admin));
+        when(expenseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        expenseService.approveExpense(expenseId, accountId);
+
+        verify(moneyAccountService).recordMovement(eq(com.ebee.finance.entity.AccountTransaction.Direction.OUT),
+                any(), eq("EXPENSE"), eq(accountId), eq(com.ebee.finance.entity.AccountTransaction.Type.EXPENSE),
+                eq("EXPENSE"), eq(expenseId), anyString());
+    }
+
+    @Test
     void approveExpense_alreadyApproved_throws() {
         UUID expenseId = UUID.randomUUID();
         Expense expense = Expense.builder().id(expenseId).status(ExpenseStatus.APPROVED).build();

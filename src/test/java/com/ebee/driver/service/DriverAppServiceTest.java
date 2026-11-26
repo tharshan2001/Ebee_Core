@@ -71,6 +71,14 @@ class DriverAppServiceTest {
     @Mock private TripMapper tripMapper;
 
     @InjectMocks private DriverAppService driverAppService;
+    @InjectMocks private DriverTripService driverTripService;
+    @InjectMocks private DriverContext driverContext;
+
+    @org.junit.jupiter.api.BeforeEach
+    void wireDriverContext() {
+        // Trips live in DriverTripService; the signed-in driver comes from a real DriverContext on the same mocks.
+        ReflectionTestUtils.setField(driverTripService, "driverContext", driverContext);
+    }
 
     private UUID userId;
     private UUID driverId;
@@ -124,7 +132,7 @@ class DriverAppServiceTest {
         when(securityService.getCurrentUserId()).thenReturn(userId);
         when(driverRepository.findByUserId(userId)).thenReturn(Optional.of(driver));
 
-        ReflectionTestUtils.setField(driverAppService, "tripOrderLifecycle",
+        ReflectionTestUtils.setField(driverTripService, "tripOrderLifecycle",
                 new TripOrderLifecycle(orderRepository));
     }
 
@@ -133,7 +141,7 @@ class DriverAppServiceTest {
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
 
-        assertThatThrownBy(() -> driverAppService.completeTrip(tripId))
+        assertThatThrownBy(() -> driverTripService.completeTrip(tripId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot complete trip")
                 .hasMessageContaining("DELIVERED, FAILED_PERMANENT, or FAILED");
@@ -156,7 +164,7 @@ class DriverAppServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
 
-        driverAppService.completeTrip(tripId);
+        driverTripService.completeTrip(tripId);
 
         assertThat(order.getTrip()).isEqualTo(trip);
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
@@ -174,7 +182,7 @@ class DriverAppServiceTest {
         when(tripRepository.save(any(Trip.class))).thenReturn(trip);
         when(orderRepository.findByTripId(tripId)).thenReturn(List.of(order));
 
-        driverAppService.completeTrip(tripId);
+        driverTripService.completeTrip(tripId);
 
         assertThat(trip.getStatus()).isEqualTo(TripStatus.COMPLETED);
         assertThat(order.getTrip()).isNull();
@@ -189,7 +197,7 @@ class DriverAppServiceTest {
     void updateMileage_negative_throws() {
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
 
-        assertThatThrownBy(() -> driverAppService.updateMileage(tripId, new BigDecimal("-10.0")))
+        assertThatThrownBy(() -> driverTripService.updateMileage(tripId, new BigDecimal("-10.0")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Mileage cannot be negative");
 
@@ -210,7 +218,7 @@ class DriverAppServiceTest {
         when(deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", false))
                 .thenReturn(new DeliveryStateTransition.TransitionResult(false, false, DeliveryStatus.PENDING));
 
-        driverAppService.startTrip(tripId);
+        driverTripService.startTrip(tripId);
 
         assertThat(trip.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
         verify(deliveryStateTransition).transition(order, DeliveryStatus.ASSIGNED, "Trip started", false);
@@ -230,7 +238,7 @@ class DriverAppServiceTest {
         com.ebee.trip.dto.AddOrdersToTripRequest request = new com.ebee.trip.dto.AddOrdersToTripRequest();
         request.setOrderIdsToRemove(List.of(orderId));
 
-        driverAppService.addOrdersToTrip(tripId, request);
+        driverTripService.addOrdersToTrip(tripId, request);
 
         assertThat(order.getTrip()).isNull();
         assertThat(order.getDeliveryAssignedTo()).isNull();
@@ -251,7 +259,7 @@ class DriverAppServiceTest {
         com.ebee.trip.dto.AddOrdersToTripRequest request = new com.ebee.trip.dto.AddOrdersToTripRequest();
         request.setOrderIdsToRemove(List.of(orderId));
 
-        driverAppService.addOrdersToTrip(tripId, request);
+        driverTripService.addOrdersToTrip(tripId, request);
 
         assertThat(order.getTrip()).isNull();
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);

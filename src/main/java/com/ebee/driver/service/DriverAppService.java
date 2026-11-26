@@ -70,44 +70,29 @@ public class DriverAppService {
     private final DriverRepository driverRepository;
     private final DriverService driverService;
     private final UserRepository userRepository;
-    private final OrderRepository orderRepository;
     private final DeliveryRepository deliveryRepository;
     private final ExpenseRepository expenseRepository;
     private final ExpenseMapper expenseMapper;
-    private final DeliveryService deliveryService;
-    private final DeliveryStateTransition deliveryStateTransition;
-    private final CommissionLifecycleService commissionLifecycleService;
     private final AlertService alertService;
     private final SecurityService securityService;
     private final AuditLogService auditLogService;
     private final StoragePort storagePort;
-    private final NotificationPort notificationPort;
-    private final ApplicationEventPublisher eventPublisher;
-    private final TripRepository tripRepository;
-    private final TripMapper tripMapper;
-    private final TripOrderLifecycle tripOrderLifecycle;
+    private final DriverContext driverContext;
+    private final DriverDeliveryService driverDeliveryService;
 
     public Driver getCurrentDriver() {
-        UUID userId = securityService.getCurrentUserId();
-        return driverRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", userId));
+        return driverContext.getCurrentDriver();
     }
 
     @Transactional(readOnly = true)
     public String getCurrentDriverName() {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         return driver.getUser().getFirstName() + " " + driver.getUser().getLastName();
-    }
-
-    private User getCurrentUser() {
-        UUID userId = securityService.getCurrentUserId();
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
     }
 
     @Transactional(readOnly = true)
     public DriverDashboardResponse getDashboard() {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         UUID userId = driver.getUser().getId();
 
         List<DeliveryStatus> activeStatuses = List.of(
@@ -145,136 +130,8 @@ public class DriverAppService {
         response.setFailedTodayCount(failedToday);
         response.setUnreadAlertsCount(unreadAlertsCount);
         response.setDriverName(driver.getUser().getFirstName() + " " + driver.getUser().getLastName());
-        response.setRecentDeliveries(recentOrders.stream().map(this::toDriverDeliveryResponse).toList());
+        response.setRecentDeliveries(recentOrders.stream().map(driverDeliveryService::toDriverDeliveryResponse).toList());
         return response;
-    }
-
-    @Transactional(readOnly = true)
-    public Page<DriverDeliveryResponse> getMyDeliveries(DeliveryStatus status, Pageable pageable) {
-        UUID userId = securityService.getCurrentUserId();
-        UUID driverId = driverRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Driver", "userId", userId))
-                .getId();
-
-        Optional<Trip> activeTrip = tripRepository.findByDriverIdAndStatus(driverId, TripStatus.IN_PROGRESS);
-        if (activeTrip.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
-        }
-
-        List<Order> orders = orderRepository.findByTripId(activeTrip.get().getId());
-        if (status != null) {
-            orders = orders.stream()
-                    .filter(o -> o.getDeliveryStatus() == status)
-                    .toList();
-        }
-        orders.sort(Comparator.comparing(Order::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
-
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), orders.size());
-        if (start > orders.size()) {
-            return new PageImpl<>(List.of(), pageable, orders.size());
-        }
-        List<DriverDeliveryResponse> pageContent = orders.subList(start, end).stream()
-                .map(this::toDriverDeliveryResponse)
-                .toList();
-        return new PageImpl<>(pageContent, pageable, orders.size());
-    }
-
-    @Transactional(readOnly = true)
-    public DriverDeliveryResponse getDeliveryDetail(UUID orderId) {
-        Order order = orderRepository.findByIdWithDetails(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-        assertDriverAssigned(order);
-        return toDriverDeliveryResponse(order);
-    }
-
-    @Transactional
-    public DriverDeliveryResponse updateDeliveryStatus(UUID orderId, DriverDeliveryStatusRequest request) {
-        Order order = orderRepository.findByIdWithDetails(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-        assertDriverAssigned(order);
-        assertDriverCanTransition(order.getDeliveryStatus(), request.getStatus());
-
-        if (request.getDriverNotes() != null) {
-            order.setDriverNotes(request.getDriverNotes());
-        }
-
-        DeliveryStatus previousStatus = order.getDeliveryStatus();
-        DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
-                order, request.getStatus(), request.getReason(), false);
-
-        Order savedOrder = orderRepository.save(order);
-
-        if (result.wasDelivered()) {
-            commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
-            recalculateDriverAvailability(securityService.getCurrentUserId());
-        }
-
-        if (request.getStatus() == DeliveryStatus.FAILED
-                && order.getDeliveryAssignedTo() != null) {
-            recalculateDriverAvailability(order.getDeliveryAssignedTo().getId());
-        }
-
-        auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
-                "Driver updated delivery for order " + savedOrder.getOrderNumber()
-                        + " from " + previousStatus + " to " + request.getStatus());
-
-        deliveryService.sendDeliveryStatusNotification(savedOrder, request.getStatus());
-
-        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                this, savedOrder, previousStatus, request.getReason(), LocalDateTime.now()));
-
-        return toDriverDeliveryResponse(savedOrder);
-    }
-
-    @Transactional
-    public DriverDeliveryResponse completeDelivery(UUID orderId, MultipartFile photo,
-                                                    MultipartFile signature, String driverNotes) {
-        Order order = orderRepository.findByIdWithDetails(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-        assertDriverAssigned(order);
-
-        if (order.getDeliveryStatus() != DeliveryStatus.IN_TRANSIT) {
-            throw new IllegalArgumentException(
-                    "Delivery can only be completed from IN_TRANSIT. Current status: " + order.getDeliveryStatus()
-                            + ". Update status to IN_TRANSIT first via updateDeliveryStatus.");
-        }
-
-        if (photo != null && !photo.isEmpty()) {
-            String photoUrl = storagePort.uploadFile(photo, "deliveries", order.getOrderNumber() + "_Photo");
-            order.setDeliveryPhotoUrl(photoUrl);
-        }
-
-        if (signature != null && !signature.isEmpty()) {
-            String sigUrl = storagePort.uploadFile(signature, "deliveries", order.getOrderNumber() + "_Signature");
-            order.setDeliverySignatureUrl(sigUrl);
-        }
-
-        if (driverNotes != null) {
-            order.setDriverNotes(driverNotes);
-        }
-
-        DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
-                order, DeliveryStatus.DELIVERED, null, false);
-
-        Order savedOrder = orderRepository.save(order);
-
-        recalculateDriverAvailability(securityService.getCurrentUserId());
-
-        commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
-
-        auditLogService.record(AuditAction.DELIVERY_STATUS_CHANGE, "Order", savedOrder.getId(),
-                "Driver completed delivery for order " + savedOrder.getOrderNumber());
-
-        deliveryService.sendDeliveryStatusNotification(savedOrder, DeliveryStatus.DELIVERED);
-
-        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                this, savedOrder, DeliveryStatus.IN_TRANSIT, null, LocalDateTime.now()));
-
-        return toDriverDeliveryResponse(savedOrder);
     }
 
     @Transactional
@@ -282,7 +139,7 @@ public class DriverAppService {
         if (availability == DriverAvailability.SUSPENDED) {
             throw new IllegalArgumentException("Cannot set availability to SUSPENDED");
         }
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         UUID userId = driver.getUser().getId();
 
         if (availability == DriverAvailability.AVAILABLE) {
@@ -300,7 +157,7 @@ public class DriverAppService {
 
     @Transactional(readOnly = true)
     public DriverProfileResponse getMyProfile() {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         User user = driver.getUser();
         DriverProfileResponse response = new DriverProfileResponse();
         response.setDriverId(driver.getId());
@@ -321,7 +178,7 @@ public class DriverAppService {
 
     @Transactional
     public DriverProfileResponse updateMyProfile(DriverProfileRequest request) {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         User user = driver.getUser();
 
         if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
@@ -377,7 +234,7 @@ public class DriverAppService {
                     .setScale(2, java.math.RoundingMode.HALF_UP);
         }
 
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         List<Expense> driverExpenses = expenseRepository.findByDriverIdOrderByCreatedAtDesc(driver.getId());
         BigDecimal totalExpenses = driverExpenses.stream()
                 .filter(e -> e.getStatus() == ExpenseStatus.APPROVED)
@@ -397,8 +254,8 @@ public class DriverAppService {
 
     @Transactional
     public ExpenseResponse createExpense(ExpenseRequest request, MultipartFile receipt) {
-        User currentUser = getCurrentUser();
-        Driver driver = getCurrentDriver();
+        User currentUser = driverContext.getCurrentUser();
+        Driver driver = driverContext.getCurrentDriver();
 
         Expense expense = Expense.builder()
                 .category(request.getCategory())
@@ -424,7 +281,7 @@ public class DriverAppService {
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getMyExpenses(ExpenseStatus status) {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         List<Expense> expenses;
         if (status != null) {
             expenses = expenseRepository.findByDriverIdOrderByCreatedAtDesc(driver.getId()).stream()
@@ -436,264 +293,9 @@ public class DriverAppService {
         return expenseMapper.toResponseList(expenses);
     }
 
-    @Transactional(readOnly = true)
-    public List<TripResponse> getAvailableTrips() {
-        Driver driver = getCurrentDriver();
-        List<Trip> trips = tripRepository.findByDriverIdAndStatusIn(
-                driver.getId(),
-                List.of(TripStatus.PLANNED, TripStatus.IN_PROGRESS));
-        return trips.stream().map(tripMapper::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public TripResponse getMyInProgressTrip() {
-        Driver driver = getCurrentDriver();
-        return tripRepository.findByDriverIdAndStatus(driver.getId(), TripStatus.IN_PROGRESS)
-                .map(tripMapper::toResponse)
-                .orElse(null);
-    }
-
-    @Transactional(readOnly = true)
-    public TripResponse getTripById(UUID tripId) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-
-        return tripMapper.toResponse(trip);
-    }
-
-    @Transactional
-    public TripResponse startTrip(UUID tripId) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-        if (trip.getStatus() != TripStatus.PLANNED) {
-            throw new IllegalStateException("Only PLANNING trips can be started");
-        }
-
-        tripRepository.findByDriverIdAndStatus(driver.getId(), TripStatus.IN_PROGRESS)
-                .ifPresent(existing -> {
-                    throw new IllegalStateException("You already have an active trip: " + existing.getName());
-                });
-
-        trip.setStatus(TripStatus.IN_PROGRESS);
-        trip = tripRepository.save(trip);
-
-        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
-                "Driver started trip '" + trip.getName() + "'");
-
-        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
-        for (Order order : orders) {
-            if (tripOrderLifecycle.isPendingForAssignment(order)) {
-                DeliveryStateTransition.TransitionResult result =
-                        deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Trip started", false);
-                orderRepository.save(order);
-                eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                        this, order, result.previousStatus(), "Trip started", LocalDateTime.now()));
-            }
-        }
-
-        deliveryService.recalculateDriverAvailability(driver.getUser().getId());
-
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, TripStatus.PLANNED, orders.size()));
-
-        return tripMapper.toResponse(trip);
-    }
-
-    @Transactional
-    public TripResponse addOrdersToTrip(UUID tripId, AddOrdersToTripRequest request) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-        if (trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED) {
-            throw new IllegalStateException("Cannot modify orders on a " + trip.getStatus() + " trip");
-        }
-
-        if (request.getOrderIdsToAdd() != null && !request.getOrderIdsToAdd().isEmpty()) {
-            for (UUID orderId : request.getOrderIdsToAdd()) {
-                Order order = orderRepository.findById(orderId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-                if (order.getTrip() != null && order.getTrip().getId().equals(tripId)) {
-                    continue;
-                }
-                if (order.getDeliveryAssignedTo() != null
-                        && !order.getDeliveryAssignedTo().getId().equals(driver.getUser().getId())) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is assigned to a different driver");
-                }
-                if (order.getTrip() != null) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is already on trip '" + order.getTrip().getName() + "'");
-                }
-
-                if (order.getStatus() != OrderStatus.SHIPPED) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " must be in SHIPPED status to add to a trip");
-                }
-
-                order.setTrip(trip);
-                order.setDeliveryAssignedTo(driver.getUser());
-                orderRepository.save(order);
-            }
-        }
-
-        if (request.getOrderIdsToRemove() != null && !request.getOrderIdsToRemove().isEmpty()) {
-            for (UUID orderId : request.getOrderIdsToRemove()) {
-                Order order = orderRepository.findById(orderId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-                if (order.getTrip() == null || !order.getTrip().getId().equals(tripId)) {
-                    throw new IllegalStateException("Order " + order.getOrderNumber() + " is not on this trip");
-                }
-
-                if (tripOrderLifecycle.isUnresolved(order)) {
-                    DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
-                    tripOrderLifecycle.detachAndReset(order);
-                    eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                            this, order, previousDeliveryStatus, "Order removed from trip", LocalDateTime.now()));
-                } else {
-                    order.setTrip(null);
-                    orderRepository.save(order);
-                }
-            }
-        }
-
-        trip = tripRepository.save(trip);
-
-        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
-                "Orders updated on trip '" + trip.getName() + "'");
-
-        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
-
-        return tripMapper.toResponse(trip);
-    }
-
-    @Transactional
-    public TripResponse updateMileage(UUID tripId, BigDecimal mileageKm) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-        if (mileageKm == null || mileageKm.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalStateException("Mileage cannot be negative");
-        }
-
-        trip.setMileageKm(mileageKm);
-        trip = tripRepository.save(trip);
-
-        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
-                "Mileage updated to " + mileageKm + " km on trip '" + trip.getName() + "'");
-
-        return tripMapper.toResponse(trip);
-    }
-
-    @Transactional
-    public TripResponse completeTrip(UUID tripId) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-        if (trip.getStatus() != TripStatus.IN_PROGRESS) {
-            throw new IllegalStateException("Only IN_PROGRESS trips can be completed");
-        }
-
-        List<Order> orders = tripOrderLifecycle.getTripOrders(trip.getId());
-        List<Order> notCompletable = orders.stream()
-                .filter(order -> !tripOrderLifecycle.isCompletableForTrip(order))
-                .toList();
-
-        if (!notCompletable.isEmpty()) {
-            String orderNumbers = notCompletable.stream()
-                    .map(Order::getOrderNumber)
-                    .collect(Collectors.joining(", "));
-            throw new IllegalStateException("Cannot complete trip '" + trip.getName() + "': " + notCompletable.size()
-                    + " order(s) not yet delivered (" + orderNumbers
-                    + "). All orders must be DELIVERED, FAILED_PERMANENT, or FAILED.");
-        }
-
-        deliveryService.recalculateDriverAvailability(driver.getUser().getId());
-
-        TripStatus previousStatus = trip.getStatus();
-        trip.setStatus(TripStatus.COMPLETED);
-        trip = tripRepository.save(trip);
-
-        for (Order order : orders) {
-            if (tripOrderLifecycle.isRetryableFailed(order)) {
-                DeliveryStatus previousDeliveryStatus = order.getDeliveryStatus();
-                tripOrderLifecycle.detachAndReset(order);
-                eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
-                        this, order, previousDeliveryStatus,
-                        "Trip completed — order released for retry", LocalDateTime.now()));
-            }
-        }
-
-        auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
-                "Trip '" + trip.getName() + "' completed by driver");
-
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
-        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
-
-        return tripMapper.toResponse(trip);
-    }
-
-    @Transactional
-    public ExpenseResponse createTripExpense(UUID tripId, ExpenseRequest request, MultipartFile receipt) {
-        Driver driver = getCurrentDriver();
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(driver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
-        if (trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED) {
-            throw new IllegalStateException("Cannot add expenses to a " + trip.getStatus() + " trip");
-        }
-
-        User currentUser = getCurrentUser();
-
-        Expense.ExpenseBuilder builder = Expense.builder()
-                .category(request.getCategory())
-                .amount(request.getAmount())
-                .description(request.getDescription())
-                .dateIncurred(request.getDateIncurred())
-                .createdBy(currentUser)
-                .driver(driver)
-                .trip(trip)
-                .status(ExpenseStatus.PENDING);
-
-        Expense expense = builder.build();
-
-        if (receipt != null && !receipt.isEmpty()) {
-            expense.setReceiptUrl(storagePort.uploadFile(receipt, "expenses", currentUser.getEmail() + "_Expense"));
-        }
-
-        expense = expenseRepository.save(expense);
-
-        auditLogService.record(AuditAction.CREATE, "Expense", expense.getId(),
-                "Driver expense " + expense.getCategory() + " LKR " + expense.getAmount() + " created on trip '" + trip.getName() + "'");
-
-        return expenseMapper.toResponse(expense);
-    }
-
     @Transactional
     public DriverProfileResponse uploadProfilePhoto(MultipartFile photo) {
-        User user = getCurrentUser();
+        User user = driverContext.getCurrentUser();
         if (photo != null && !photo.isEmpty()) {
             String photoUrl = storagePort.uploadFile(photo, "profiles", user.getEmail() + "_Profile");
             user.setProfilePictureUrl(photoUrl);
@@ -705,189 +307,10 @@ public class DriverAppService {
 
     @Transactional
     public void registerDeviceToken(String fcmToken) {
-        Driver driver = getCurrentDriver();
+        Driver driver = driverContext.getCurrentDriver();
         driver.setFcmToken(fcmToken);
         driverRepository.save(driver);
         log.info("FCM token registered for driver {}", driver.getUser().getEmail());
     }
 
-    private void assertDriverAssigned(Order order) {
-        UUID userId = securityService.getCurrentUserId();
-        if (order.getDeliveryAssignedTo() == null
-                || !order.getDeliveryAssignedTo().getId().equals(userId)) {
-            throw new AccessDeniedException("This delivery is not assigned to you");
-        }
-    }
-
-    private void recalculateDriverAvailability(UUID userId) {
-        List<DeliveryStatus> activeStatuses = List.of(
-                DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.IN_TRANSIT);
-        long activeCount = deliveryRepository.countByDeliveryAssignedToIdAndDeliveryStatusIn(userId, activeStatuses);
-        DriverAvailability newAvailability = activeCount > 0 ? DriverAvailability.ON_TRIP : DriverAvailability.AVAILABLE;
-        driverRepository.findByUserId(userId).ifPresent(d -> {
-            if (d.getAvailability() != newAvailability) {
-                d.setAvailability(newAvailability);
-                driverRepository.save(d);
-            }
-        });
-    }
-
-    private void assertDriverCanTransition(DeliveryStatus current, DeliveryStatus target) {
-        Set<DeliveryStatus> allowed = switch (current) {
-            case ASSIGNED -> Set.of(DeliveryStatus.PICKED_UP, DeliveryStatus.FAILED);
-            case PICKED_UP -> Set.of(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED);
-            case IN_TRANSIT -> Set.of(DeliveryStatus.DELIVERED, DeliveryStatus.FAILED);
-            case FAILED -> Set.of(DeliveryStatus.PENDING);
-            default -> Set.of();
-        };
-        if (!allowed.contains(target)) {
-            throw new IllegalArgumentException(
-                    "Cannot transition from " + current + " to " + target);
-        }
-    }
-
-    private DriverDeliveryResponse toDriverDeliveryResponse(Order order) {
-        DriverDeliveryResponse response = new DriverDeliveryResponse();
-        response.setOrderId(order.getId());
-        response.setOrderNumber(order.getOrderNumber());
-        response.setDeliveryStatus(order.getDeliveryStatus());
-        response.setOrderStatus(order.getStatus());
-        response.setDistrict(order.getDistrict());
-        response.setNotes(order.getNotes());
-        response.setDeliveryNotes(order.getDeliveryNotes());
-        response.setDriverNotes(order.getDriverNotes());
-        response.setDeliveryFailureReason(order.getDeliveryFailureReason());
-        response.setDeliveryPhotoUrl(order.getDeliveryPhotoUrl());
-        response.setDeliverySignatureUrl(order.getDeliverySignatureUrl());
-        response.setDeliveredAt(order.getDeliveredAt());
-        response.setTotalAmount(order.getTotalAmount());
-        response.setPaidAmount(order.getPaidAmount());
-        response.setOutstandingBalance(order.getOutstandingBalance());
-        response.setPaymentStatus(order.getPaymentStatus());
-        response.setScheduledDate(order.getDeliveryScheduledDate());
-        response.setCreatedAt(order.getCreatedAt());
-
-        if (order.getDeliveryAssignedTo() != null) {
-            response.setDriverId(order.getDeliveryAssignedTo().getId());
-            response.setDriverName(order.getDeliveryAssignedTo().getFirstName()
-                    + " " + order.getDeliveryAssignedTo().getLastName());
-        }
-
-        if (order.getCustomer() != null) {
-            response.setCustomerName(order.getCustomer().getFirstName()
-                    + " " + order.getCustomer().getLastName());
-            response.setCustomerPhone(order.getCustomer().getPhoneNumber());
-            if (order.getCustomer().getAddress() != null) {
-                var a = order.getCustomer().getAddress();
-                response.setCustomerStreet(a.getStreet());
-                response.setCustomerAddressLine2(a.getAddressLine2());
-                response.setCustomerCity(a.getCity());
-                response.setCustomerPostalCode(a.getPostalCode());
-                response.setCustomerDistrict(a.getDistrict() != null
-                        ? a.getDistrict().getDisplayName() : null);
-                response.setCustomerCountry(a.getCountry());
-            }
-        }
-
-        if (order.getItems() != null) {
-            response.setItems(order.getItems().stream().map(this::toItemInfo).toList());
-        }
-
-        return response;
-    }
-
-    private DriverDeliveryResponse.OrderItemInfo toItemInfo(OrderItem item) {
-        DriverDeliveryResponse.OrderItemInfo info = new DriverDeliveryResponse.OrderItemInfo();
-        info.setProductId(item.getProduct().getId());
-        info.setProductName(item.getProduct().getName());
-        info.setProductItemCode(item.getProduct().getItemCode());
-        info.setImageUrl(item.getProduct().getImages().isEmpty()
-                ? null
-                : item.getProduct().getImages().getFirst().getImageUrl());
-        info.setQuantity(item.getQuantity());
-        info.setUnitPrice(item.getUnitPrice());
-        info.setSubtotal(item.getSubtotal());
-        return info;
-    }
-
-    private List<TripOrderMarkerDto> buildOrderMarkers(Trip trip) {
-        List<Order> orders = orderRepository.findByTripId(trip.getId());
-        if (orders == null || orders.isEmpty()) {
-            return List.of();
-        }
-        return orders.stream()
-                .map(this::toTripOrderMarkerDto)
-                .toList();
-    }
-
-    private TripOrderMarkerDto toTripOrderMarkerDto(Order order) {
-        String customerName = null;
-        String customerPhone = null;
-        String street = null;
-        String addressLine2 = null;
-        String city = null;
-        String postalCode = null;
-        String district = null;
-        String country = null;
-
-        if (order.getCustomer() != null) {
-            customerName = order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName();
-            customerPhone = order.getCustomer().getPhoneNumber();
-            if (order.getCustomer().getAddress() != null) {
-                var addr = order.getCustomer().getAddress();
-                street = addr.getStreet();
-                addressLine2 = addr.getAddressLine2();
-                city = addr.getCity();
-                postalCode = addr.getPostalCode();
-                district = addr.getDistrict() != null ? addr.getDistrict().getDisplayName() : null;
-                country = addr.getCountry();
-            }
-        }
-
-        String formattedAddress = buildFormattedAddress(street, addressLine2, city, postalCode, district, country);
-
-        return new TripOrderMarkerDto(
-                order.getId(),
-                order.getOrderNumber(),
-                customerName,
-                customerPhone,
-                street,
-                addressLine2,
-                city,
-                postalCode,
-                district,
-                country,
-                order.getDeliveryStatus(),
-                order.getStatus(),
-                order.getTotalAmount(),
-                formattedAddress
-        );
-    }
-
-    private String buildFormattedAddress(String street, String addressLine2, String city,
-                                         String postalCode, String district, String country) {
-        StringBuilder sb = new StringBuilder();
-        if (street != null) sb.append(street);
-        if (addressLine2 != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(addressLine2);
-        }
-        if (city != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(city);
-        }
-        if (postalCode != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(postalCode);
-        }
-        if (district != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(district);
-        }
-        if (country != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(country);
-        }
-        return sb.toString();
-    }
 }

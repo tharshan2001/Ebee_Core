@@ -42,6 +42,8 @@ import java.util.UUID;
 public class DriverAppController {
 
     private final DriverAppService driverAppService;
+    private final com.ebee.driver.service.DriverDeliveryService driverDeliveryService;
+    private final com.ebee.driver.service.DriverTripService driverTripService;
     private final DriverLocationService driverLocationService;
 
     @GetMapping("/dashboard")
@@ -59,13 +61,13 @@ public class DriverAppController {
         int safeSize = PaginationUtils.safeSize(size);
         Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), safeSize,
                 SortUtils.parse(sort, SortableFields.AllowedFor.DRIVER_DELIVERY));
-        Page<DriverDeliveryResponse> responses = driverAppService.getMyDeliveries(status, pageable);
+        Page<DriverDeliveryResponse> responses = driverDeliveryService.getMyDeliveries(status, pageable);
         return ResponseEntity.ok(ApiResponse.success("Deliveries retrieved successfully", PageResponse.from(responses)));
     }
 
     @GetMapping("/deliveries/{orderId}")
     public ResponseEntity<ApiResponse<DriverDeliveryResponse>> getDeliveryDetail(@PathVariable UUID orderId) {
-        DriverDeliveryResponse response = driverAppService.getDeliveryDetail(orderId);
+        DriverDeliveryResponse response = driverDeliveryService.getDeliveryDetail(orderId);
         return ResponseEntity.ok(ApiResponse.success("Delivery retrieved successfully", response));
     }
 
@@ -73,7 +75,7 @@ public class DriverAppController {
     public ResponseEntity<ApiResponse<DriverDeliveryResponse>> updateDeliveryStatus(
             @PathVariable UUID orderId,
             @Valid @RequestBody DriverDeliveryStatusRequest request) {
-        DriverDeliveryResponse response = driverAppService.updateDeliveryStatus(orderId, request);
+        DriverDeliveryResponse response = driverDeliveryService.updateDeliveryStatus(orderId, request);
         return ResponseEntity.ok(ApiResponse.success("Delivery status updated successfully", response));
     }
 
@@ -83,7 +85,7 @@ public class DriverAppController {
             @RequestParam(value = "photo", required = false) MultipartFile photo,
             @RequestParam(value = "signature", required = false) MultipartFile signature,
             @RequestParam(value = "driverNotes", required = false) String driverNotes) {
-        DriverDeliveryResponse response = driverAppService.completeDelivery(orderId, photo, signature, driverNotes);
+        DriverDeliveryResponse response = driverDeliveryService.completeDelivery(orderId, photo, signature, driverNotes);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Delivery completed successfully", response));
     }
@@ -141,25 +143,25 @@ public class DriverAppController {
 
     @GetMapping("/trips/available")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getAvailableTrips() {
-        List<TripResponse> trips = driverAppService.getAvailableTrips();
+        List<TripResponse> trips = driverTripService.getAvailableTrips();
         return ResponseEntity.ok(ApiResponse.success("Available trips retrieved successfully", trips));
     }
 
     @GetMapping("/trips/my")
     public ResponseEntity<ApiResponse<TripResponse>> getMyInProgressTrip() {
-        TripResponse trip = driverAppService.getMyInProgressTrip();
+        TripResponse trip = driverTripService.getMyInProgressTrip();
         return ResponseEntity.ok(ApiResponse.success("Current trip retrieved successfully", trip));
     }
 
     @GetMapping("/trips/{id}")
     public ResponseEntity<ApiResponse<TripResponse>> getTripById(@PathVariable UUID id) {
-        TripResponse response = driverAppService.getTripById(id);
+        TripResponse response = driverTripService.getTripById(id);
         return ResponseEntity.ok(ApiResponse.success("Trip retrieved successfully", response));
     }
 
     @PatchMapping("/trips/{id}/start")
     public ResponseEntity<ApiResponse<TripResponse>> startTrip(@PathVariable UUID id) {
-        TripResponse response = driverAppService.startTrip(id);
+        TripResponse response = driverTripService.startTrip(id);
         return ResponseEntity.ok(ApiResponse.success("Trip started successfully", response));
     }
 
@@ -167,7 +169,7 @@ public class DriverAppController {
     public ResponseEntity<ApiResponse<TripResponse>> addOrdersToTrip(
             @PathVariable UUID id,
             @Valid @RequestBody AddOrdersToTripRequest request) {
-        TripResponse response = driverAppService.addOrdersToTrip(id, request);
+        TripResponse response = driverTripService.addOrdersToTrip(id, request);
         return ResponseEntity.ok(ApiResponse.success("Orders updated successfully", response));
     }
 
@@ -175,13 +177,13 @@ public class DriverAppController {
     public ResponseEntity<ApiResponse<TripResponse>> updateMileage(
             @PathVariable UUID id,
             @RequestParam BigDecimal mileageKm) {
-        TripResponse response = driverAppService.updateMileage(id, mileageKm);
+        TripResponse response = driverTripService.updateMileage(id, mileageKm);
         return ResponseEntity.ok(ApiResponse.success("Mileage updated successfully", response));
     }
 
     @PatchMapping("/trips/{id}/complete")
     public ResponseEntity<ApiResponse<TripResponse>> completeTrip(@PathVariable UUID id) {
-        TripResponse response = driverAppService.completeTrip(id);
+        TripResponse response = driverTripService.completeTrip(id);
         return ResponseEntity.ok(ApiResponse.success("Trip completed successfully", response));
     }
 
@@ -190,7 +192,7 @@ public class DriverAppController {
             @PathVariable UUID id,
             @RequestPart("expense") @Valid ExpenseRequest request,
             @RequestParam(value = "receipt", required = false) MultipartFile receipt) {
-        ExpenseResponse response = driverAppService.createTripExpense(id, request, receipt);
+        ExpenseResponse response = driverTripService.createTripExpense(id, request, receipt);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Expense created successfully", response));
     }

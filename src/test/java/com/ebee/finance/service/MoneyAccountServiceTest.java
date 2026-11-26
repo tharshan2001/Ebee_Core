@@ -53,6 +53,10 @@ class MoneyAccountServiceTest {
                 .filter(t -> t.getAccount().getId().equals(i.getArgument(0)))
                 .filter(t -> !t.getTxnDate().isBefore(i.getArgument(1)) && !t.getTxnDate().isAfter(i.getArgument(2)))
                 .toList());
+        when(txnRepo.findByAccount_IdAndType(any(), any())).thenAnswer(i -> txns.stream()
+                .filter(t -> t.getAccount().getId().equals(i.getArgument(0)) && t.getType() == i.getArgument(1)).toList());
+        org.mockito.Mockito.doAnswer(i -> { txns.removeAll((java.util.Collection<?>) i.getArgument(0)); return null; })
+                .when(txnRepo).deleteAll(any());
         PaymentAccountDefaultRepository defaultRepo = mock(PaymentAccountDefaultRepository.class);
         when(defaultRepo.findById(any())).thenAnswer(i -> Optional.ofNullable(defaults.get((String) i.getArgument(0))));
         SecurityService security = mock(SecurityService.class);
@@ -162,5 +166,26 @@ class MoneyAccountServiceTest {
         assertThat(st.openingBalance()).isEqualByComparingTo("1000");
         assertThat(st.lines()).extracting(l -> l.balanceAfter().toPlainString()).containsExactly("1500", "1300");
         assertThat(st.closingBalance()).isEqualByComparingTo("1300");
+    }
+
+    @Test
+    void openingBalance_isSetReplacedAndRemoved_withoutTouchingOtherMovements() {
+        service.recordMovement(Direction.IN, bd("1000"), "CASH", null, Type.CUSTOMER_RECEIPT, "PAYMENT", UUID.randomUUID(), "x");
+
+        service.setOpeningBalance(cash.getId(), bd("25000"), LocalDate.now().minusDays(30));
+        assertThat(bal(cash)).isEqualByComparingTo("26000");
+
+        // Correcting it replaces the opening row instead of adding a second one.
+        service.setOpeningBalance(cash.getId(), bd("20000"), LocalDate.now().minusDays(30));
+        assertThat(bal(cash)).isEqualByComparingTo("21000");
+        assertThat(txns).filteredOn(t -> t.getType() == Type.OPENING).hasSize(1);
+
+        // Overdrawn bank: a negative opening balance is money out.
+        service.setOpeningBalance(bank.getId(), bd("-500"), null);
+        assertThat(bal(bank)).isEqualByComparingTo("-500");
+
+        // Zero removes it.
+        service.setOpeningBalance(cash.getId(), BigDecimal.ZERO, null);
+        assertThat(bal(cash)).isEqualByComparingTo("1000");
     }
 }

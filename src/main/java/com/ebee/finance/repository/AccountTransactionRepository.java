@@ -37,4 +37,7 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
     List<Object[]> flowsByType(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     boolean existsByAccountId(UUID accountId);
+
+    /** Opening-balance rows of one account (normally zero or one). */
+    List<AccountTransaction> findByAccount_IdAndType(UUID accountId, AccountTransaction.Type type);
 }

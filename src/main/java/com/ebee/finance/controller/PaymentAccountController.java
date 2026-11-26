@@ -59,6 +59,12 @@ public class PaymentAccountController {
         return ok("Account updated", accounts.updateAccount(id, request));
     }
 
+    @PutMapping("/accounts/{id}/opening-balance")
+    public ResponseEntity<ApiResponse<PaymentAccountResponse>> openingBalance(@PathVariable UUID id,
+            @Valid @RequestBody com.ebee.finance.dto.OpeningBalanceRequest request) {
+        return ok("Opening balance set", accounts.setOpeningBalance(id, request.amount(), request.date()));
+    }
+
     @GetMapping("/accounts/{id}/statement")
     public ResponseEntity<ApiResponse<AccountStatement>> statement(@PathVariable UUID id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

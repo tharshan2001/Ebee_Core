@@ -112,6 +112,23 @@ public class MoneyAccountService {
         return toResponse(account, balance(account.getId(), LocalDate.now()));
     }
 
+    /**
+     * Sets an account's opening balance: replaces its OPENING transaction (zero removes it).
+     * Accounts seeded by V126 start at zero and could only get an opening balance when created,
+     * so this is how real starting balances are entered before relying on the balance sheet.
+     */
+    @Transactional
+    public PaymentAccountResponse setOpeningBalance(UUID id, BigDecimal amount, LocalDate date) {
+        PaymentAccount account = requireAccount(id);
+        transactionRepository.deleteAll(transactionRepository.findByAccount_IdAndType(id, Type.OPENING));
+        if (amount.signum() != 0) {
+            transactionRepository.save(new AccountTransaction(account, date != null ? date : LocalDate.now(),
+                    amount.signum() > 0 ? Direction.IN : Direction.OUT, amount.abs(), Type.OPENING,
+                    null, null, null, "Opening balance", securityService.getCurrentUserId()));
+        }
+        return toResponse(account, balance(id, LocalDate.now()));
+    }
+
     @Transactional
     public PaymentAccountResponse updateAccount(UUID id, PaymentAccountRequest request) {
         PaymentAccount account = requireAccount(id);

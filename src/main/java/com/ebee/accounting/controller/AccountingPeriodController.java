@@ -2,8 +2,10 @@ package com.ebee.accounting.controller;
 
 import com.ebee.accounting.dto.AccountingPeriodResponse;
 import com.ebee.accounting.dto.PeriodActionRequest;
+import com.ebee.accounting.dto.PeriodSummaryResponse;
 import com.ebee.accounting.entity.AccountingPeriod;
 import com.ebee.accounting.service.AccountingPeriodService;
+import com.ebee.accounting.service.PeriodSummaryService;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.security.SecurityService;
 import jakarta.validation.Valid;
@@ -22,6 +24,7 @@ public class AccountingPeriodController {
 
     private final AccountingPeriodService accountingPeriodService;
     private final SecurityService securityService;
+    private final PeriodSummaryService periodSummaryService;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -51,6 +54,13 @@ public class AccountingPeriodController {
         return accountingPeriodService.getPeriodByMonthAndYear(month, year)
             .map(period -> ResponseEntity.ok(ApiResponse.success("Period found", toResponse(period))))
             .orElse(ResponseEntity.ok(ApiResponse.success("Period not found", null)));
+    }
+
+    /** What was posted in this period, by kind, and its status history (for the month-close screen). */
+    @GetMapping("/{id}/summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PeriodSummaryResponse>> getPeriodSummary(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Period summary", periodSummaryService.summarize(id)));
     }
 
     @GetMapping("/open")

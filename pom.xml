@@ -25,12 +25,12 @@
 		<java.version>21</java.version>
 		<spring-cloud.version>2026.0.0</spring-cloud.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
-		<archunit.version>1.4.0</archunit.version>
+		<archunit.version>1.5.1</archunit.version>
 		<jjwt.version>0.12.6</jjwt.version>
 		<lombok.version>1.18.30</lombok.version>
 		<mockito.version>5.5.0</mockito.version>
 		<awssdk.version>2.20.0</awssdk.version>
-		<testcontainers.version>1.20.4</testcontainers.version>
+		<testcontainers.version>1.21.4</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
 		<flying-saucer.version>10.2.2</flying-saucer.version>
 		<jacoco.version>0.8.12</jacoco.version>

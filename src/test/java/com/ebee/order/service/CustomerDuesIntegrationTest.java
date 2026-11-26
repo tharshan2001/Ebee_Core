@@ -46,6 +46,7 @@ class CustomerDuesIntegrationTest extends RealDatabaseTest {
 
     @BeforeEach
     void setUpData() {
+        ensureDefaultCommissionRate();
         agent = agent();
         customer = customer();
         customer.setAddress(com.ebee.customer.entity.Address.builder()

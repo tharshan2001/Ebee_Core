@@ -59,17 +59,35 @@ public class TripService {
     private final OrderRepository orderRepository;
     private final ExpenseRepository expenseRepository;
     private final DriverRepository driverRepository;
-    private final TripMapper tripMapper;
-    private final ExpenseMapper expenseMapper;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
-    private final SecurityService securityService;
     private final DeliveryStateTransition deliveryStateTransition;
     private final DeliveryService deliveryService;
     private final TripOrderLifecycle tripOrderLifecycle;
+    private final TripViews tripViews;
+    private final TripQueryService tripQueryService;
 
-    private static final Set<OrderStatus> EXCLUDED_FROM_SETTLEMENT = Set.of(
-            OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.RETURN_EXCHANGE);
+    // ── lookups (TripQueryService) ──
+
+    public TripResponse getTripById(UUID tripId) {
+        return tripQueryService.getTripById(tripId);
+    }
+
+    public List<TripResponse> getAllTrips(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        return tripQueryService.getAllTrips(status, driverId, dateFrom, dateTo);
+    }
+
+    public PageResponse<TripResponse> getAllTripsPaginated(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
+        return tripQueryService.getAllTripsPaginated(status, driverId, dateFrom, dateTo, pageable);
+    }
+
+    public List<TripOrderMarkerDto> getActiveTripOrderMarkers(UUID driverId) {
+        return tripQueryService.getActiveTripOrderMarkers(driverId);
+    }
+
+    public List<TripOrderMarkerDto> getTripOrderMarkers(UUID tripId) {
+        return tripQueryService.getTripOrderMarkers(tripId);
+    }
 
     @Transactional
     public TripResponse createTrip(CreateTripRequest request) {
@@ -99,7 +117,7 @@ public class TripService {
                 "Trip '" + trip.getName() + "' created");
 
         log.info("Trip {} created with name {}", trip.getId(), trip.getName());
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -168,70 +186,7 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Trip '" + trip.getName() + "' updated");
 
-        return toTripResponse(trip);
-    }
-
-    @Transactional(readOnly = true)
-    public TripResponse getTripById(UUID tripId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-        requireDriverOwnsTripForNonAdmin(trip);
-        return toTripResponse(trip);
-    }
-
-    @Transactional(readOnly = true)
-    public List<TripResponse> getAllTrips(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
-        List<Trip> trips = tripRepository.search(status, driverId, dateFrom, dateTo);
-        return trips.stream().map(this::toTripResponse).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponse<TripResponse> getAllTripsPaginated(
-            TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
-        Page<Trip> tripsPage = tripRepository.search(status, driverId, dateFrom, dateTo, pageable);
-        return PageResponse.from(tripsPage.map(this::toTripResponse));
-    }
-
-    @Transactional(readOnly = true)
-    public List<TripOrderMarkerDto> getActiveTripOrderMarkers(UUID driverId) {
-        UUID effectiveDriverId = driverId;
-        if (!securityService.isAdmin()) {
-            Driver currentDriver = resolveCurrentDriver();
-            effectiveDriverId = currentDriver.getId();
-        }
-        return tripRepository.findByDriverIdAndStatus(effectiveDriverId, TripStatus.IN_PROGRESS)
-                .map(trip -> {
-                    List<Order> orders = orderRepository.findByTripId(trip.getId());
-                    trip.setOrders(orders);
-                    return buildOrderMarkers(trip);
-                })
-                .orElse(List.of());
-    }
-
-    @Transactional(readOnly = true)
-    public List<TripOrderMarkerDto> getTripOrderMarkers(UUID tripId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new ResourceNotFoundException("Trip", "id", tripId));
-        requireDriverOwnsTripForNonAdmin(trip);
-        List<Order> orders = orderRepository.findByTripId(tripId);
-        trip.setOrders(orders);
-        return buildOrderMarkers(trip);
-    }
-
-    private Driver resolveCurrentDriver() {
-        UUID currentUserId = securityService.getCurrentUserId();
-        return driverRepository.findByUserId(currentUserId)
-                .orElseThrow(() -> new AccessDeniedException("Only drivers can access their own trip data"));
-    }
-
-    private void requireDriverOwnsTripForNonAdmin(Trip trip) {
-        if (securityService.isAdmin()) {
-            return;
-        }
-        Driver currentDriver = resolveCurrentDriver();
-        if (trip.getDriver() == null || !trip.getDriver().getId().equals(currentDriver.getId())) {
-            throw new AccessDeniedException("This trip is not assigned to you");
-        }
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -274,7 +229,7 @@ public class TripService {
         eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
 
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -337,9 +292,9 @@ public class TripService {
         deliveryService.recalculateDriverAvailability(trip.getDriver().getUser().getId());
 
         eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
-        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
+        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, tripViews.buildOrderMarkers(trip)));
 
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -409,9 +364,9 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Orders updated on trip '" + trip.getName() + "'");
 
-        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
+        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, tripViews.buildOrderMarkers(trip)));
 
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -429,7 +384,7 @@ public class TripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Mileage updated to " + mileageKm + " km on trip '" + trip.getName() + "'");
 
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     @Transactional
@@ -481,7 +436,7 @@ public class TripService {
         eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, previousStatus, orders.size()));
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, List.of()));
 
-        return toTripResponse(trip);
+        return tripViews.toTripResponse(trip);
     }
 
     private void syncOrdersDriver(Trip trip) {
@@ -493,154 +448,4 @@ public class TripService {
         }
     }
 
-    private List<TripOrderMarkerDto> buildOrderMarkers(Trip trip) {
-        List<Order> orders = orderRepository.findByTripId(trip.getId());
-        if (orders == null || orders.isEmpty()) {
-            return List.of();
-        }
-        return orders.stream()
-                .map(this::toTripOrderMarkerDto)
-                .toList();
-    }
-
-    private TripOrderMarkerDto toTripOrderMarkerDto(Order order) {
-        String customerName = null;
-        String customerPhone = null;
-        String street = null;
-        String addressLine2 = null;
-        String city = null;
-        String postalCode = null;
-        String district = null;
-        String country = null;
-
-        if (order.getCustomer() != null) {
-            customerName = order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName();
-            customerPhone = order.getCustomer().getPhoneNumber();
-            if (order.getCustomer().getAddress() != null) {
-                var addr = order.getCustomer().getAddress();
-                street = addr.getStreet();
-                addressLine2 = addr.getAddressLine2();
-                city = addr.getCity();
-                postalCode = addr.getPostalCode();
-                district = addr.getDistrict() != null ? addr.getDistrict().getDisplayName() : null;
-                country = addr.getCountry();
-            }
-        }
-
-        String formattedAddress = buildFormattedAddress(street, addressLine2, city, postalCode, district, country);
-
-        return new TripOrderMarkerDto(
-                order.getId(),
-                order.getOrderNumber(),
-                customerName,
-                customerPhone,
-                street,
-                addressLine2,
-                city,
-                postalCode,
-                district,
-                country,
-                order.getDeliveryStatus(),
-                order.getStatus(),
-                order.getTotalAmount(),
-                formattedAddress
-        );
-    }
-
-    private String buildFormattedAddress(String street, String addressLine2, String city,
-                                         String postalCode, String district, String country) {
-        StringBuilder sb = new StringBuilder();
-        if (street != null) sb.append(street);
-        if (addressLine2 != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(addressLine2);
-        }
-        if (city != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(city);
-        }
-        if (postalCode != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(postalCode);
-        }
-        if (district != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(district);
-        }
-        if (country != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(country);
-        }
-        return sb.toString();
-    }
-
-    private TripResponse toTripResponse(Trip trip) {
-        TripResponse response = tripMapper.toResponse(trip);
-
-        List<Order> orders = orderRepository.findByTripId(trip.getId());
-
-        response.setOrderCount(orders.size());
-
-        int paidCount = 0;
-        int partialCount = 0;
-        int unpaidCount = 0;
-        int deliveredCount = 0;
-        int failedCount = 0;
-        BigDecimal expected = BigDecimal.ZERO;
-        BigDecimal collected = BigDecimal.ZERO;
-
-        for (Order order : orders) {
-            if (order.getDeliveryStatus() == DeliveryStatus.DELIVERED) {
-                deliveredCount++;
-            } else if (order.getDeliveryStatus() == DeliveryStatus.FAILED_PERMANENT) {
-                failedCount++;
-            }
-            boolean saleable = !EXCLUDED_FROM_SETTLEMENT.contains(order.getStatus())
-                    && order.getDeliveryStatus() != DeliveryStatus.FAILED_PERMANENT;
-            if (!saleable) {
-                continue;
-            }
-            expected = expected.add(order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO);
-            collected = collected.add(order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO);
-
-            if (order.getPaidAmount() != null && order.getTotalAmount() != null) {
-                if (order.getPaidAmount().compareTo(BigDecimal.ZERO) == 0) {
-                    unpaidCount++;
-                } else if (order.getPaidAmount().compareTo(order.getTotalAmount()) >= 0) {
-                    paidCount++;
-                } else {
-                    partialCount++;
-                }
-            } else {
-                unpaidCount++;
-            }
-        }
-
-        response.setPaidOrderCount(paidCount);
-        response.setPartialOrderCount(partialCount);
-        response.setUnpaidOrderCount(unpaidCount);
-        response.setDeliveredOrderCount(deliveredCount);
-        response.setFailedOrderCount(failedCount);
-
-        response.setExpectedAmount(expected);
-        response.setCollectedAmount(collected);
-        response.setOutstandingAmount(expected.subtract(collected));
-
-        List<Expense> expenseList = expenseRepository.findByTripIdWithRelations(trip.getId());
-
-        BigDecimal totalExpenses = BigDecimal.ZERO;
-        for (Expense expense : expenseList) {
-            if (expense.getStatus() == ExpenseStatus.APPROVED && expense.getAmount() != null) {
-                totalExpenses = totalExpenses.add(expense.getAmount());
-            }
-        }
-
-        response.setTotalExpenses(totalExpenses);
-        response.setNetAmount(collected.subtract(totalExpenses));
-
-        response.setOrderIds(orders.stream().map(Order::getId).collect(Collectors.toList()));
-        response.setExpenses(expenseList.stream().map(expenseMapper::toResponse).collect(Collectors.toList()));
-
-        return response;
-    }
 }

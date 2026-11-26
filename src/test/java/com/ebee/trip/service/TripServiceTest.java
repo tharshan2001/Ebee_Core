@@ -63,6 +63,16 @@ class TripServiceTest {
     @Mock private DeliveryService deliveryService;
 
     @InjectMocks private TripService tripService;
+    @InjectMocks private TripViews tripViews;
+    @InjectMocks private TripQueryService tripQueryService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void wireSplitTripServices() {
+        // TripService builds responses with TripViews and hands lookups to TripQueryService (same mocks underneath).
+        ReflectionTestUtils.setField(tripQueryService, "tripViews", tripViews);
+        ReflectionTestUtils.setField(tripService, "tripViews", tripViews);
+        ReflectionTestUtils.setField(tripService, "tripQueryService", tripQueryService);
+    }
 
     private UUID tripId;
     private UUID driverId;

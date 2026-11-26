@@ -73,11 +73,13 @@ class DriverAppServiceTest {
     @InjectMocks private DriverAppService driverAppService;
     @InjectMocks private DriverTripService driverTripService;
     @InjectMocks private DriverContext driverContext;
+    @InjectMocks private com.ebee.trip.service.TripViews tripViews;
 
     @org.junit.jupiter.api.BeforeEach
     void wireDriverContext() {
         // Trips live in DriverTripService; the signed-in driver comes from a real DriverContext on the same mocks.
         ReflectionTestUtils.setField(driverTripService, "driverContext", driverContext);
+        ReflectionTestUtils.setField(driverTripService, "tripViews", tripViews);
     }
 
     private UUID userId;
@@ -265,5 +267,34 @@ class DriverAppServiceTest {
         assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(order.getDeliveryAssignedTo()).isEqualTo(user);
         verify(eventPublisher, never()).publishEvent(any(DeliveryStatusChangedEvent.class));
+    }
+
+    @Test
+    void changingTripOrders_publishesTheSameMapMarkersAsTheAdminScreens() {
+        Order staying = Order.builder().id(UUID.randomUUID()).orderNumber("JF-A-20250614-002")
+                .status(OrderStatus.SHIPPED).totalAmount(new BigDecimal("1200.00"))
+                .deliveryStatus(DeliveryStatus.ASSIGNED).build();
+        order.setTrip(trip);
+        order.setDeliveryAssignedTo(user);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        com.ebee.trip.dto.AddOrdersToTripRequest request = new com.ebee.trip.dto.AddOrdersToTripRequest();
+        request.setOrderIdsToRemove(List.of(orderId));
+        when(orderRepository.findByTripId(tripId)).thenReturn(List.of(staying));
+
+        driverTripService.addOrdersToTrip(tripId, request);
+
+        org.mockito.ArgumentCaptor<org.springframework.context.ApplicationEvent> events =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.context.ApplicationEvent.class);
+        verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(events.capture());
+        var changed = events.getAllValues().stream()
+                .filter(e -> e instanceof com.ebee.trip.event.TripOrdersChangedEvent)
+                .map(e -> (com.ebee.trip.event.TripOrdersChangedEvent) e).findFirst().orElseThrow();
+        // Built by TripViews, exactly as the admin trip map builds them.
+        assertThat(changed.getOrderMarkers()).isEqualTo(tripViews.buildOrderMarkers(trip));
+        assertThat(changed.getOrderMarkers()).extracting(com.ebee.trip.dto.TripOrderMarkerDto::orderNumber)
+                .contains("JF-A-20250614-002");
     }
 }

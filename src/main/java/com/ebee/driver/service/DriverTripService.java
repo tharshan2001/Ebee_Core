@@ -79,6 +79,8 @@ public class DriverTripService {
     private final TripMapper tripMapper;
     private final TripOrderLifecycle tripOrderLifecycle;
     private final DriverContext driverContext;
+    /** Map markers come from the same place as the admin trip screens. */
+    private final com.ebee.trip.service.TripViews tripViews;
 
     @Transactional(readOnly = true)
     public List<TripResponse> getAvailableTrips() {
@@ -217,7 +219,7 @@ public class DriverTripService {
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Orders updated on trip '" + trip.getName() + "'");
 
-        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, buildOrderMarkers(trip)));
+        eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, tripViews.buildOrderMarkers(trip)));
 
         return tripMapper.toResponse(trip);
     }
@@ -333,87 +335,6 @@ public class DriverTripService {
                 "Driver expense " + expense.getCategory() + " LKR " + expense.getAmount() + " created on trip '" + trip.getName() + "'");
 
         return expenseMapper.toResponse(expense);
-    }
-
-    private List<TripOrderMarkerDto> buildOrderMarkers(Trip trip) {
-        List<Order> orders = orderRepository.findByTripId(trip.getId());
-        if (orders == null || orders.isEmpty()) {
-            return List.of();
-        }
-        return orders.stream()
-                .map(this::toTripOrderMarkerDto)
-                .toList();
-    }
-
-    private TripOrderMarkerDto toTripOrderMarkerDto(Order order) {
-        String customerName = null;
-        String customerPhone = null;
-        String street = null;
-        String addressLine2 = null;
-        String city = null;
-        String postalCode = null;
-        String district = null;
-        String country = null;
-
-        if (order.getCustomer() != null) {
-            customerName = order.getCustomer().getFirstName() + " " + order.getCustomer().getLastName();
-            customerPhone = order.getCustomer().getPhoneNumber();
-            if (order.getCustomer().getAddress() != null) {
-                var addr = order.getCustomer().getAddress();
-                street = addr.getStreet();
-                addressLine2 = addr.getAddressLine2();
-                city = addr.getCity();
-                postalCode = addr.getPostalCode();
-                district = addr.getDistrict() != null ? addr.getDistrict().getDisplayName() : null;
-                country = addr.getCountry();
-            }
-        }
-
-        String formattedAddress = buildFormattedAddress(street, addressLine2, city, postalCode, district, country);
-
-        return new TripOrderMarkerDto(
-                order.getId(),
-                order.getOrderNumber(),
-                customerName,
-                customerPhone,
-                street,
-                addressLine2,
-                city,
-                postalCode,
-                district,
-                country,
-                order.getDeliveryStatus(),
-                order.getStatus(),
-                order.getTotalAmount(),
-                formattedAddress
-        );
-    }
-
-    private String buildFormattedAddress(String street, String addressLine2, String city,
-                                         String postalCode, String district, String country) {
-        StringBuilder sb = new StringBuilder();
-        if (street != null) sb.append(street);
-        if (addressLine2 != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(addressLine2);
-        }
-        if (city != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(city);
-        }
-        if (postalCode != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(postalCode);
-        }
-        if (district != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(district);
-        }
-        if (country != null) {
-            if (!sb.isEmpty()) sb.append(", ");
-            sb.append(country);
-        }
-        return sb.toString();
     }
 
 }

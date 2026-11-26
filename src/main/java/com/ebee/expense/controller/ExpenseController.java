@@ -3,6 +3,7 @@ package com.ebee.expense.controller;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
+import com.ebee.expense.enums.ExpenseStatus;
 import com.ebee.expense.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,8 +48,9 @@ public class ExpenseController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getAllExpenses(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        Page<ExpenseResponse> expenses = expenseService.getAllExpenses(page, size);
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) ExpenseStatus status) {
+        Page<ExpenseResponse> expenses = expenseService.getAllExpenses(page, size, status);
         return ResponseEntity.ok(ApiResponse.success("Expenses retrieved successfully", expenses));
     }
 
@@ -68,8 +70,10 @@ public class ExpenseController {
 
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<ExpenseResponse>> approveExpense(@PathVariable UUID id) {
-        ExpenseResponse response = expenseService.approveExpense(id);
+    public ResponseEntity<ApiResponse<ExpenseResponse>> approveExpense(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID accountId) {
+        ExpenseResponse response = expenseService.approveExpense(id, accountId);
         return ResponseEntity.ok(ApiResponse.success("Expense approved successfully", response));
     }
 

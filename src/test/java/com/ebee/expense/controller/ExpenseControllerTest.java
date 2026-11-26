@@ -33,6 +33,9 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -115,7 +118,7 @@ class ExpenseControllerTest {
     @WithMockUser(roles = "ADMIN")
     void getAllExpenses_asAdmin_returns200() throws Exception {
         Page<ExpenseResponse> page = new PageImpl<>(List.of(new ExpenseResponse()));
-        when(expenseService.getAllExpenses(anyInt(), anyInt())).thenReturn(page);
+        when(expenseService.getAllExpenses(anyInt(), anyInt(), isNull())).thenReturn(page);
 
         mockMvc.perform(get("/api/expenses"))
                 .andExpect(status().isOk());
@@ -132,10 +135,34 @@ class ExpenseControllerTest {
     @WithMockUser(roles = "ADMIN")
     void approveExpense_asAdmin_returns200() throws Exception {
         UUID expenseId = UUID.randomUUID();
-        when(expenseService.approveExpense(expenseId)).thenReturn(new ExpenseResponse());
+        when(expenseService.approveExpense(expenseId, null)).thenReturn(new ExpenseResponse());
 
         mockMvc.perform(put("/api/expenses/{id}/approve", expenseId))
                 .andExpect(status().isOk());
+        verify(expenseService).approveExpense(expenseId, null);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void approveExpense_withAccount_passesTheAccountOn() throws Exception {
+        UUID expenseId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        when(expenseService.approveExpense(expenseId, accountId)).thenReturn(new ExpenseResponse());
+
+        mockMvc.perform(put("/api/expenses/{id}/approve", expenseId).param("accountId", accountId.toString()))
+                .andExpect(status().isOk());
+        verify(expenseService).approveExpense(expenseId, accountId);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getAllExpenses_withStatus_filtersByIt() throws Exception {
+        when(expenseService.getAllExpenses(anyInt(), anyInt(), eq(com.ebee.expense.enums.ExpenseStatus.PENDING)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/expenses").param("status", "PENDING"))
+                .andExpect(status().isOk());
+        verify(expenseService).getAllExpenses(0, 20, com.ebee.expense.enums.ExpenseStatus.PENDING);
     }
 
     @Test

@@ -119,8 +119,16 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public Page<ExpenseResponse> getAllExpenses(int page, int size) {
-        int cappedSize = Math.min(size, 200);
-        return expenseRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, cappedSize))
+        return getAllExpenses(page, size, null);
+    }
+
+    /** All expenses, newest first; with {@code status}, only those (e.g. PENDING for the approval queue). */
+    @Transactional(readOnly = true)
+    public Page<ExpenseResponse> getAllExpenses(int page, int size, ExpenseStatus status) {
+        PageRequest pageable = PageRequest.of(page, Math.min(size, 200));
+        return (status == null
+                ? expenseRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : expenseRepository.findByStatusOrderByCreatedAtDesc(status, pageable))
                 .map(expenseMapper::toResponse);
     }
 
@@ -142,6 +150,15 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseResponse approveExpense(UUID id) {
+        return approveExpense(id, null);
+    }
+
+    /**
+     * Approves a pending expense and records the money going out of {@code accountId}, or of the
+     * default account for expenses when none is given (Bank & Cash settings).
+     */
+    @Transactional
+    public ExpenseResponse approveExpense(UUID id, UUID accountId) {
         Expense expense = findExpense(id);
 
         if (expense.getStatus() != ExpenseStatus.PENDING) {
@@ -155,7 +172,7 @@ public class ExpenseService {
         expense.setApprovedBy(admin);
         expense.setApprovedAt(LocalDateTime.now());
         expense = expenseRepository.save(expense);
-        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, expense.getAmount(), "EXPENSE", null,
+        moneyAccountService.recordMovement(com.ebee.finance.entity.AccountTransaction.Direction.OUT, expense.getAmount(), "EXPENSE", accountId,
                 com.ebee.finance.entity.AccountTransaction.Type.EXPENSE, "EXPENSE", expense.getId(), "Expense " + expense.getCategory());
 
         auditLogService.record(AuditAction.EXPENSE_APPROVE, "Expense", expense.getId(),

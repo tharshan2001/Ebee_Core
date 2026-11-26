@@ -48,6 +48,7 @@ public abstract class RealDatabaseTest {
     @Autowired protected ProductRepository productRepository;
     @Autowired protected AgentRepository agentRepository;
     @Autowired protected OrderRepository orderRepository;
+    @Autowired protected com.ebee.commission.repository.CommissionConfigRepository commissionConfigRepository;
 
     protected final String suffix = UUID.randomUUID().toString().substring(0, 8);
     protected User admin;
@@ -73,13 +74,40 @@ public abstract class RealDatabaseTest {
         SecurityContextHolder.clearContext();
     }
 
+    // Sequential from a random start: unique within a run (random numbers collided once a test
+    // created hundreds of customers), and unlikely to clash with a developer database's rows.
+    private static final java.util.concurrent.atomic.AtomicInteger PHONE_SEQ =
+            new java.util.concurrent.atomic.AtomicInteger(new java.util.Random().nextInt(5_000_000));
+
+    protected static String nextPhone() {
+        return "077" + String.format("%07d", PHONE_SEQ.incrementAndGet() % 10_000_000);
+    }
+
     protected Customer customer() {
         return customerRepository.save(Customer.builder()
                 .firstName("Test")
                 .lastName("Customer " + suffix)
-                .phoneNumber("077" + String.format("%07d", Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000)))
+                .phoneNumber(nextPhone())
                 .customerCode("CU-" + UUID.randomUUID().toString().substring(0, 8))
                 .build());
+    }
+
+    /**
+     * Real order creation needs an active DEFAULT commission rate. A developer database usually has
+     * one; CI's empty database doesn't, so tests that create orders must call this (it adds a 7.5%
+     * default only when none is active; @Transactional tests roll it back).
+     */
+    protected void ensureDefaultCommissionRate() {
+        if (commissionConfigRepository.findFirstByTypeAndIsActiveTrue(com.ebee.commission.enums.CommissionType.DEFAULT).isEmpty()) {
+            commissionConfigRepository.save(com.ebee.commission.entity.CommissionConfig.builder()
+                    .name("Test default " + suffix)
+                    .commissionRate(new BigDecimal("7.5"))
+                    .type(com.ebee.commission.enums.CommissionType.DEFAULT)
+                    .appliesTo("ALL")
+                    .isActive(true)
+                    .effectiveFrom(java.time.LocalDateTime.now().minusDays(1))
+                    .build());
+        }
     }
 
     protected Agent agent() {

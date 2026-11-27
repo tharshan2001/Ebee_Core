@@ -125,6 +125,10 @@ public class DriverDeliveryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         driverContext.assertDriverAssigned(order);
+        // A driver finishes a delivery only through completeDelivery, which needs the proof of delivery.
+        if (request.getStatus() == DeliveryStatus.DELIVERED) {
+            throw new IllegalArgumentException(DeliveryService.PROOF_REQUIRED);
+        }
         assertDriverCanTransition(order.getDeliveryStatus(), request.getStatus());
 
         if (request.getDriverNotes() != null) {
@@ -132,15 +136,9 @@ public class DriverDeliveryService {
         }
 
         DeliveryStatus previousStatus = order.getDeliveryStatus();
-        DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
-                order, request.getStatus(), request.getReason(), false);
+        deliveryStateTransition.transition(order, request.getStatus(), request.getReason(), false);
 
         Order savedOrder = orderRepository.save(order);
-
-        if (result.wasDelivered()) {
-            commissionLifecycleService.approveCommissionForOrder(savedOrder.getId());
-            driverContext.recalculateDriverAvailability(securityService.getCurrentUserId());
-        }
 
         if (request.getStatus() == DeliveryStatus.FAILED
                 && order.getDeliveryAssignedTo() != null) {
@@ -173,15 +171,12 @@ public class DriverDeliveryService {
                             + ". Update status to IN_TRANSIT first via updateDeliveryStatus.");
         }
 
-        if (photo != null && !photo.isEmpty()) {
-            String photoUrl = storagePort.uploadFile(photo, "deliveries", order.getOrderNumber() + "_Photo");
-            order.setDeliveryPhotoUrl(photoUrl);
+        // Both are checked before either is uploaded, so a refused request stores nothing.
+        if (photo == null || photo.isEmpty() || signature == null || signature.isEmpty()) {
+            throw new IllegalArgumentException(DeliveryService.PROOF_REQUIRED);
         }
-
-        if (signature != null && !signature.isEmpty()) {
-            String sigUrl = storagePort.uploadFile(signature, "deliveries", order.getOrderNumber() + "_Signature");
-            order.setDeliverySignatureUrl(sigUrl);
-        }
+        order.setDeliveryPhotoUrl(storagePort.uploadFile(photo, "deliveries", order.getOrderNumber() + "_Photo"));
+        order.setDeliverySignatureUrl(storagePort.uploadFile(signature, "deliveries", order.getOrderNumber() + "_Signature"));
 
         if (driverNotes != null) {
             order.setDriverNotes(driverNotes);

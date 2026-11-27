@@ -172,6 +172,23 @@ class DeliveryServiceTest {
     }
 
     @Test
+    void updateDeliveryStatus_driverCannotMarkOwnDeliveryDelivered_withoutProof() {
+        order.setDeliveryAssignedTo(User.builder().id(driverUserId).role(RoleType.DRIVER).build());
+        order.setDeliveryStatus(DeliveryStatus.IN_TRANSIT);
+        DeliveryStatusUpdateRequest request = new DeliveryStatusUpdateRequest();
+        request.setStatus(DeliveryStatus.DELIVERED);
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(securityService.isAdmin()).thenReturn(false);
+        when(securityService.getCurrentUserId()).thenReturn(driverUserId);
+
+        assertThatThrownBy(() -> deliveryService.updateDeliveryStatus(orderId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("photo and the customer's signature");
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.IN_TRANSIT);
+    }
+
+    @Test
     void updateDeliveryStatus_delivered_approvesCommission() {
         order.setDeliveryStatus(DeliveryStatus.IN_TRANSIT);
         DeliveryStatusUpdateRequest request = new DeliveryStatusUpdateRequest();

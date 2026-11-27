@@ -61,6 +61,9 @@ public class DeliveryService {
     private final ApplicationEventPublisher eventPublisher;
     private final OrderSettlementService orderSettlementService;
 
+    public static final String PROOF_REQUIRED =
+            "Complete the delivery with a photo and the customer's signature";
+
     @Transactional
     public DeliveryResponse updateDeliveryStatus(UUID orderId, DeliveryStatusUpdateRequest request) {
         Order order = orderRepository.findByIdWithDetails(orderId)
@@ -71,6 +74,10 @@ public class DeliveryService {
             if (order.getDeliveryAssignedTo() == null ||
                     !order.getDeliveryAssignedTo().getId().equals(currentUserId)) {
                 throw new AccessDeniedException("You can only update deliveries assigned to you");
+            }
+            // Drivers can't skip the proof of delivery through this endpoint; admins can still mark delivered.
+            if (request.getStatus() == DeliveryStatus.DELIVERED) {
+                throw new IllegalArgumentException(PROOF_REQUIRED);
             }
         }
 

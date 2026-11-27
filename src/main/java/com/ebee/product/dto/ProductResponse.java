@@ -34,6 +34,8 @@ public class ProductResponse {
     private List<String> imageUrls;
     private List<ProductImageResponse> images;
     private InventoryResponse inventory;
+    /** Whether any can be ordered. The only stock information anonymous visitors get. */
+    private Boolean inStock;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

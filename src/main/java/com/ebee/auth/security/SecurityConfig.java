@@ -57,7 +57,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints must also be skipped by JwtAuthenticationFilter.shouldNotFilter()
+                // Public endpoints must also be skipped by JwtAuthenticationFilter.shouldNotFilter(), except product
+                // reads, which parse any token because the response differs by caller (ProductVisibilityAdvice).
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/refresh",

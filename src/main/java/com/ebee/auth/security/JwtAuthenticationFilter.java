@@ -41,13 +41,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/auth/forgot-password")
                 || path.startsWith("/api/auth/verify-otp")
                 || path.startsWith("/api/auth/reset-password")
-                || ("GET".equals(request.getMethod()) && (path.startsWith("/api/products") || path.startsWith("/api/categories") || path.startsWith("/api/combos")))
+                // Product reads are public too, but still parse the token: what they show depends on who asks.
+                || ("GET".equals(request.getMethod()) && (path.startsWith("/api/categories") || path.startsWith("/api/combos")))
                 || path.startsWith("/api/agent-applications")
                 || path.startsWith("/api/whatsapp/webhook")
                 || path.startsWith("/ws")
                 || path.startsWith("/raw-ws")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui");
+    }
+
+    private boolean isProductRead(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return "GET".equals(request.getMethod()) && path.startsWith("/api/products");
     }
 
     @Override
@@ -90,6 +96,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.warn("Invalid JWT for request {}: {}", request.getServletPath(), e.getMessage());
         } catch (Exception e) {
             log.warn("JWT processing error for request {}: {}", request.getServletPath(), e.getMessage());
+        }
+
+        // A signed-in client with a stale token must be told to refresh it, not quietly given the
+        // trimmed public view of a product (which would look like everything is out of stock).
+        if (SecurityContextHolder.getContext().getAuthentication() == null && isProductRead(request)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write("{\"success\":false,\"message\":\"Unauthorized\"}");
+            return;
         }
 
         filterChain.doFilter(request, response);

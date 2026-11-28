@@ -31,6 +31,7 @@ public class ReportsController {
     private final FinancialReportService financialReportService;
     private final ActivityReportService activityReportService;
     private final ReportsService reportsService;
+    private final com.ebee.report.service.LedgerBrowseService ledgerBrowseService;
 
     @GetMapping("/sales/summary")
     public ResponseEntity<ApiResponse<SalesSummaryReport>> getSalesSummary(
@@ -290,6 +291,16 @@ public class ReportsController {
     @GetMapping("/trial-balance")
     public ResponseEntity<ApiResponse<TrialBalanceResponse>> getTrialBalance() {
         return ResponseEntity.ok(ApiResponse.success("Trial balance retrieved successfully", reportsService.getTrialBalance()));
+    }
+
+    @GetMapping("/ledgers")
+    public ResponseEntity<ApiResponse<com.ebee.report.dto.LedgerPage>> getLedger(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "customer") String book,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Ledger retrieved successfully", ledgerBrowseService.page(book, search,
+                com.ebee.common.util.PaginationUtils.safePage(page), com.ebee.common.util.PaginationUtils.safeSize(size))));
     }
 
     @GetMapping("/aging")

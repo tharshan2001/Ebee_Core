@@ -28,6 +28,9 @@ class ServerPagingIntegrationTest extends RealDatabaseTest {
     @Autowired private InventoryService inventory;
     @Autowired private ExpenseService expenses;
     @Autowired private ReportsService reports;
+    @Autowired private jakarta.persistence.EntityManager entityManager;
+    @Autowired private com.ebee.report.service.LedgerBrowseService ledgers;
+    @Autowired private com.ebee.accounting.service.LedgerService ledger;
 
     @Test
     void customerBalances_areFilteredSortedAndPaged_withTotalsOverAll() {
@@ -76,5 +79,27 @@ class ServerPagingIntegrationTest extends RealDatabaseTest {
         var aging = reports.getAgingReport(0, 1);
         assertThat(aging.getCustomerBuckets().size()).isLessThanOrEqualTo(1);
         assertThat(aging.getTotalBuckets()).isNotNull();
+    }
+
+    @Test
+    void ledgers_pageNewestFirst_withEachPartysRunningBalance() {
+        var c = customer();
+        ledger.recordCustomerAdjustment(c.getId(), new BigDecimal("100"), java.time.LocalDate.now(), "first " + suffix,
+                "test", admin.getId());
+        ledger.recordCustomerAdjustment(c.getId(), new BigDecimal("50"), java.time.LocalDate.now(), "second " + suffix,
+                "test", admin.getId());
+
+        entityManager.flush(); // the ledger screen reads with plain SQL
+
+        var page = ledgers.page("customer", suffix, 0, 1);
+        assertThat(page.page().getTotalElements()).isEqualTo(2);
+        assertThat(page.page().getTotalPages()).isEqualTo(2);
+        var all = ledgers.page("customer", suffix, 0, 10).page().getContent();
+        assertThat(all).extracting(r -> r.balance().intValue()).containsExactlyInAnyOrder(100, 150);
+        // A search for one entry still shows the balance over the party's whole history.
+        assertThat(ledgers.page("customer", "second " + suffix, 0, 10).page().getContent())
+                .singleElement().satisfies(r -> assertThat(r.balance()).isEqualByComparingTo("150"));
+        assertThat(ledgers.page("supplier", null, 0, 5).customerBalance()).isNotNull();
+        assertThat(ledgers.page("agent", null, 0, 5).page().getPageSize()).isEqualTo(5);
     }
 }

@@ -32,7 +32,7 @@ import java.util.UUID;
 /**
  * Creates customers (no welcome SMS/email), or updates them when the phone number already exists:
  * blank cells leave the stored value, and the address on file is kept. New customers need what the
- * create form needs: first name, phone and district. An opening balance is posted only for a customer with no history: positive =
+ * create form needs: first and last name, phone and district. An opening balance is posted only for a customer with no history: positive =
  * they owe you (ledger), negative = their advance.
  */
 @Component
@@ -151,6 +151,9 @@ public class CustomerImporter implements RowImporter {
             } else {
                 created++;
                 row.requiredText("district", errors);
+                if (row.text("last_name") == null) {
+                    errors.add(new RowError(n, "last_name", "is required for a new customer"));
+                }
             }
 
             if (opening != null && opening.signum() != 0) {

@@ -142,7 +142,7 @@ public class CustomerService {
 
         Customer customer = Customer.builder()
                 .firstName(request.getFirstName())
-                .lastName(request.getLastName() != null ? request.getLastName() : "") // optional, never null
+                .lastName(request.getLastName())
                 .phoneNumber(request.getPhoneNumber())
                 .phoneNumber2(secondPhone(request.getPhoneNumber2(), request.getPhoneNumber()))
                 .email(request.getEmail())

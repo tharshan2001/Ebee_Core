@@ -46,4 +46,26 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
                       @Param("dateFrom") LocalDate dateFrom,
                       @Param("dateTo") LocalDate dateTo,
                       Pageable pageable);
+
+    /** {@link #search} plus a lower-case LIKE pattern on the trip or driver name ("%" matches all). */
+    @Query(value = "SELECT t FROM Trip t LEFT JOIN t.driver d LEFT JOIN d.user u WHERE (:status IS NULL OR t.status = :status) "
+            + "AND (:driverId IS NULL OR d.id = :driverId) "
+            + "AND t.startDate >= COALESCE(:dateFrom, CAST('0001-01-01' AS date)) "
+            + "AND t.endDate <= COALESCE(:dateTo, CAST('9999-12-31' AS date)) "
+            + "AND (LOWER(t.name) LIKE :q OR LOWER(CONCAT(COALESCE(u.firstName, ''), ' ', COALESCE(u.lastName, ''))) LIKE :q)",
+           countQuery = "SELECT COUNT(t) FROM Trip t LEFT JOIN t.driver d LEFT JOIN d.user u WHERE (:status IS NULL OR t.status = :status) "
+            + "AND (:driverId IS NULL OR d.id = :driverId) "
+            + "AND t.startDate >= COALESCE(:dateFrom, CAST('0001-01-01' AS date)) "
+            + "AND t.endDate <= COALESCE(:dateTo, CAST('9999-12-31' AS date)) "
+            + "AND (LOWER(t.name) LIKE :q OR LOWER(CONCAT(COALESCE(u.firstName, ''), ' ', COALESCE(u.lastName, ''))) LIKE :q)")
+    Page<Trip> searchByText(@Param("status") TripStatus status,
+                            @Param("driverId") UUID driverId,
+                            @Param("dateFrom") LocalDate dateFrom,
+                            @Param("dateTo") LocalDate dateTo,
+                            @Param("q") String q,
+                            Pageable pageable);
+
+    /** Rows of [status, number of trips]. */
+    @Query("SELECT t.status, COUNT(t) FROM Trip t GROUP BY t.status")
+    List<Object[]> countByStatus();
 }

@@ -28,6 +28,7 @@ class ServerPagingIntegrationTest extends RealDatabaseTest {
     @Autowired private InventoryService inventory;
     @Autowired private ExpenseService expenses;
     @Autowired private ReportsService reports;
+    @Autowired private com.ebee.trip.service.TripService trips;
     @Autowired private jakarta.persistence.EntityManager entityManager;
     @Autowired private com.ebee.report.service.LedgerBrowseService ledgers;
     @Autowired private com.ebee.accounting.service.LedgerService ledger;
@@ -101,5 +102,14 @@ class ServerPagingIntegrationTest extends RealDatabaseTest {
                 .singleElement().satisfies(r -> assertThat(r.balance()).isEqualByComparingTo("150"));
         assertThat(ledgers.page("supplier", null, 0, 5).customerBalance()).isNotNull();
         assertThat(ledgers.page("agent", null, 0, 5).page().getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    void trips_areSearchedAndPaged_andCountedByStatus() {
+        var page = org.springframework.data.domain.PageRequest.of(0, 5,
+                org.springframework.data.domain.Sort.by("createdAt").descending());
+        assertThat(trips.getAllTripsPaginated(null, null, null, null, "no-such-" + suffix, page).getContent()).isEmpty();
+        assertThat(trips.getAllTripsPaginated(null, null, null, null, null, page).getPageSize()).isEqualTo(5);
+        assertThat(trips.countByStatus()).containsKeys(com.ebee.trip.enums.TripStatus.values());
     }
 }

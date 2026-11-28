@@ -76,9 +76,22 @@ public class TripQueryService {
 
     @Transactional(readOnly = true)
     public PageResponse<TripResponse> getAllTripsPaginated(
-            TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
-        Page<Trip> tripsPage = tripRepository.search(status, driverId, dateFrom, dateTo, pageable);
+            TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String search,
+            Pageable pageable) {
+        Page<Trip> tripsPage = tripRepository.searchByText(status, driverId, dateFrom, dateTo,
+                com.ebee.common.util.SearchPatterns.contains(search), pageable);
         return PageResponse.from(tripsPage.map(tripViews::toTripResponse));
+    }
+
+    /** How many trips are in each status (statuses with none are included as 0). */
+    @Transactional(readOnly = true)
+    public java.util.Map<TripStatus, Long> countByStatus() {
+        java.util.Map<TripStatus, Long> counts = new java.util.EnumMap<>(TripStatus.class);
+        for (TripStatus s : TripStatus.values()) {
+            counts.put(s, 0L);
+        }
+        tripRepository.countByStatus().forEach(row -> counts.put((TripStatus) row[0], (Long) row[1]));
+        return counts;
     }
 
     @Transactional(readOnly = true)

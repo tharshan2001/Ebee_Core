@@ -190,6 +190,9 @@ public class DriverTripService {
                 order.setTrip(trip);
                 order.setDeliveryAssignedTo(driver.getUser());
                 orderRepository.save(order);
+                if (trip.getStatus() == TripStatus.IN_PROGRESS) {
+                    assignOnRunningTrip(order);
+                }
             }
         }
 
@@ -216,12 +219,28 @@ public class DriverTripService {
 
         trip = tripRepository.save(trip);
 
+        if (trip.getStatus() == TripStatus.IN_PROGRESS) {
+            deliveryService.recalculateDriverAvailability(driver.getUser().getId());
+        }
+
         auditLogService.record(AuditAction.UPDATE, "Trip", trip.getId(),
                 "Orders updated on trip '" + trip.getName() + "'");
 
         eventPublisher.publishEvent(new TripOrdersChangedEvent(this, trip, tripViews.buildOrderMarkers(trip)));
 
         return tripMapper.toResponse(trip);
+    }
+
+    /** startTrip has already run, so an order joining now must be assigned here or it never moves. */
+    private void assignOnRunningTrip(Order order) {
+        if (!tripOrderLifecycle.isPendingForAssignment(order)) {
+            return;
+        }
+        DeliveryStateTransition.TransitionResult result = deliveryStateTransition.transition(
+                order, DeliveryStatus.ASSIGNED, "Added to running trip", false);
+        orderRepository.save(order);
+        eventPublisher.publishEvent(new DeliveryStatusChangedEvent(
+                this, order, result.previousStatus(), "Added to running trip", LocalDateTime.now()));
     }
 
     @Transactional

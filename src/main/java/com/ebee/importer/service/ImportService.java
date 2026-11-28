@@ -148,9 +148,18 @@ public class ImportService {
         List<ImportResult.PreviewRow> rows = o.dryRun()
                 ? o.parsed().rows().stream().map(r -> new ImportResult.PreviewRow(r.rowNumber(), r.values())).toList()
                 : List.of();
+        // Warn about the template's example row; it is valid data, so it is not an error.
+        List<RowError> notices = new ArrayList<>(o.notices());
+        int samples = 0;
+        for (ImportRow row : o.parsed().rows()) {
+            if (o.type().isSampleRow(row)) {
+                samples++;
+                notices.add(new RowError(row.rowNumber(), null, "this is the template's example row, not your data"));
+            }
+        }
         return new ImportResult(job.getId(), o.type(), o.dryRun(), status, o.total(), counts.created(),
-                counts.updated(), counts.skipped(), o.errors().size(), o.errors(), o.notices(), o.ignored(),
-                o.invalidRows(), columns, rows);
+                counts.updated(), counts.skipped(), o.errors().size(), o.errors(), notices, o.ignored(),
+                o.invalidRows(), columns, rows, samples);
     }
 
     private String toJson(List<RowError> errors) {

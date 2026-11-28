@@ -292,4 +292,38 @@ class ImportersTest {
                 && "Grocery".equals(r.getCategory()) && r.getCostPrice() == null));
         verify(productService, never()).createProduct(any());
     }
+
+    @Test
+    void productVatFlag_picksTheRate_andZeroRemovesItFromAnExistingProduct() {
+        var productRepo = mock(ProductRepository.class);
+        var productService = mock(com.ebee.product.service.ProductService.class);
+        var taxService = mock(com.ebee.tax.service.TaxService.class);
+        var vat = new com.ebee.tax.entity.TaxRate("VAT 18%", new BigDecimal("18"));
+        var exempt = new com.ebee.tax.entity.TaxRate("Exempt", BigDecimal.ZERO);
+        ReflectionTestUtils.setField(vat, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(exempt, "id", UUID.randomUUID());
+        when(taxService.listRates()).thenReturn(List.of(vat, exempt));
+        Product taxed = Product.builder().id(UUID.randomUUID()).name("Old").itemCode("OLD").taxRateId(vat.getId()).build();
+        when(productRepo.findByItemCodeIgnoreCase("OLD")).thenReturn(List.of(taxed));
+        var importer = new com.ebee.importer.service.importers.ProductImporter(productRepo, productService,
+                mock(com.ebee.category.repository.CategoryRepository.class),
+                mock(com.ebee.category.service.CategoryService.class), taxService, mock(InventoryService.class));
+
+        importer.apply(List.of(
+                row(2, "item_code", "YES", "name", "A", "category", "C", "vat", "1"),
+                row(3, "item_code", "NO", "name", "B", "category", "C", "vat", "0"),
+                row(4, "item_code", "OLD", "name", "Old", "category", "C", "vat", "0")));
+
+        verify(productService).createProduct(argThat(r -> "YES".equals(r.getItemCode()) && vat.getId().equals(r.getTaxRateId())));
+        verify(productService).createProduct(argThat(r -> "NO".equals(r.getItemCode()) && r.getTaxRateId() == null));
+        verify(productService).updateProduct(eq(taxed.getId()), argThat(r -> exempt.getId().equals(r.getTaxRateId())));
+
+        List<RowError> errors = new ArrayList<>();
+        importer.validate(List.of(
+                row(2, "item_code", "X", "name", "X", "category", "C", "vat", "2"),
+                row(3, "item_code", "Y", "name", "Y", "category", "C", "vat", "0", "vat_rate", "VAT 18%")),
+                errors, new ArrayList<>());
+        assertThat(messages(errors)).anyMatch(m -> m.startsWith("vat: '2'"))
+                .anyMatch(m -> m.startsWith("vat_rate") && m.contains("vat is 0"));
+    }
 }

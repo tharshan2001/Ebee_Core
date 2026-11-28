@@ -36,6 +36,7 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
     @Autowired private SupplierService supplierService;
     @Autowired private CategoryService categories;
     @Autowired private ReportsService reports;
+    @Autowired private com.ebee.product.service.ProductService productService;
     @Autowired private com.ebee.customer.service.CustomerService customerService;
 
     private ImportResult upload(ImportType type, String csv, boolean dryRun) throws IOException {
@@ -59,7 +60,7 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
         checkThenApply(ImportType.CUSTOMERS, ImportType.CUSTOMERS.templateCsv());
         checkThenApply(ImportType.SUPPLIERS, ImportType.SUPPLIERS.templateCsv());
 
-        Product product = productRepository.findByItemCodeIgnoreCase("SKU-001").get(0);
+        Product product = productRepository.findByItemCodeIgnoreCase("ITEM-001").get(0);
         assertThat(product.getCostPrice()).isEqualByComparingTo("900.00");
 
         var customer = customerRepository.findByPhoneNumber("0771234567").orElseThrow();
@@ -144,5 +145,23 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
         request.setPhoneNumber2(phone);
         assertThatThrownBy(() -> customerService.updateCustomer(customer.getId(), request))
                 .hasMessageContaining("different from the main phone");
+    }
+
+    @Test
+    void productsWithoutAnItemCode_getAGeneratedOne_andARepeatIsFlagged() throws IOException {
+        String name = "Uncoded " + suffix;
+        String csv = "name,category,price\n" + name + ",Misc " + suffix + ",10\n";
+        checkThenApply(ImportType.PRODUCTS, csv);
+        String code = productRepository.findByNameIgnoreCase(name).get(0).getItemCode();
+        assertThat(code).matches("ITM-\\d{5,}");
+
+        assertThat(upload(ImportType.PRODUCTS, csv, true).notices())
+                .anyMatch(n -> n.message().contains("already exists (" + code + ")"));
+
+        var request = new com.ebee.product.dto.ProductRequest();
+        request.setName("From form " + suffix);
+        request.setItemCode(" ");
+        request.setCategory("Misc " + suffix);
+        assertThat(productService.createProduct(request).getItemCode()).matches("ITM-\\d{5,}").isNotEqualTo(code);
     }
 }

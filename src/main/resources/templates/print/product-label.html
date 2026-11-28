@@ -24,7 +24,7 @@
       </td>
     </tr>
   </table>
-  <div class="sku" th:text="'SKU: ' + ${itemCode}">CODE</div>
+  <div class="sku" th:text="'Item code: ' + ${itemCode}">CODE</div>
   <div class="price" th:text="${#numbers.formatDecimal(price, 1, 2)}">0.00</div>
   <div class="meta">
     <span th:if="${category}" th:text="'Cat: ' + ${category}">Category</span>

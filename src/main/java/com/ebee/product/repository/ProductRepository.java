@@ -22,6 +22,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     List<Product> findByItemCodeIn(Collection<String> itemCodes);
 
+    @Query(value = "SELECT nextval('item_code_seq')", nativeQuery = true)
+    long nextItemCodeNumber();
+
+    List<Product> findByNameIgnoreCase(String name);
+
     /** Item codes are unique ignoring case; older data may still hold variants, hence a list. */
     List<Product> findByItemCodeIgnoreCase(String itemCode);
 

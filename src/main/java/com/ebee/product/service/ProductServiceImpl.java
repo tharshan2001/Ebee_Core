@@ -55,7 +55,9 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Override
     public ProductResponse createProduct(ProductRequest request) {
-        if (request.getItemCode() != null) {
+        if (request.getItemCode() == null || request.getItemCode().isBlank()) {
+            request.setItemCode(generateItemCode());
+        } else {
             request.setItemCode(request.getItemCode().trim());
         }
         if (productRepository.existsByItemCodeIgnoreCase(request.getItemCode())) {
@@ -103,6 +105,15 @@ public class ProductServiceImpl implements ProductService {
         }
 
         return getProductById(productId);
+    }
+
+    /** The next free ITM-nnnnn code; numbers someone already typed by hand are skipped. */
+    private String generateItemCode() {
+        String code;
+        do {
+            code = String.format("ITM-%05d", productRepository.nextItemCodeNumber());
+        } while (productRepository.existsByItemCodeIgnoreCase(code));
+        return code;
     }
 
     @Override
@@ -298,7 +309,7 @@ public class ProductServiceImpl implements ProductService {
         if (request.getName() != null) {
             product.setName(request.getName());
         }
-        if (request.getItemCode() != null) {
+        if (request.getItemCode() != null && !request.getItemCode().isBlank()) {
             String itemCode = request.getItemCode().trim();
             if (!itemCode.equalsIgnoreCase(product.getItemCode()) &&
                 productRepository.existsByItemCodeIgnoreCaseAndIdNot(itemCode, id)) {

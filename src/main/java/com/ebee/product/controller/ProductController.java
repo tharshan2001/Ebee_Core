@@ -50,7 +50,7 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @RequestParam("name") String name,
-            @RequestParam("itemCode") String itemCode,
+            @RequestParam(value = "itemCode", required = false) String itemCode,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("category") String category,
             @RequestParam(value = "price", required = false) BigDecimal price,

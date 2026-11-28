@@ -5,13 +5,13 @@ import java.util.List;
 /** What can be imported, with its columns (required first) and a sample row for the template. */
 public enum ImportType {
 
-    PRODUCTS(List.of("item_code", "name", "category", "price"),
-            List.of("cost_price", "brand", "description", "vat_rate", "tracks_expiry"),
-            List.of("SKU-001", "Coconut oil 1L", "Grocery", "1250.00", "900.00", "Kandy Gold", "Cold pressed", "VAT 18%", "false")),
+    PRODUCTS(List.of("name", "category", "price"),
+            List.of("item_code", "cost_price", "brand", "description", "vat", "vat_rate", "tracks_expiry"),
+            List.of("Coconut oil 1L", "Grocery", "1250.00", "ITEM-001", "900.00", "Kandy Gold", "Cold pressed", "1", "", "false")),
 
     OPENING_STOCK(List.of("item_code", "quantity", "unit_cost"),
             List.of("location_code", "lot_number", "expiry_date", "manufactured_date"),
-            List.of("SKU-001", "120", "900.00", "MAIN", "LOT-2026-11", "2027-11-30", "2026-11-01")),
+            List.of("ITEM-001", "120", "900.00", "MAIN", "LOT-2026-11", "2027-11-30", "2026-11-01")),
 
     CUSTOMERS(List.of("phone", "first_name", "district"),
             List.of("phone_2", "last_name", "street", "city", "email", "vat_number", "credit_limit", "opening_balance",

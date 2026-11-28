@@ -24,7 +24,8 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Bulk import from CSV or Excel. Types: products, opening-stock, customers, suppliers.
- * Upload with dryRun=true (the default) to check the file; upload again with dryRun=false to apply.
+ * Upload with dryRun=true (the default) to check the file; upload again with dryRun=false to apply,
+ * adding skipInvalid=true to leave out the rows with problems.
  */
 @RestController
 @RequestMapping("/api/imports")
@@ -40,12 +41,15 @@ public class ImportController {
     @PostMapping(value = "/{type}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ImportResult>> upload(@PathVariable String type,
                                                             @RequestParam("file") MultipartFile file,
-                                                            @RequestParam(defaultValue = "true") boolean dryRun) throws IOException {
-        ImportResult result = importService.run(ImportType.fromPath(type), file, dryRun);
+                                                            @RequestParam(defaultValue = "true") boolean dryRun,
+                                                            @RequestParam(defaultValue = "false") boolean skipInvalid)
+            throws IOException {
+        ImportResult result = importService.run(ImportType.fromPath(type), file, dryRun, skipInvalid);
         String message = switch (result.status()) {
             case VALID -> "File is valid: " + result.totalRows() + " rows ready to import";
             case INVALID -> result.errorCount() + " problem(s) found; nothing was imported";
-            case APPLIED -> "Imported " + result.totalRows() + " rows";
+            case APPLIED -> "Imported " + (result.totalRows() - result.invalidRows()) + " rows"
+                    + (result.invalidRows() > 0 ? "; " + result.invalidRows() + " left out" : "");
             case FAILED -> "Import failed; nothing was imported";
         };
         return ResponseEntity.ok(ApiResponse.success(message, result));

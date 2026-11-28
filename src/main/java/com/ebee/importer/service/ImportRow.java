@@ -25,6 +25,11 @@ public final class ImportRow {
         return rowNumber;
     }
 
+    /** The cells as read from the file, keyed by column. */
+    public Map<String, String> values() {
+        return values;
+    }
+
     public String text(String column) {
         String v = values.get(column);
         return v == null || v.isBlank() ? null : v.trim();
@@ -114,7 +119,7 @@ public final class ImportRow {
             case "true", "yes", "y", "1" -> true;
             case "false", "no", "n", "0" -> false;
             default -> {
-                errors.add(new RowError(rowNumber, column, "'" + v + "' must be true or false"));
+                errors.add(new RowError(rowNumber, column, "'" + v + "' must be 1 or 0 (yes or no also work)"));
                 yield null;
             }
         };

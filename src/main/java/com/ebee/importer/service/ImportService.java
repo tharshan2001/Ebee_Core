@@ -18,16 +18,18 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Import flow: read the file → check columns → validate every row → (dry run: stop here) →
- * apply all rows in one transaction. Nothing is written while there's any error.
+ * apply in one transaction. Rows with problems block the import unless the caller asks to skip them.
  */
 @Service
 public class ImportService {
 
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
-    static final int MAX_ERRORS_RETURNED = 200;
+    static final int MAX_ERRORS_STORED = 200;
     private static final RowImporter.Counts NOTHING = new RowImporter.Counts(0, 0, 0);
 
     private final Map<ImportType, RowImporter> importers = new EnumMap<>(ImportType.class);
@@ -46,60 +48,109 @@ public class ImportService {
     }
 
     public ImportResult run(ImportType type, MultipartFile file, boolean dryRun) throws IOException {
+        return run(type, file, dryRun, false);
+    }
+
+    /** @param skipInvalid when applying, leave out rows with problems and import the others */
+    public ImportResult run(ImportType type, MultipartFile file, boolean dryRun, boolean skipInvalid) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Upload a non-empty .csv or .xlsx file");
         }
         TabularFileReader.Parsed parsed = TabularFileReader.read(file.getOriginalFilename(), file.getInputStream());
-        return run(type, file.getOriginalFilename(), parsed, dryRun);
+        return run(type, file.getOriginalFilename(), parsed, dryRun, skipInvalid);
     }
 
-    ImportResult run(ImportType type, String fileName, TabularFileReader.Parsed parsed, boolean dryRun) {
+    /** The rows that pass the checks together, and what applying them would do. */
+    private record Checked(List<ImportRow> good, RowImporter.Counts counts, List<RowError> errors,
+                           List<RowError> notices) {
+    }
+
+    /**
+     * Checks the rows, then re-checks what is left after dropping the bad ones (rows are checked
+     * against each other too) until the remainder is clean. {@code errors} has every dropped row's
+     * problems; {@code notices} describes the first, complete pass.
+     */
+    private Checked check(RowImporter importer, List<ImportRow> rows) {
+        List<RowError> errors = new ArrayList<>();
+        List<RowError> notices = new ArrayList<>();
+        List<ImportRow> good = rows;
+        RowImporter.Counts counts = importer.validate(good, errors, notices);
+        List<RowError> found = errors;
+        while (!found.isEmpty()) {
+            Set<Integer> bad = found.stream().map(RowError::row).collect(Collectors.toSet());
+            List<ImportRow> rest = good.stream().filter(r -> !bad.contains(r.rowNumber())).toList();
+            if (rest.isEmpty() || rest.size() == good.size()) {
+                return new Checked(List.of(), NOTHING, errors, notices);
+            }
+            good = rest;
+            found = new ArrayList<>();
+            counts = importer.validate(good, found, new ArrayList<>());
+            errors.addAll(found);
+        }
+        return new Checked(good, counts, errors, notices);
+    }
+
+    ImportResult run(ImportType type, String fileName, TabularFileReader.Parsed parsed, boolean dryRun,
+                     boolean skipInvalid) {
         RowImporter importer = importers.get(type);
         if (importer == null) {
             throw new IllegalArgumentException("No importer for " + type);
         }
-        List<RowError> errors = new ArrayList<>();
+        // Problems with the file as a whole: nothing can be imported.
+        List<RowError> fileErrors = new ArrayList<>();
         for (String col : type.requiredColumns()) {
             if (!parsed.headers().contains(col)) {
-                errors.add(new RowError(1, col, "column is missing (download the template for the expected headers)"));
+                fileErrors.add(new RowError(1, col, "column is missing (download the template for the expected headers)"));
             }
         }
         List<String> ignored = parsed.headers().stream()
                 .filter(h -> !h.isBlank() && !type.allColumns().contains(h)).toList();
-        if (parsed.rows().isEmpty() && errors.isEmpty()) {
-            errors.add(new RowError(2, null, "the file has no data rows"));
+        if (parsed.rows().isEmpty() && fileErrors.isEmpty()) {
+            fileErrors.add(new RowError(2, null, "the file has no data rows"));
         }
-        List<RowError> notices = new ArrayList<>();
-        RowImporter.Counts preview = NOTHING;
-        if (errors.isEmpty()) {
-            preview = importer.validate(parsed.rows(), errors, notices);
-        }
-
         int total = parsed.rows().size();
-        if (!errors.isEmpty() || dryRun) {
-            ImportJob.Status status = errors.isEmpty() ? ImportJob.Status.VALID : ImportJob.Status.INVALID;
-            return finish(type, fileName, dryRun, status, total, errors.isEmpty() ? preview : NOTHING, errors, notices,
-                    ignored);
+        Checked checked = fileErrors.isEmpty()
+                ? check(importer, parsed.rows())
+                : new Checked(List.of(), NOTHING, fileErrors, List.of());
+        int invalid = fileErrors.isEmpty() ? total - checked.good().size() : total;
+        List<RowError> errors = new ArrayList<>(checked.errors());
+        Outcome outcome = new Outcome(type, fileName, dryRun, total, invalid, errors, checked.notices(), ignored, parsed);
+
+        if (dryRun) {
+            return finish(outcome, errors.isEmpty() ? ImportJob.Status.VALID : ImportJob.Status.INVALID, checked.counts());
+        }
+        if (checked.good().isEmpty() || (!errors.isEmpty() && !skipInvalid)) {
+            return finish(outcome, ImportJob.Status.INVALID, NOTHING);
         }
         try {
-            RowImporter.Counts counts = applier.apply(importer, parsed.rows());
-            return finish(type, fileName, false, ImportJob.Status.APPLIED, total, counts, errors, notices, ignored);
+            return finish(outcome, ImportJob.Status.APPLIED, applier.apply(importer, checked.good()));
         } catch (RuntimeException e) {
             log.warn("Import {} of '{}' failed and was rolled back: {}", type, fileName, e.getMessage());
             errors.add(new RowError(0, null, "Nothing was imported: " + e.getMessage()));
-            return finish(type, fileName, false, ImportJob.Status.FAILED, total, NOTHING, errors, List.of(), ignored);
+            return finish(outcome, ImportJob.Status.FAILED, NOTHING);
         }
     }
 
-    private ImportResult finish(ImportType type, String fileName, boolean dryRun, ImportJob.Status status, int total,
-                                RowImporter.Counts counts, List<RowError> errors, List<RowError> notices,
-                                List<String> ignored) {
-        List<RowError> shown = errors.size() > MAX_ERRORS_RETURNED ? errors.subList(0, MAX_ERRORS_RETURNED) : errors;
-        ImportJob job = jobRepository.save(new ImportJob(type.name(), fileName, dryRun, status, total, counts.created(),
-                counts.updated(), counts.skipped(), errors.size(), toJson(shown), securityService.getCurrentUserId()));
-        return new ImportResult(job.getId(), type, dryRun, status, total, counts.created(), counts.updated(),
-                counts.skipped(), errors.size(), shown,
-                notices.size() > MAX_ERRORS_RETURNED ? notices.subList(0, MAX_ERRORS_RETURNED) : notices, ignored);
+    private record Outcome(ImportType type, String fileName, boolean dryRun, int total, int invalidRows,
+                           List<RowError> errors, List<RowError> notices, List<String> ignored,
+                           TabularFileReader.Parsed parsed) {
+    }
+
+    private ImportResult finish(Outcome o, ImportJob.Status status, RowImporter.Counts counts) {
+        List<RowError> stored = o.errors().size() > MAX_ERRORS_STORED
+                ? o.errors().subList(0, MAX_ERRORS_STORED) : o.errors();
+        ImportJob job = jobRepository.save(new ImportJob(o.type().name(), o.fileName(), o.dryRun(), status, o.total(),
+                counts.created(), counts.updated(), counts.skipped(), o.errors().size(), toJson(stored),
+                securityService.getCurrentUserId()));
+        // The file is echoed back only for the check, which is what the screen draws its table from.
+        List<String> columns = o.dryRun()
+                ? o.parsed().headers().stream().filter(h -> !h.isBlank()).distinct().toList() : List.of();
+        List<ImportResult.PreviewRow> rows = o.dryRun()
+                ? o.parsed().rows().stream().map(r -> new ImportResult.PreviewRow(r.rowNumber(), r.values())).toList()
+                : List.of();
+        return new ImportResult(job.getId(), o.type(), o.dryRun(), status, o.total(), counts.created(),
+                counts.updated(), counts.skipped(), o.errors().size(), o.errors(), o.notices(), o.ignored(),
+                o.invalidRows(), columns, rows);
     }
 
     private String toJson(List<RowError> errors) {

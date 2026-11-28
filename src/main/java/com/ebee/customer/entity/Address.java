@@ -33,13 +33,13 @@ public class Address {
     @JoinColumn(name = "customer_id", nullable = false, unique = true)
     private Customer customer;
 
-    @Column(nullable = false, length = 255)
+    @Column(length = 255)
     private String street;
 
     @Column(name = "address_line_2", length = 255)
     private String addressLine2;
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String city;
 
     @Column(nullable = false, length = 100)

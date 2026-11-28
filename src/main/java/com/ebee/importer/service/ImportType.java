@@ -13,11 +13,11 @@ public enum ImportType {
             List.of("location_code", "lot_number", "expiry_date", "manufactured_date"),
             List.of("SKU-001", "120", "900.00", "MAIN", "LOT-2026-11", "2027-11-30", "2026-11-01")),
 
-    CUSTOMERS(List.of("phone", "first_name", "district", "city", "street"),
-            List.of("last_name", "email", "vat_number", "credit_limit", "opening_balance", "address_line2",
-                    "postal_code", "book_no"),
-            List.of("0771234567", "Nimal", "JF", "Jaffna", "12 Main Street", "Perera", "nimal@example.com", "",
-                    "50000", "12500.00", "", "40000", "")),
+    CUSTOMERS(List.of("phone", "first_name", "district"),
+            List.of("phone_2", "last_name", "street", "city", "email", "vat_number", "credit_limit", "opening_balance",
+                    "address_line2", "postal_code", "book_no"),
+            List.of("0771234567", "Nimal", "JF", "0212345678", "Perera", "12 Main Street", "Jaffna", "nimal@example.com",
+                    "", "50000", "12500.00", "", "40000", "")),
 
     SUPPLIERS(List.of("name", "address_line1", "city"),
             List.of("contact_person", "email", "phone", "district", "opening_balance"),

@@ -36,6 +36,7 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
     @Autowired private SupplierService supplierService;
     @Autowired private CategoryService categories;
     @Autowired private ReportsService reports;
+    @Autowired private com.ebee.customer.service.CustomerService customerService;
 
     private ImportResult upload(ImportType type, String csv, boolean dryRun) throws IOException {
         return imports.run(type, new MockMultipartFile("file", "file.csv", "text/csv", csv.getBytes()), dryRun);
@@ -67,7 +68,7 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
                         && b.getTotalOutstanding().compareTo(new BigDecimal("12500.00")) == 0);
 
         ImportResult again = upload(ImportType.CUSTOMERS,
-                "phone,first_name,district,city,street,opening_balance\n0771234567,Nimal,,,,999\n", false);
+                "phone,first_name,district,opening_balance\n0771234567,Nimal,,999\n", false);
         assertThat(again.status()).as("%s", again.errors()).isEqualTo(ImportJob.Status.APPLIED);
         assertThat(customer.getLastName()).isEqualTo("Perera");
         assertThat(customer.getOutstandingBalance()).isEqualByComparingTo("12500.00");
@@ -111,5 +112,36 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
         request.setExpiryDate(LocalDate.now().plusMonths(6));
 
         assertThat(inventory.adjustStock(request).getQuantity()).isEqualTo(5);
+    }
+
+    @Test
+    void onlyNamePhoneAndDistrictAreNeeded_andPhoneTwoCanBeSetAndRemoved() throws IOException {
+        String phone = nextPhone();
+        String second = nextPhone();
+        checkThenApply(ImportType.CUSTOMERS, "phone,first_name,district\n" + phone + ",Solo,JF\n");
+        var customer = customerRepository.findByPhoneNumber(phone).orElseThrow();
+        assertThat(customer.getLastName()).isEmpty();
+        assertThat(customer.getAddress().getStreet()).isNull();
+        assertThat(customer.getPhoneNumber2()).isNull();
+
+        checkThenApply(ImportType.CUSTOMERS, "phone,first_name,district,phone_2\n" + phone + ",Solo,," + second + "\n");
+        assertThat(customer.getPhoneNumber2()).isEqualTo(second);
+        assertThat(customerService.searchCustomers(second)).extracting(c -> c.getPhoneNumber()).containsExactly(phone);
+
+        var request = new com.ebee.customer.dto.CustomerRequest();
+        request.setFirstName("Solo");
+        request.setPhoneNumber(phone);
+        request.setPhoneNumber2("");
+        var address = new com.ebee.customer.dto.AddressRequest();
+        address.setDistrict("Jaffna");
+        address.setStreet("  ");
+        request.setAddress(address);
+        var updated = customerService.updateCustomer(customer.getId(), request);
+        assertThat(updated.getPhoneNumber2()).isNull();
+        assertThat(updated.getAddress().getStreet()).isNull();
+
+        request.setPhoneNumber2(phone);
+        assertThatThrownBy(() -> customerService.updateCustomer(customer.getId(), request))
+                .hasMessageContaining("different from the main phone");
     }
 }

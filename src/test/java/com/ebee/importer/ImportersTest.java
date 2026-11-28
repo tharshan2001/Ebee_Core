@@ -168,7 +168,7 @@ class ImportersTest {
     }
 
     @Test
-    void customerPreview_countsUpdates_andNewCustomersNeedWhatTheFormNeeds() {
+    void customerPreview_countsUpdates_andNewCustomersNeedOnlyNamePhoneAndDistrict() {
         var f = customers(true, true);
         List<RowError> errors = new ArrayList<>();
         List<RowError> notices = new ArrayList<>();
@@ -178,7 +178,7 @@ class ImportersTest {
                 row(3, "phone", "0770000000", "first_name", "New")), errors, notices);
 
         assertThat(preview).isEqualTo(new RowImporter.Counts(1, 1, 1));
-        assertThat(errors).extracting(RowError::column).containsExactly("district", "city", "street", "last_name");
+        assertThat(errors).extracting(RowError::column).containsExactly("district");
         assertThat(messages(notices)).anyMatch(m -> m.contains("will update the existing customer Nimal Perera"))
                 .anyMatch(m -> m.startsWith("opening_balance: not posted"));
     }

@@ -154,7 +154,6 @@ public class ProductImporter implements RowImporter {
             if (code == null) {
                 taxRateFor(row, null, rates, errors);
                 created++;
-                notices.add(new RowError(n, "item_code", "blank: an item code will be generated"));
                 // Without a code there is nothing to match on, so say when this looks like a repeat.
                 if (productName != null) {
                     if (!uncodedNames.add(productName.toLowerCase(Locale.ROOT))) {

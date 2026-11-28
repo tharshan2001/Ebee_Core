@@ -2,6 +2,7 @@ package com.ebee.importer;
 
 import com.ebee.common.security.SecurityService;
 import com.ebee.importer.service.ImportApplier;
+import com.ebee.importer.service.ImportRow;
 import com.ebee.importer.service.ImportService;
 import com.ebee.importer.service.ImportType;
 import com.ebee.importer.service.RowError;
@@ -101,5 +102,38 @@ class ImportServiceTest {
         assertThat(r.status()).isEqualTo(ImportJob.Status.FAILED);
         assertThat(r.errors().get(0).message()).contains("Nothing was imported").contains("database down");
         verify(jobs).save(any());
+    }
+
+    @Test
+    void skippingInvalidRows_appliesTheGoodOnes_andSaysWhichWereLeftOut() throws Exception {
+        doAnswer(inv -> {
+            List<ImportRow> rows = inv.getArgument(0);
+            List<RowError> errors = inv.getArgument(1);
+            rows.stream().filter(r -> r.text("city") == null)
+                    .forEach(r -> errors.add(new RowError(r.rowNumber(), "city", "is required")));
+            return new RowImporter.Counts(rows.size() - errors.size(), 0, 0);
+        }).when(importer).validate(anyList(), anyList(), anyList());
+        when(applier.apply(any(), anyList())).thenReturn(new RowImporter.Counts(1, 0, 0));
+        var csv = file("name,address_line1,city\nAcme,1 Road,Jaffna\nBad,2 Road,\n");
+
+        var check = service.run(ImportType.SUPPLIERS, csv, true, false);
+        assertThat(check.status()).isEqualTo(ImportJob.Status.INVALID);
+        assertThat(check.invalidRows()).isEqualTo(1);
+        assertThat(check.created()).isEqualTo(1);
+        assertThat(check.rows()).extracting(r -> r.values().get("name")).containsExactly("Acme", "Bad");
+
+        var applied = service.run(ImportType.SUPPLIERS, csv, false, true);
+        assertThat(applied.status()).isEqualTo(ImportJob.Status.APPLIED);
+        assertThat(applied.invalidRows()).isEqualTo(1);
+        assertThat(applied.errors()).extracting(RowError::row).containsExactly(3);
+        verify(applier).apply(any(), org.mockito.ArgumentMatchers.argThat((List<ImportRow> r) -> r.size() == 1));
+    }
+
+    @Test
+    void skippingCannotRescueAFileWithAMissingColumn() throws Exception {
+        var r = service.run(ImportType.SUPPLIERS, file("name,city\nAcme,Jaffna\n"), false, true);
+
+        assertThat(r.status()).isEqualTo(ImportJob.Status.INVALID);
+        verify(applier, never()).apply(any(), anyList());
     }
 }

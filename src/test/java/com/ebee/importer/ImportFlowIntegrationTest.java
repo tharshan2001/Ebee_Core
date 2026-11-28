@@ -115,12 +115,12 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
     }
 
     @Test
-    void onlyNamePhoneAndDistrictAreNeeded_andPhoneTwoCanBeSetAndRemoved() throws IOException {
+    void onlyNamesPhoneAndDistrictAreNeeded_andPhoneTwoCanBeSetAndRemoved() throws IOException {
         String phone = nextPhone();
         String second = nextPhone();
-        checkThenApply(ImportType.CUSTOMERS, "phone,first_name,district\n" + phone + ",Solo,JF\n");
+        checkThenApply(ImportType.CUSTOMERS, "phone,first_name,last_name,district\n" + phone + ",Solo,Silva,JF\n");
         var customer = customerRepository.findByPhoneNumber(phone).orElseThrow();
-        assertThat(customer.getLastName()).isEmpty();
+        assertThat(customer.getLastName()).isEqualTo("Silva");
         assertThat(customer.getAddress().getStreet()).isNull();
         assertThat(customer.getPhoneNumber2()).isNull();
 
@@ -130,6 +130,7 @@ class ImportFlowIntegrationTest extends RealDatabaseTest {
 
         var request = new com.ebee.customer.dto.CustomerRequest();
         request.setFirstName("Solo");
+        request.setLastName("Silva");
         request.setPhoneNumber(phone);
         request.setPhoneNumber2("");
         var address = new com.ebee.customer.dto.AddressRequest();

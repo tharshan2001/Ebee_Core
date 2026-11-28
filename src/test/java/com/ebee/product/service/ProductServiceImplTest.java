@@ -142,4 +142,16 @@ class ProductServiceImplTest {
         assertThat(product.getMaxDiscountType()).isEqualTo("FIXED");
         assertThat(product.getMaxDiscountValue()).isEqualByComparingTo(new BigDecimal("200.00"));
     }
+
+    @Test
+    @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT) // refused before saving
+    void updateProduct_priceBelowExistingMaxDiscount_isRefused() {
+        product.setMaxDiscountType("FIXED");
+        product.setMaxDiscountValue(new BigDecimal("200.00"));
+        ProductRequest request = new ProductRequest();
+        request.setPrice(new BigDecimal("150.00"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> productService.updateProduct(productId, request))
+                .hasMessageContaining("maximum discount");
+    }
 }

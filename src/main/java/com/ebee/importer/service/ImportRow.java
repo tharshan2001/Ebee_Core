@@ -38,6 +38,21 @@ public final class ImportRow {
         return v;
     }
 
+    /** Records an error when the value is longer than the database column. */
+    public void maxLength(String column, int max, List<RowError> errors) {
+        String v = text(column);
+        if (v != null && v.length() > max) {
+            errors.add(new RowError(rowNumber, column, "must be " + max + " characters or fewer"));
+        }
+    }
+
+    /** Records an error when the number is too large for the database column. */
+    public void maxValue(String column, BigDecimal value, BigDecimal max, List<RowError> errors) {
+        if (value != null && value.abs().compareTo(max) > 0) {
+            errors.add(new RowError(rowNumber, column, "is too large (limit " + max.toPlainString() + ")"));
+        }
+    }
+
     public BigDecimal decimal(String column, boolean required, boolean allowNegative, List<RowError> errors) {
         String v = text(column);
         if (v == null) {

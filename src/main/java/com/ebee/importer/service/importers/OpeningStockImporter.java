@@ -32,6 +32,8 @@ import java.util.UUID;
 @Component
 public class OpeningStockImporter implements RowImporter {
 
+    private static final BigDecimal MAX_UNIT_COST = new BigDecimal("99999999.99");
+
     private final ProductRepository productRepository;
     private final LocationRepository locationRepository;
     private final LocationService locationService;
@@ -56,12 +58,13 @@ public class OpeningStockImporter implements RowImporter {
     }
 
     @Override
-    public void validate(List<ImportRow> rows, List<RowError> errors) {
+    public Counts validate(List<ImportRow> rows, List<RowError> errors, List<RowError> notices) {
         Set<String> seen = new HashSet<>();
         for (ImportRow row : rows) {
             String code = row.requiredText("item_code", errors);
             row.positiveInt("quantity", errors);
-            row.decimal("unit_cost", true, false, errors);
+            row.maxValue("unit_cost", row.decimal("unit_cost", true, false, errors), MAX_UNIT_COST, errors);
+            row.maxLength("lot_number", 50, errors);
             var expiry = row.date("expiry_date", errors);
             row.date("manufactured_date", errors);
             Optional<Location> loc = location(row);
@@ -73,7 +76,7 @@ public class OpeningStockImporter implements RowImporter {
             if (code == null) {
                 continue;
             }
-            Optional<Product> product = productRepository.findByItemCode(code);
+            Optional<Product> product = ItemCodes.find(productRepository, code);
             if (product.isEmpty()) {
                 errors.add(new RowError(row.rowNumber(), "item_code", "no product with item code '" + code + "' (import products first)"));
                 continue;
@@ -91,6 +94,7 @@ public class OpeningStockImporter implements RowImporter {
                 errors.add(new RowError(row.rowNumber(), "lot_number", "same product, location and lot appear more than once"));
             }
         }
+        return new Counts(rows.size(), 0, 0);
     }
 
     @Override
@@ -108,7 +112,7 @@ public class OpeningStockImporter implements RowImporter {
             List<LotInfo> lots = new ArrayList<>();
             List<String> notes = new ArrayList<>();
             for (ImportRow row : locRows) {
-                productIds.add(productRepository.findByItemCode(row.text("item_code")).orElseThrow().getId());
+                productIds.add(ItemCodes.find(productRepository, row.text("item_code")).orElseThrow().getId());
                 quantities.add(row.positiveInt("quantity", ignored));
                 costs.add(row.decimal("unit_cost", true, false, ignored));
                 lots.add(new LotInfo(row.text("lot_number"), row.date("expiry_date", ignored), row.date("manufactured_date", ignored)));

@@ -22,9 +22,12 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     List<Product> findByItemCodeIn(Collection<String> itemCodes);
 
-    boolean existsByItemCode(String itemCode);
+    /** Item codes are unique ignoring case; older data may still hold variants, hence a list. */
+    List<Product> findByItemCodeIgnoreCase(String itemCode);
 
-    boolean existsByItemCodeAndIdNot(String itemCode, UUID id);
+    boolean existsByItemCodeIgnoreCase(String itemCode);
+
+    boolean existsByItemCodeIgnoreCaseAndIdNot(String itemCode, UUID id);
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.inventories LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithRelations(@Param("id") UUID id);

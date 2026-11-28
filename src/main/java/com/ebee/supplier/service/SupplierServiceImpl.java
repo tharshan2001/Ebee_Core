@@ -4,6 +4,7 @@ import com.ebee.accounting.repository.SupplierLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.exception.ResourceNotFoundException;
 import com.ebee.common.security.SecurityService;
+import com.ebee.common.util.PhoneUtils;
 import com.ebee.purchase.entity.PurchaseOrder;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
 import com.ebee.purchase.enums.PurchasePaymentStatus;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -52,7 +54,12 @@ public class SupplierServiceImpl implements SupplierService {
 
     @Override
     public SupplierResponse createSupplier(SupplierRequest request) {
+        String name = request.name().trim();
+        requireUnusedName(name);
+        String phone = PhoneUtils.contactPhone(request.phone());
         Supplier supplier = supplierMapper.toEntity(request);
+        supplier.setName(name);
+        supplier.setPhone(phone);
         Supplier saved = supplierRepository.save(supplier);
         return supplierMapper.toResponse(saved);
     }
@@ -89,7 +96,16 @@ public class SupplierServiceImpl implements SupplierService {
     public SupplierResponse updateSupplier(UUID id, SupplierRequest request) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+        // Only changed values are checked, so older records stay editable.
+        String name = request.name().trim();
+        if (!name.equalsIgnoreCase(supplier.getName())) {
+            requireUnusedName(name);
+        }
+        String phone = Objects.equals(request.phone(), supplier.getPhone())
+                ? supplier.getPhone() : PhoneUtils.contactPhone(request.phone());
         supplierMapper.updateEntity(request, supplier);
+        supplier.setName(name);
+        supplier.setPhone(phone);
         Supplier saved = supplierRepository.save(supplier);
         return supplierMapper.toResponse(saved);
     }
@@ -236,6 +252,12 @@ public class SupplierServiceImpl implements SupplierService {
                 request.description(),
                 supplier.getOutstandingBalance()
         );
+    }
+
+    private void requireUnusedName(String name) {
+        if (supplierRepository.findFirstByNameIgnoreCase(name).isPresent()) {
+            throw new IllegalArgumentException("A supplier named '" + name + "' already exists");
+        }
     }
 
     public void syncSupplierOutstanding(Supplier supplier) {

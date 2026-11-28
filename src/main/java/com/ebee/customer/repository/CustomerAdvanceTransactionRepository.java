@@ -19,6 +19,8 @@ public interface CustomerAdvanceTransactionRepository extends JpaRepository<Cust
 
     List<CustomerAdvanceTransaction> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
 
+    boolean existsByCustomerId(UUID customerId);
+
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM CustomerAdvanceTransaction t WHERE t.customer.id = :customerId")
     BigDecimal sumAdvanceByCustomerId(@Param("customerId") UUID customerId);
 

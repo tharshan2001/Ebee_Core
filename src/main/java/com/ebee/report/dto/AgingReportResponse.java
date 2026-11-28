@@ -15,6 +15,11 @@ public class AgingReportResponse {
     private LocalDateTime generatedAt;
     private AgingSummary summary;
     private List<CustomerAgingBucket> customerBuckets;
+    /** Set when a page was asked for: {@code customerBuckets} then holds only that page. */
+    private Integer pageNumber;
+    private Integer totalPages;
+    private Integer totalBuckets;
+    private Integer over90Count;
 
     @Data
     @Builder

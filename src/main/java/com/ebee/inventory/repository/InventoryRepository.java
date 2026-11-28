@@ -20,6 +20,14 @@ public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
     List<Inventory> findAllByProductId(UUID productId);
 
+    @Query(value = "SELECT i FROM Inventory i JOIN FETCH i.product p LEFT JOIN FETCH i.location l "
+            + "WHERE (:anyLocation = true OR l.id = :locationId) AND (LOWER(p.name) LIKE :q OR LOWER(p.itemCode) LIKE :q) "
+            + "ORDER BY p.name, i.id",
+           countQuery = "SELECT COUNT(i) FROM Inventory i JOIN i.product p LEFT JOIN i.location l "
+            + "WHERE (:anyLocation = true OR l.id = :locationId) AND (LOWER(p.name) LIKE :q OR LOWER(p.itemCode) LIKE :q)")
+    org.springframework.data.domain.Page<Inventory> search(@Param("q") String q, @Param("anyLocation") boolean anyLocation,
+            @Param("locationId") UUID locationId, org.springframework.data.domain.Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inventory i WHERE i.product.id = :productId AND i.location.id = :locationId")
     Optional<Inventory> findByProductIdWithLock(@Param("productId") UUID productId, @Param("locationId") UUID locationId);

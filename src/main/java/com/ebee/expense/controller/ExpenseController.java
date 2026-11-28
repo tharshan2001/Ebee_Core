@@ -1,5 +1,8 @@
 package com.ebee.expense.controller;
 
+import com.ebee.expense.enums.ExpenseCategory;
+import com.ebee.expense.dto.ExpenseSummary;
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.expense.dto.ExpenseRequest;
 import com.ebee.expense.dto.ExpenseResponse;
@@ -49,9 +52,32 @@ public class ExpenseController {
     public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getAllExpenses(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) ExpenseStatus status) {
-        Page<ExpenseResponse> expenses = expenseService.getAllExpenses(page, size, status);
+            @RequestParam(required = false) ExpenseStatus status,
+            @RequestParam(required = false) ExpenseCategory category,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean oldestFirst) {
+        Page<ExpenseResponse> expenses = expenseService.searchExpenses(status, category, search, false, oldestFirst,
+                PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
         return ResponseEntity.ok(ApiResponse.success("Expenses retrieved successfully", expenses));
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<ExpenseSummary>> getSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Expense summary retrieved successfully", expenseService.getSummary()));
+    }
+
+    @GetMapping("/my/page")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Page<ExpenseResponse>>> getMyExpensesPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) ExpenseStatus status,
+            @RequestParam(required = false) ExpenseCategory category,
+            @RequestParam(required = false) String search) {
+        Page<ExpenseResponse> expenses = expenseService.searchExpenses(status, category, search, true, false,
+                PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        return ResponseEntity.ok(ApiResponse.success("My expenses retrieved successfully", expenses));
     }
 
     @GetMapping("/my")

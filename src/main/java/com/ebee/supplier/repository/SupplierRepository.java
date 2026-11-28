@@ -22,4 +22,16 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID> {
     List<Supplier> findBySearchTerm(@Param("search") String search);
 
     java.util.Optional<Supplier> findFirstByNameIgnoreCase(String name);
+
+    @Query(value = "SELECT s FROM Supplier s WHERE s.outstandingBalance > 0 "
+            + "AND (LOWER(s.name) LIKE :q OR LOWER(COALESCE(s.phone, '')) LIKE :q)",
+           countQuery = "SELECT COUNT(s) FROM Supplier s WHERE s.outstandingBalance > 0 "
+            + "AND (LOWER(s.name) LIKE :q OR LOWER(COALESCE(s.phone, '')) LIKE :q)")
+    Page<Supplier> findDues(@Param("q") String q, Pageable pageable);
+
+    /** One row: [count, total outstanding]. */
+    @Query("SELECT COUNT(s), COALESCE(SUM(s.outstandingBalance), 0) FROM Supplier s WHERE s.outstandingBalance > 0")
+    List<Object[]> duesTotals();
+
+    java.util.Optional<Supplier> findFirstByOutstandingBalanceGreaterThanOrderByOutstandingBalanceDesc(java.math.BigDecimal amount);
 }

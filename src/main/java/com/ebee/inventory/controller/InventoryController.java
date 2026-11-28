@@ -52,6 +52,18 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Inventories retrieved successfully", response));
     }
 
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<InventoryResponse>>> searchStock(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) UUID locationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(PaginationUtils.safePage(page), PaginationUtils.safeSize(size));
+        return ResponseEntity.ok(ApiResponse.success("Stock retrieved successfully",
+                PageResponse.from(inventoryService.searchStock(search, locationId, pageable))));
+    }
+
     @GetMapping("/low-stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> getLowStockInventories() {

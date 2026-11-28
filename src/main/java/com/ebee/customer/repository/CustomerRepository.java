@@ -59,4 +59,19 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     @Query("SELECT c FROM Customer c WHERE c.outstandingBalance > 0 ORDER BY c.outstandingBalance DESC")
     List<Customer> findAllWithOutstandingBalance();
+
+    // Customer money screens. {@code q} is a lower-case LIKE pattern ("%" matches everyone).
+    @Query(value = "SELECT c FROM Customer c WHERE (:dues = false OR c.outstandingBalance > 0) "
+            + "AND (:advance = false OR c.advanceBalance > 0) "
+            + "AND (LOWER(CONCAT(c.firstName, ' ', c.lastName)) LIKE :q OR c.phoneNumber LIKE :q OR c.phoneNumber2 LIKE :q)",
+           countQuery = "SELECT COUNT(c) FROM Customer c WHERE (:dues = false OR c.outstandingBalance > 0) "
+            + "AND (:advance = false OR c.advanceBalance > 0) "
+            + "AND (LOWER(CONCAT(c.firstName, ' ', c.lastName)) LIKE :q OR c.phoneNumber LIKE :q OR c.phoneNumber2 LIKE :q)")
+    Page<Customer> findBalances(@Param("dues") boolean dues, @Param("advance") boolean advance, @Param("q") String q,
+                                Pageable pageable);
+
+    /** One row: [count, total outstanding, total advance]. */
+    @Query("SELECT COUNT(c), COALESCE(SUM(c.outstandingBalance), 0), COALESCE(SUM(c.advanceBalance), 0) FROM Customer c "
+            + "WHERE (:dues = false OR c.outstandingBalance > 0) AND (:advance = false OR c.advanceBalance > 0)")
+    List<Object[]> balanceTotals(@Param("dues") boolean dues, @Param("advance") boolean advance);
 }

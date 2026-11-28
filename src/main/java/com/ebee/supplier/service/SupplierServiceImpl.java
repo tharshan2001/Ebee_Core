@@ -1,5 +1,8 @@
 package com.ebee.supplier.service;
 
+import org.springframework.data.domain.PageRequest;
+import com.ebee.common.util.SearchPatterns;
+import com.ebee.common.response.PageResponse;
 import com.ebee.accounting.repository.SupplierLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -252,6 +255,20 @@ public class SupplierServiceImpl implements SupplierService {
                 request.description(),
                 supplier.getOutstandingBalance()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SupplierDuesPage getDuesPage(String search, int page, int size) {
+        Sort sort = Sort.by(Sort.Direction.DESC, "outstandingBalance").and(Sort.by("id"));
+        Page<SupplierResponse> found = supplierRepository
+                .findDues(SearchPatterns.contains(search), PageRequest.of(page, size, sort))
+                .map(supplierMapper::toResponse);
+        Object[] totals = supplierRepository.duesTotals().get(0);
+        var largest = supplierRepository.findFirstByOutstandingBalanceGreaterThanOrderByOutstandingBalanceDesc(BigDecimal.ZERO);
+        return new SupplierDuesPage(PageResponse.from(found), (Long) totals[0], (BigDecimal) totals[1],
+                largest.map(Supplier::getName).orElse(null),
+                largest.map(Supplier::getOutstandingBalance).orElse(BigDecimal.ZERO));
     }
 
     private void requireUnusedName(String name) {

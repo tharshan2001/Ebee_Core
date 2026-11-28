@@ -32,6 +32,23 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     long countByStatus(ExpenseStatus status);
 
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'PENDING'")
+    BigDecimal sumPending();
+
+    @Query(value = "SELECT e FROM Expense e LEFT JOIN FETCH e.createdBy u LEFT JOIN FETCH e.driver d "
+            + "LEFT JOIN FETCH d.user LEFT JOIN FETCH e.approvedBy "
+            + "WHERE (:anyStatus = true OR e.status = :status) AND (:anyCategory = true OR e.category = :category) "
+            + "AND (:anyCreator = true OR u.id = :creator) "
+            + "AND (LOWER(e.description) LIKE :q OR LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE :q)",
+           countQuery = "SELECT COUNT(e) FROM Expense e LEFT JOIN e.createdBy u "
+            + "WHERE (:anyStatus = true OR e.status = :status) AND (:anyCategory = true OR e.category = :category) "
+            + "AND (:anyCreator = true OR u.id = :creator) "
+            + "AND (LOWER(e.description) LIKE :q OR LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE :q)")
+    Page<Expense> search(@Param("anyStatus") boolean anyStatus, @Param("status") ExpenseStatus status,
+                         @Param("anyCategory") boolean anyCategory, @Param("category") ExpenseCategory category,
+                         @Param("anyCreator") boolean anyCreator, @Param("creator") UUID creator,
+                         @Param("q") String q, Pageable pageable);
+
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.status = 'APPROVED' AND e.dateIncurred >= :start AND e.dateIncurred <= :end")
     BigDecimal sumApprovedByDateRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
 

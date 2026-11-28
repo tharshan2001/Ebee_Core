@@ -157,12 +157,13 @@ class ExpenseControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getAllExpenses_withStatus_filtersByIt() throws Exception {
-        when(expenseService.getAllExpenses(anyInt(), anyInt(), eq(com.ebee.expense.enums.ExpenseStatus.PENDING)))
+        var pending = com.ebee.expense.enums.ExpenseStatus.PENDING;
+        when(expenseService.searchExpenses(pending, null, null, false, false, 0, 20))
                 .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/expenses").param("status", "PENDING"))
                 .andExpect(status().isOk());
-        verify(expenseService).getAllExpenses(0, 20, com.ebee.expense.enums.ExpenseStatus.PENDING);
+        verify(expenseService).searchExpenses(pending, null, null, false, false, 0, 20);
     }
 
     @Test

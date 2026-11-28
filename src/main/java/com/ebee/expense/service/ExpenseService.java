@@ -1,5 +1,9 @@
 package com.ebee.expense.service;
 
+import java.time.LocalDate;
+import org.springframework.data.domain.Sort;
+import com.ebee.expense.dto.ExpenseSummary;
+import com.ebee.common.util.SearchPatterns;
 import com.ebee.audit.enums.AuditAction;
 import com.ebee.audit.service.AuditLogService;
 import com.ebee.common.exception.ResourceNotFoundException;
@@ -130,6 +134,31 @@ public class ExpenseService {
                 ? expenseRepository.findAllByOrderByCreatedAtDesc(pageable)
                 : expenseRepository.findByStatusOrderByCreatedAtDesc(status, pageable))
                 .map(expenseMapper::toResponse);
+    }
+
+    /**
+     * @param mine         only the signed-in user's own expenses
+     * @param oldestFirst  by date incurred (the approval queue); otherwise newest entry first
+     */
+    @Transactional(readOnly = true)
+    public Page<ExpenseResponse> searchExpenses(ExpenseStatus status, ExpenseCategory category, String search,
+                                                boolean mine, boolean oldestFirst, int page, int size) {
+        Sort sort = oldestFirst
+                ? Sort.by("dateIncurred", "createdAt", "id")
+                : Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
+        UUID creator = mine ? securityService.getCurrentUserId() : new UUID(0, 0);
+        return expenseRepository.search(status == null, status != null ? status : ExpenseStatus.PENDING,
+                        category == null, category != null ? category : ExpenseCategory.OTHER,
+                        !mine, creator, SearchPatterns.contains(search), PageRequest.of(page, size, sort))
+                .map(expenseMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public ExpenseSummary getSummary() {
+        LocalDate month = LocalDate.now().withDayOfMonth(1);
+        return new ExpenseSummary(expenseRepository.countByStatus(ExpenseStatus.PENDING), expenseRepository.sumPending(),
+                expenseRepository.sumApprovedByDateRange(month, month.plusMonths(1).minusDays(1)),
+                expenseRepository.sumApprovedByDateRange(month.minusMonths(1), month.minusDays(1)));
     }
 
     @Transactional(readOnly = true)

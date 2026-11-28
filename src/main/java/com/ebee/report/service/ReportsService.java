@@ -291,6 +291,19 @@ public class ReportsService {
                 .build();
     }
 
+    /** The aging report with one page of customers; the summary still covers everyone. */
+    public AgingReportResponse getAgingReport(int page, int size) {
+        AgingReportResponse report = getAgingReport();
+        List<CustomerAgingBucket> all = report.getCustomerBuckets();
+        int from = (int) Math.min((long) page * size, all.size());
+        report.setCustomerBuckets(all.subList(from, Math.min(from + size, all.size())));
+        report.setPageNumber(page);
+        report.setTotalBuckets(all.size());
+        report.setTotalPages((all.size() + size - 1) / size);
+        report.setOver90Count((int) all.stream().filter(b -> b.getDays90Plus().signum() > 0).count());
+        return report;
+    }
+
     public AgingReportResponse getAgingReport() {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = LocalDate.now();

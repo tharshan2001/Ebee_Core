@@ -1,5 +1,6 @@
 package com.ebee.customer.controller;
 
+import com.ebee.customer.dto.CustomerBalancePage;
 import com.ebee.accounting.dto.LedgerEntryResponse;
 import com.ebee.accounting.entity.CustomerLedger;
 import com.ebee.common.response.ApiResponse;
@@ -120,6 +121,19 @@ public class CustomerController {
         PageResponse<CustomerResponse> response = PageResponse.from(customersPage);
 
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved successfully", response));
+    }
+
+    @GetMapping("/balances")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerBalancePage>> getCustomerBalances(
+            @RequestParam(defaultValue = "dues") String view,
+            @RequestParam(defaultValue = "false") boolean withAdvance,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Customer balances retrieved successfully",
+                customerService.getBalances(view, withAdvance, search, PaginationUtils.safePage(page),
+                        PaginationUtils.safeSize(size))));
     }
 
     @GetMapping("/with-dues")

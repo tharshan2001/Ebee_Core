@@ -1,5 +1,9 @@
 package com.ebee.customer.service;
 
+import org.springframework.data.domain.PageRequest;
+import com.ebee.common.util.SearchPatterns;
+import com.ebee.common.response.PageResponse;
+import com.ebee.customer.dto.CustomerBalancePage;
 import com.ebee.accounting.entity.CustomerLedger;
 import com.ebee.accounting.repository.CustomerLedgerRepository;
 import com.ebee.accounting.service.LedgerService;
@@ -423,5 +427,25 @@ public class CustomerService {
 
     private static String blankToNull(String v) {
         return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    /**
+     * @param view        "dues" = customers who owe, largest first; "advance" = customers holding an advance
+     * @param withAdvance for "dues": only those who also hold an advance
+     */
+    @Transactional(readOnly = true)
+    public CustomerBalancePage getBalances(String view, boolean withAdvance, String search, int page, int size) {
+        boolean advanceView = "advance".equals(view);
+        boolean dues = !advanceView;
+        boolean advance = advanceView || withAdvance;
+        Sort sort = Sort.by(Sort.Direction.DESC, advanceView ? "advanceBalance" : "outstandingBalance")
+                .and(Sort.by("id"));
+        Page<CustomerResponse> found = customerRepository
+                .findBalances(dues, advance, SearchPatterns.contains(search), PageRequest.of(page, size, sort))
+                .map(this::toResponse);
+        // The headline figures describe the whole tab, whatever is searched or filtered.
+        Object[] totals = customerRepository.balanceTotals(dues, advanceView).get(0);
+        return new CustomerBalancePage(PageResponse.from(found), (Long) totals[0], (BigDecimal) totals[1],
+                (BigDecimal) totals[2]);
     }
 }

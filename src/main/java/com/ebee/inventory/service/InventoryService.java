@@ -148,6 +148,15 @@ public class InventoryService {
                 .toList();
     }
 
+    /** Stock rows (one per product and location) by product name, filtered and paged. */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<InventoryResponse> searchStock(String search, UUID locationId,
+                                                                              Pageable pageable) {
+        return inventoryRepository.search(com.ebee.common.util.SearchPatterns.contains(search), locationId == null,
+                        locationId != null ? locationId : new UUID(0, 0), pageable)
+                .map(inventoryMapper::toResponse);
+    }
+
     @Transactional(readOnly = true)
     public List<InventoryResponse> getLowStockInventories() {
         return inventoryRepository.findLowStockInventories().stream()

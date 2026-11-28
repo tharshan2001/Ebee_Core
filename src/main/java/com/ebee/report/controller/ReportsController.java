@@ -293,7 +293,12 @@ public class ReportsController {
     }
 
     @GetMapping("/aging")
-    public ResponseEntity<ApiResponse<AgingReportResponse>> getAgingReport() {
-        return ResponseEntity.ok(ApiResponse.success("Aging report retrieved successfully", reportsService.getAgingReport()));
+    public ResponseEntity<ApiResponse<AgingReportResponse>> getAgingReport(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
+        AgingReportResponse report = size == null ? reportsService.getAgingReport()
+                : reportsService.getAgingReport(com.ebee.common.util.PaginationUtils.safePage(page == null ? 0 : page),
+                        com.ebee.common.util.PaginationUtils.safeSize(size));
+        return ResponseEntity.ok(ApiResponse.success("Aging report retrieved successfully", report));
     }
 }

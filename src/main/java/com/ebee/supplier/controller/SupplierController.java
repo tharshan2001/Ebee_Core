@@ -1,5 +1,6 @@
 package com.ebee.supplier.controller;
 
+import com.ebee.common.util.PaginationUtils;
 import com.ebee.common.response.ApiResponse;
 import com.ebee.common.response.PageResponse;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
@@ -28,6 +29,15 @@ public class SupplierController {
 
     public SupplierController(SupplierService supplierService) {
         this.supplierService = supplierService;
+    }
+
+    @GetMapping("/dues")
+    public ResponseEntity<ApiResponse<SupplierDuesPage>> getDues(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Supplier dues retrieved successfully",
+                supplierService.getDuesPage(search, PaginationUtils.safePage(page), PaginationUtils.safeSize(size))));
     }
 
     @PostMapping

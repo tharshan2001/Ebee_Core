@@ -1,5 +1,6 @@
 package com.ebee.supplier.service;
 
+import com.ebee.supplier.dto.SupplierDuesPage;
 import com.ebee.supplier.dto.*;
 import com.ebee.purchase.enums.PurchasePaymentMethod;
 import org.springframework.data.domain.Page;
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface SupplierService {
+    SupplierDuesPage getDuesPage(String search, int page, int size);
+
 
     SupplierResponse createSupplier(SupplierRequest request);
 

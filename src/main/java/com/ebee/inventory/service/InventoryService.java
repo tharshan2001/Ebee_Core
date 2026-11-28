@@ -190,7 +190,10 @@ public class InventoryService {
             consumeFifoLayers(inventory, -change);
             recalculateAverageCost(inventory);
         } else if (change > 0) {
-            addLayer(inventory, change, resolveReturnCost(inventory, null));
+            BigDecimal unitCost = request.getUnitCost() != null
+                    ? request.getUnitCost() : resolveReturnCost(inventory, null);
+            addLayer(inventory, change, unitCost, new com.ebee.inventory.dto.LotInfo(request.getLotNumber(),
+                    request.getExpiryDate(), request.getManufacturedDate()));
             recalculateAverageCost(inventory);
         }
 
@@ -325,8 +328,25 @@ public class InventoryService {
     public List<StockResponse> addOpeningStock(UUID locationId, List<UUID> productIds, List<Integer> quantities,
                                                List<BigDecimal> unitCosts, List<com.ebee.inventory.dto.LotInfo> lots,
                                                List<String> notes) {
-        return applyMovements(locationId, productIds, quantities, StockMovementType.OPENING, notes, unitCosts, lots,
-                null, null);
+        List<StockResponse> results = applyMovements(locationId, productIds, quantities, StockMovementType.OPENING,
+                notes, unitCosts, lots, null, null);
+        // As with a purchase receipt, the product's cost follows the average cost of its stock.
+        List<Product> costed = new ArrayList<>();
+        for (Inventory inv : inventoryRepository.findByProductIdInAndLocationId(productIds, loc(locationId))) {
+            if (inv.getAverageCost() != null) {
+                inv.getProduct().setCostPrice(inv.getAverageCost().setScale(2, java.math.RoundingMode.HALF_UP));
+                costed.add(inv.getProduct());
+            }
+        }
+        productRepository.saveAll(costed);
+        return results;
+    }
+
+    /** Whether a product holds stock, or ever had stock moved, at any location. */
+    @Transactional(readOnly = true)
+    public boolean hasAnyStockHistory(UUID productId) {
+        return inventoryRepository.findAllByProductId(productId).stream()
+                .anyMatch(inv -> inv.getQuantity() > 0 || stockRepository.existsByInventoryId(inv.getId()));
     }
 
     /** Whether a product already has stock (or ever had stock moved) at a location — opening stock is refused then. */

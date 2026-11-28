@@ -50,17 +50,20 @@ class ImportServiceTest {
 
         assertThat(r.status()).isEqualTo(ImportJob.Status.INVALID);
         assertThat(r.errors()).extracting(RowError::column).containsExactly("address_line1");
-        verify(importer, never()).validate(anyList(), anyList());
+        verify(importer, never()).validate(anyList(), anyList(), anyList());
         verify(applier, never()).apply(any(), anyList());
     }
 
     @Test
     void dryRun_validatesButNeverApplies_andReportsUnknownColumns() throws Exception {
+        when(importer.validate(anyList(), anyList(), anyList())).thenReturn(new RowImporter.Counts(0, 1, 0));
+
         var r = service.run(ImportType.SUPPLIERS, file(GOOD), true);
 
         assertThat(r.status()).isEqualTo(ImportJob.Status.VALID);
+        assertThat(r.updated()).isEqualTo(1);
         assertThat(r.ignoredColumns()).containsExactly("colour");
-        verify(importer).validate(anyList(), anyList());
+        verify(importer).validate(anyList(), anyList(), anyList());
         verify(applier, never()).apply(any(), anyList());
     }
 
@@ -69,8 +72,8 @@ class ImportServiceTest {
         doAnswer(inv -> {
             List<RowError> errors = inv.getArgument(1);
             errors.add(new RowError(2, "city", "is required"));
-            return null;
-        }).when(importer).validate(anyList(), anyList());
+            return new RowImporter.Counts(0, 0, 0);
+        }).when(importer).validate(anyList(), anyList(), anyList());
 
         var r = service.run(ImportType.SUPPLIERS, file(GOOD), false);
 

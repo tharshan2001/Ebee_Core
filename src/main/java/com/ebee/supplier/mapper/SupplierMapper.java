@@ -10,7 +10,7 @@ import org.mapstruct.MappingTarget;
 @Mapper(componentModel = "spring", imports = {com.ebee.common.enums.District.class})
 public interface SupplierMapper {
 
-    @Mapping(target = "district", expression = "java(request.district() != null ? District.fromDisplayName(request.district()) : null)")
+    @Mapping(target = "district", expression = "java(request.district() != null && !request.district().isBlank() ? District.fromDisplayName(request.district()) : null)")
     @Mapping(target = "country", expression = "java(request.country() != null ? request.country() : \"Sri Lanka\")")
     Supplier toEntity(SupplierRequest request);
 
@@ -21,7 +21,7 @@ public interface SupplierMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "district", expression = "java(request.district() != null ? District.fromDisplayName(request.district()) : null)")
+    @Mapping(target = "district", expression = "java(request.district() != null && !request.district().isBlank() ? District.fromDisplayName(request.district()) : null)")
     @Mapping(target = "country", expression = "java(request.country() != null ? request.country() : \"Sri Lanka\")")
     void updateEntity(SupplierRequest request, @MappingTarget Supplier supplier);
 }

@@ -14,14 +14,15 @@ public enum ImportType {
             List.of("SKU-001", "120", "900.00", "MAIN", "LOT-2026-11", "2027-11-30", "2026-11-01")),
 
     CUSTOMERS(List.of("phone", "first_name", "district", "city", "street"),
-            List.of("last_name", "email", "vat_number", "credit_limit", "opening_balance"),
+            List.of("last_name", "email", "vat_number", "credit_limit", "opening_balance", "address_line2",
+                    "postal_code", "book_no"),
             List.of("0771234567", "Nimal", "JF", "Jaffna", "12 Main Street", "Perera", "nimal@example.com", "",
-                    "50000", "12500.00")),
+                    "50000", "12500.00", "", "40000", "")),
 
     SUPPLIERS(List.of("name", "address_line1", "city"),
             List.of("contact_person", "email", "phone", "district", "opening_balance"),
-            List.of("Lanka Oils (Pvt) Ltd", "45 Factory Road", "Colombo", "Sunil", "sales@lankaoils.lk", "0112345678",
-                    "CMB", "250000.00"));
+            List.of("Lanka Oils (Pvt) Ltd", "45 Factory Road", "Jaffna", "Sunil", "sales@lankaoils.lk", "0212345678",
+                    "JF", "250000.00"));
 
     private final List<String> requiredColumns;
     private final List<String> optionalColumns;

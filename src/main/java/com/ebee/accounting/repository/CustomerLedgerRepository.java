@@ -55,5 +55,5 @@ public interface CustomerLedgerRepository extends JpaRepository<CustomerLedger, 
             + "WHERE l.createdAt < :before GROUP BY l.customerId")
     List<Object[]> balancesBefore(@Param("before") LocalDateTime before);
 
-    boolean existsByCustomerIdAndDescription(UUID customerId, String description);
+    boolean existsByCustomerId(UUID customerId);
 }

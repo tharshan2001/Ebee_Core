@@ -35,6 +35,7 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -310,7 +311,20 @@ public class ReportsService {
                     List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)
             );
 
-            if (unpaidOrders.isEmpty()) {
+            // Dues that aren't on any order: opening balances and manual adjustments.
+            BigDecimal orderDues = unpaidOrders.stream().map(Order::getOutstandingBalance)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<CustomerLedger> offOrder = customerLedgerRepository.findByCustomerIdOrderByCreatedAtDesc(customer.getId())
+                    .stream()
+                    .filter(l -> l.getOrderId() == null && l.getPaymentId() == null && l.getReturnId() == null
+                            && !"ADVANCE".equals(l.getTransactionType()))
+                    .toList();
+            BigDecimal offOrderDues = offOrder.stream().map(l -> l.getDebit().subtract(l.getCredit()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .min(customer.getOutstandingBalance().subtract(orderDues))
+                    .max(BigDecimal.ZERO);
+
+            if (unpaidOrders.isEmpty() && offOrderDues.signum() == 0) {
                 continue;
             }
 
@@ -321,10 +335,21 @@ public class ReportsService {
             BigDecimal days90Plus = BigDecimal.ZERO;
             LocalDate oldestDate = null;
 
-            for (Order order : unpaidOrders) {
-                LocalDate orderDate = order.getCreatedAt().toLocalDate();
+            List<Map.Entry<LocalDate, BigDecimal>> dues = new ArrayList<>();
+            unpaidOrders.forEach(o -> dues.add(Map.entry(o.getCreatedAt().toLocalDate(), o.getOutstandingBalance())));
+            if (offOrderDues.signum() > 0) {
+                LocalDate since = offOrder.stream()
+                        .filter(l -> l.getDebit().signum() > 0)
+                        .map(l -> l.getEffectiveDate() != null ? l.getEffectiveDate() : l.getCreatedAt().toLocalDate())
+                        .min(LocalDate::compareTo)
+                        .orElse(today);
+                dues.add(Map.entry(since, offOrderDues));
+            }
+
+            for (Map.Entry<LocalDate, BigDecimal> due : dues) {
+                LocalDate orderDate = due.getKey();
                 long daysDiff = ChronoUnit.DAYS.between(orderDate, today);
-                BigDecimal outstanding = order.getOutstandingBalance();
+                BigDecimal outstanding = due.getValue();
 
                 if (oldestDate == null || orderDate.isBefore(oldestDate)) {
                     oldestDate = orderDate;

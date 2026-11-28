@@ -64,6 +64,15 @@ public class AccountingPeriodService {
                 .orElse(false);
     }
 
+    /** Read-only: true when this month's period exists and isn't open, so nothing can be posted. */
+    @Transactional(readOnly = true)
+    public boolean isCurrentPeriodBlocked() {
+        LocalDate today = LocalDate.now();
+        return accountingPeriodRepository.findByMonthAndYear(today.getMonthValue(), today.getYear())
+                .map(p -> p.getStatus() != PeriodStatus.OPEN)
+                .orElse(false);
+    }
+
     @Transactional
     public AccountingPeriod openPeriod(Integer year, Integer month, UUID openedBy) {
         FiscalYear fiscalYear = fiscalYearRepository.findByFiscalYear(year)

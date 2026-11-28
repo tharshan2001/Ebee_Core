@@ -55,7 +55,10 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Override
     public ProductResponse createProduct(ProductRequest request) {
-        if (productRepository.existsByItemCode(request.getItemCode())) {
+        if (request.getItemCode() != null) {
+            request.setItemCode(request.getItemCode().trim());
+        }
+        if (productRepository.existsByItemCodeIgnoreCase(request.getItemCode())) {
             throw new IllegalArgumentException("Item code already exists: " + request.getItemCode());
         }
 
@@ -296,11 +299,12 @@ public class ProductServiceImpl implements ProductService {
             product.setName(request.getName());
         }
         if (request.getItemCode() != null) {
-            if (!product.getItemCode().equals(request.getItemCode()) &&
-                productRepository.existsByItemCodeAndIdNot(request.getItemCode(), id)) {
-                throw new IllegalArgumentException("Item code already exists: " + request.getItemCode());
+            String itemCode = request.getItemCode().trim();
+            if (!itemCode.equalsIgnoreCase(product.getItemCode()) &&
+                productRepository.existsByItemCodeIgnoreCaseAndIdNot(itemCode, id)) {
+                throw new IllegalArgumentException("Item code already exists: " + itemCode);
             }
-            product.setItemCode(request.getItemCode());
+            product.setItemCode(itemCode);
         }
         if (request.getDescription() != null) {
             product.setDescription(request.getDescription());
@@ -316,6 +320,13 @@ public class ProductServiceImpl implements ProductService {
             product.setCostPrice(request.getCostPrice());
         }
         validateDiscount(request);
+        // A price change on its own must still respect the maximum discount already on the product.
+        if (request.getPrice() != null && !request.isMaxDiscountFieldsSet()
+                && "FIXED".equals(product.getMaxDiscountType()) && product.getMaxDiscountValue() != null
+                && product.getMaxDiscountValue().compareTo(request.getPrice()) > 0) {
+            throw new IllegalArgumentException("Price " + request.getPrice() + " is below the product's maximum discount of "
+                    + product.getMaxDiscountValue() + "; lower the maximum discount first");
+        }
         if (request.isDiscountFieldsSet()) {
             product.setDiscountType(request.getDiscountType() != null ? request.getDiscountType().name() : null);
             product.setDiscountValue(request.getDiscountValue());

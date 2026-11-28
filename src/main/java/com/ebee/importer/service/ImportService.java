@@ -28,6 +28,7 @@ public class ImportService {
 
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
     static final int MAX_ERRORS_RETURNED = 200;
+    private static final RowImporter.Counts NOTHING = new RowImporter.Counts(0, 0, 0);
 
     private final Map<ImportType, RowImporter> importers = new EnumMap<>(ImportType.class);
     private final ImportApplier applier;
@@ -68,32 +69,37 @@ public class ImportService {
         if (parsed.rows().isEmpty() && errors.isEmpty()) {
             errors.add(new RowError(2, null, "the file has no data rows"));
         }
+        List<RowError> notices = new ArrayList<>();
+        RowImporter.Counts preview = NOTHING;
         if (errors.isEmpty()) {
-            importer.validate(parsed.rows(), errors);
+            preview = importer.validate(parsed.rows(), errors, notices);
         }
 
         int total = parsed.rows().size();
         if (!errors.isEmpty() || dryRun) {
             ImportJob.Status status = errors.isEmpty() ? ImportJob.Status.VALID : ImportJob.Status.INVALID;
-            return finish(type, fileName, dryRun, status, total, new RowImporter.Counts(0, 0, 0), errors, ignored);
+            return finish(type, fileName, dryRun, status, total, errors.isEmpty() ? preview : NOTHING, errors, notices,
+                    ignored);
         }
         try {
             RowImporter.Counts counts = applier.apply(importer, parsed.rows());
-            return finish(type, fileName, false, ImportJob.Status.APPLIED, total, counts, errors, ignored);
+            return finish(type, fileName, false, ImportJob.Status.APPLIED, total, counts, errors, notices, ignored);
         } catch (RuntimeException e) {
             log.warn("Import {} of '{}' failed and was rolled back: {}", type, fileName, e.getMessage());
             errors.add(new RowError(0, null, "Nothing was imported: " + e.getMessage()));
-            return finish(type, fileName, false, ImportJob.Status.FAILED, total, new RowImporter.Counts(0, 0, 0), errors, ignored);
+            return finish(type, fileName, false, ImportJob.Status.FAILED, total, NOTHING, errors, List.of(), ignored);
         }
     }
 
     private ImportResult finish(ImportType type, String fileName, boolean dryRun, ImportJob.Status status, int total,
-                                RowImporter.Counts counts, List<RowError> errors, List<String> ignored) {
+                                RowImporter.Counts counts, List<RowError> errors, List<RowError> notices,
+                                List<String> ignored) {
         List<RowError> shown = errors.size() > MAX_ERRORS_RETURNED ? errors.subList(0, MAX_ERRORS_RETURNED) : errors;
         ImportJob job = jobRepository.save(new ImportJob(type.name(), fileName, dryRun, status, total, counts.created(),
                 counts.updated(), counts.skipped(), errors.size(), toJson(shown), securityService.getCurrentUserId()));
         return new ImportResult(job.getId(), type, dryRun, status, total, counts.created(), counts.updated(),
-                counts.skipped(), errors.size(), shown, ignored);
+                counts.skipped(), errors.size(), shown,
+                notices.size() > MAX_ERRORS_RETURNED ? notices.subList(0, MAX_ERRORS_RETURNED) : notices, ignored);
     }
 
     private String toJson(List<RowError> errors) {

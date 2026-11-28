@@ -7,8 +7,12 @@ public interface RowImporter {
 
     ImportType type();
 
-    /** Check every row (and the file as a whole, e.g. duplicates), adding errors. */
-    void validate(List<ImportRow> rows, List<RowError> errors);
+    /**
+     * Check every row (and the file as a whole, e.g. duplicates), adding errors, and report what
+     * applying would do: the returned counts, plus {@code notices} for rows that touch existing
+     * records or where something in the row won't be applied.
+     */
+    Counts validate(List<ImportRow> rows, List<RowError> errors, List<RowError> notices);
 
     /** Write the rows. Runs inside one transaction with the others: all rows or none. */
     Counts apply(List<ImportRow> rows);

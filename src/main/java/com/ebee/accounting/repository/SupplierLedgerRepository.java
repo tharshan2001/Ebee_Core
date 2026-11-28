@@ -38,5 +38,5 @@ public interface SupplierLedgerRepository extends JpaRepository<SupplierLedger, 
             + "WHERE l.createdAt < :before GROUP BY l.supplierId")
     java.util.List<Object[]> balancesBefore(@Param("before") java.time.LocalDateTime before);
 
-    boolean existsBySupplierIdAndDescription(java.util.UUID supplierId, String description);
+    boolean existsBySupplierId(java.util.UUID supplierId);
 }

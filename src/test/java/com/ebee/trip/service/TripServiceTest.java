@@ -318,6 +318,43 @@ class TripServiceTest {
     }
 
     @Test
+    void addOrdersToTrip_runningTrip_assignsPendingDelivery() {
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        order.setDeliveryStatus(DeliveryStatus.PENDING);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+        when(deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Added to running trip", true))
+                .thenReturn(new DeliveryStateTransition.TransitionResult(false, false, DeliveryStatus.PENDING));
+
+        AddOrdersToTripRequest request = new AddOrdersToTripRequest();
+        request.setOrderIdsToAdd(List.of(orderId));
+
+        tripService.addOrdersToTrip(tripId, request);
+
+        verify(deliveryStateTransition).transition(order, DeliveryStatus.ASSIGNED, "Added to running trip", true);
+        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
+        verify(deliveryService).recalculateDriverAvailability(driverId);
+    }
+
+    @Test
+    void addOrdersToTrip_plannedTrip_leavesDeliveryPending() {
+        order.setDeliveryStatus(DeliveryStatus.PENDING);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(tripMapper.toResponse(trip)).thenReturn(tripResponse);
+
+        AddOrdersToTripRequest request = new AddOrdersToTripRequest();
+        request.setOrderIdsToAdd(List.of(orderId));
+
+        tripService.addOrdersToTrip(tripId, request);
+
+        verifyNoInteractions(deliveryStateTransition);
+    }
+
+    @Test
     void addOrdersToTrip_orderAlreadyOnTrip_skips() {
         order.setTrip(trip);
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));

@@ -229,6 +229,29 @@ class DriverAppServiceTest {
     }
 
     @Test
+    void addOrdersToTrip_runningTrip_assignsPendingDelivery() {
+        trip.setStatus(TripStatus.IN_PROGRESS);
+        order.setStatus(OrderStatus.SHIPPED);
+        order.setDeliveryStatus(DeliveryStatus.PENDING);
+        order.setDeliveryAssignedTo(null);
+        order.setTrip(null);
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(tripRepository.save(any(Trip.class))).thenReturn(trip);
+        when(deliveryStateTransition.transition(order, DeliveryStatus.ASSIGNED, "Added to running trip", false))
+                .thenReturn(new DeliveryStateTransition.TransitionResult(false, false, DeliveryStatus.PENDING));
+
+        com.ebee.trip.dto.AddOrdersToTripRequest request = new com.ebee.trip.dto.AddOrdersToTripRequest();
+        request.setOrderIdsToAdd(List.of(orderId));
+
+        driverTripService.addOrdersToTrip(tripId, request);
+
+        verify(deliveryStateTransition).transition(order, DeliveryStatus.ASSIGNED, "Added to running trip", false);
+        verify(eventPublisher).publishEvent(any(DeliveryStatusChangedEvent.class));
+        verify(deliveryService).recalculateDriverAvailability(user.getId());
+    }
+
+    @Test
     void removeOrdersFromTrip_fullyDetachesUnresolvedOrder() {
         order.setTrip(trip);
         order.setDeliveryAssignedTo(user);

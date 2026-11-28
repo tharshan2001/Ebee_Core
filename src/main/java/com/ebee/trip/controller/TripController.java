@@ -61,14 +61,21 @@ public class TripController {
             @RequestParam(required = false) TripStatus status,
             @RequestParam(required = false) UUID driverId,
             @RequestParam(required = false) LocalDate dateFrom,
-            @RequestParam(required = false) LocalDate dateTo) {
+            @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(required = false) String search) {
         Pageable pageable = PageRequest.of(
                 PaginationUtils.safePage(page),
                 PaginationUtils.safeSize(size),
                 SortUtils.parse(sort, SortableFields.AllowedFor.TRIP));
         PageResponse<TripResponse> response = tripService.getAllTripsPaginated(
-                status, driverId, dateFrom, dateTo, pageable);
+                status, driverId, dateFrom, dateTo, search, pageable);
         return ResponseEntity.ok(ApiResponse.success("Trips retrieved successfully", response));
+    }
+
+    @GetMapping("/status-counts")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<TripStatus, Long>>> getStatusCounts() {
+        return ResponseEntity.ok(ApiResponse.success("Trip counts retrieved successfully", tripService.countByStatus()));
     }
 
     @GetMapping("/{id}")

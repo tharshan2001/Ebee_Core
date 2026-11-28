@@ -77,8 +77,12 @@ public class TripService {
         return tripQueryService.getAllTrips(status, driverId, dateFrom, dateTo);
     }
 
-    public PageResponse<TripResponse> getAllTripsPaginated(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, Pageable pageable) {
-        return tripQueryService.getAllTripsPaginated(status, driverId, dateFrom, dateTo, pageable);
+    public PageResponse<TripResponse> getAllTripsPaginated(TripStatus status, UUID driverId, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String search, Pageable pageable) {
+        return tripQueryService.getAllTripsPaginated(status, driverId, dateFrom, dateTo, search, pageable);
+    }
+
+    public java.util.Map<TripStatus, Long> countByStatus() {
+        return tripQueryService.countByStatus();
     }
 
     public List<TripOrderMarkerDto> getActiveTripOrderMarkers(UUID driverId) {

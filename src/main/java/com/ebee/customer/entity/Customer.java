@@ -38,6 +38,10 @@ public class Customer {
     @Column(name = "phone_number", nullable = false, unique = true, length = 20)
     private String phoneNumber;
 
+    /** Another number to reach them on; the customer is looked up by {@link #phoneNumber} only. */
+    @Column(name = "phone_number_2", length = 20)
+    private String phoneNumber2;
+
     @Column(name = "customer_code", nullable = false, unique = true, length = 20)
     private String customerCode;
 

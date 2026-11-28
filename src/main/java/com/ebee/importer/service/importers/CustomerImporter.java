@@ -32,7 +32,7 @@ import java.util.UUID;
 /**
  * Creates customers (no welcome SMS/email), or updates them when the phone number already exists:
  * blank cells leave the stored value, and the address on file is kept. New customers need what the
- * create form needs. An opening balance is posted only for a customer with no history: positive =
+ * create form needs: first name, phone and district. An opening balance is posted only for a customer with no history: positive =
  * they owe you (ledger), negative = their advance.
  */
 @Component
@@ -40,7 +40,8 @@ public class CustomerImporter implements RowImporter {
 
     static final String OPENING_BALANCE = "Opening balance (import)";
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
-    private static final List<String> ADDRESS_COLUMNS = List.of("district", "city", "street");
+    private static final List<String> ADDRESS_COLUMNS = List.of("district", "city", "street", "address_line2",
+            "postal_code");
 
     private final CustomerRepository customerRepository;
     private final CustomerService customerService;
@@ -119,6 +120,16 @@ public class CustomerImporter implements RowImporter {
                 }
             }
 
+            String second = row.text("phone_2");
+            if (second != null) {
+                String normalized = PhoneUtils.normalize(second);
+                if (!normalized.matches("^0\\d{9}$")) {
+                    errors.add(new RowError(n, "phone_2", "'" + second + "' isn't a 10-digit Sri Lankan number"));
+                } else if (phone != null && normalized.equals(PhoneUtils.normalize(phone))) {
+                    errors.add(new RowError(n, "phone_2", "must be different from phone"));
+                }
+            }
+
             String bookNo = row.text("book_no");
             if (bookNo != null) {
                 UUID self = existing.map(Customer::getId).orElse(null);
@@ -139,10 +150,7 @@ public class CustomerImporter implements RowImporter {
                 }
             } else {
                 created++;
-                ADDRESS_COLUMNS.forEach(col -> row.requiredText(col, errors));
-                if (row.text("last_name") == null) {
-                    errors.add(new RowError(n, "last_name", "is required for a new customer"));
-                }
+                row.requiredText("district", errors);
             }
 
             if (opening != null && opening.signum() != 0) {
@@ -167,6 +175,7 @@ public class CustomerImporter implements RowImporter {
         for (ImportRow row : rows) {
             CustomerRequest r = new CustomerRequest();
             r.setPhoneNumber(row.text("phone"));
+            r.setPhoneNumber2(row.text("phone_2"));
             r.setFirstName(row.text("first_name"));
             r.setLastName(row.text("last_name"));
             r.setEmail(row.text("email"));

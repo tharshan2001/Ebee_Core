@@ -14,6 +14,7 @@ public class CustomerResponse {
     private String firstName;
     private String lastName;
     private String phoneNumber;
+    private String phoneNumber2;
     private String email;
     private String bookNo;
     private String vatNumber;

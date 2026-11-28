@@ -12,12 +12,15 @@ public class CustomerRequest {
     @NotBlank(message = "First name is required")
     private String firstName;
 
-    @NotBlank(message = "Last name is required")
     private String lastName;
 
     @NotBlank(message = "Phone is required")
     @Pattern(regexp = "^0\\d{9}$", message = "Phone must be 10 digits starting with 0")
     private String phoneNumber;
+
+    /** Optional; null leaves it unchanged on update, "" removes it. */
+    @Pattern(regexp = "^$|^0\\d{9}$", message = "Phone 2 must be 10 digits starting with 0")
+    private String phoneNumber2;
 
     @Email(message = "Invalid email format")
     private String email;

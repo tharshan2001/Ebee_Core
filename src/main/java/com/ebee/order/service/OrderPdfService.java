@@ -184,13 +184,13 @@ public class OrderPdfService {
 
     private String formatAddress(String line1, String line2, String city, String postalCode,
                                   com.ebee.common.enums.District district, String country) {
-        StringBuilder sb = new StringBuilder(line1);
-        if (line2 != null) sb.append(", ").append(line2);
-        sb.append(", ").append(city);
-        if (postalCode != null) sb.append(" ").append(postalCode);
-        sb.append(", ").append(district.getDisplayName());
-        if (country != null) sb.append(", ").append(country);
-        return sb.toString();
+        // Only the district is required, so any other part may be missing.
+        String town = java.util.stream.Stream.of(city, postalCode)
+                .filter(v -> v != null && !v.isBlank())
+                .collect(java.util.stream.Collectors.joining(" "));
+        return java.util.stream.Stream.of(line1, line2, town, district != null ? district.getDisplayName() : null, country)
+                .filter(v -> v != null && !v.isBlank())
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private Map<String, Object> toMap(Object record) {

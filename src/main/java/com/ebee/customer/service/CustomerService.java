@@ -51,6 +51,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -139,8 +142,9 @@ public class CustomerService {
 
         Customer customer = Customer.builder()
                 .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .lastName(request.getLastName() != null ? request.getLastName() : "") // optional, never null
                 .phoneNumber(request.getPhoneNumber())
+                .phoneNumber2(secondPhone(request.getPhoneNumber2(), request.getPhoneNumber()))
                 .email(request.getEmail())
                 .bookNo(request.getBookNo())
                 .vatNumber(blankToNull(request.getVatNumber()))
@@ -179,6 +183,9 @@ public class CustomerService {
         }
         if (request.getPhoneNumber() != null) {
             customer.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getPhoneNumber2() != null) {
+            customer.setPhoneNumber2(secondPhone(request.getPhoneNumber2(), customer.getPhoneNumber()));
         }
         if (Boolean.TRUE.equals(request.getClearEmail())) {
             customer.setEmail(null);
@@ -309,10 +316,10 @@ public class CustomerService {
     private Address buildAddress(AddressRequest request, Customer customer) {
         Address.AddressBuilder builder = Address.builder()
                 .customer(customer)
-                .street(request.getStreet())
-                .addressLine2(request.getAddressLine2())
-                .city(request.getCity())
-                .postalCode(request.getPostalCode())
+                .street(blankToNull(request.getStreet()))
+                .addressLine2(blankToNull(request.getAddressLine2()))
+                .city(blankToNull(request.getCity()))
+                .postalCode(blankToNull(request.getPostalCode()))
                 .country(request.getCountry() != null ? request.getCountry() : "Sri Lanka");
 
         if (request.getDistrict() != null) {
@@ -323,13 +330,13 @@ public class CustomerService {
     }
 
     private void updateAddress(Address address, AddressRequest request) {
-        address.setStreet(request.getStreet());
-        address.setAddressLine2(request.getAddressLine2());
-        address.setCity(request.getCity());
+        address.setStreet(blankToNull(request.getStreet()));
+        address.setAddressLine2(blankToNull(request.getAddressLine2()));
+        address.setCity(blankToNull(request.getCity()));
         if (request.getDistrict() != null) {
             address.setDistrict(District.fromDisplayName(request.getDistrict()));
         }
-        address.setPostalCode(request.getPostalCode());
+        address.setPostalCode(blankToNull(request.getPostalCode()));
         address.setCountry(request.getCountry() != null ? request.getCountry() : "Sri Lanka");
     }
 
@@ -351,14 +358,10 @@ public class CustomerService {
     }
 
     private String formatAddressBlock(Address a) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(a.getStreet());
-        if (a.getAddressLine2() != null) sb.append("\n").append(a.getAddressLine2());
-        sb.append("\n").append(a.getCity());
-        if (a.getPostalCode() != null) sb.append(" ").append(a.getPostalCode());
-        sb.append("\n").append(a.getDistrict().getDisplayName());
-        if (a.getCountry() != null) sb.append("\n").append(a.getCountry());
-        return sb.toString();
+        String town = Stream.of(a.getCity(), a.getPostalCode()).filter(Objects::nonNull).collect(Collectors.joining(" "));
+        return Stream.of(a.getStreet(), a.getAddressLine2(), town, a.getDistrict().getDisplayName(), a.getCountry())
+                .filter(line -> line != null && !line.isEmpty())
+                .collect(Collectors.joining("\n"));
     }
 
     private String generateCustomerCode(CustomerRequest request) {
@@ -380,6 +383,7 @@ public class CustomerService {
         response.setFirstName(customer.getFirstName());
         response.setLastName(customer.getLastName());
         response.setPhoneNumber(customer.getPhoneNumber());
+        response.setPhoneNumber2(customer.getPhoneNumber2());
         response.setEmail(customer.getEmail());
         response.setBookNo(customer.getBookNo());
         response.setVatNumber(customer.getVatNumber());
@@ -404,6 +408,17 @@ public class CustomerService {
         response.setCreatedAt(customer.getCreatedAt());
         response.setUpdatedAt(customer.getUpdatedAt());
         return response;
+    }
+
+    private static String secondPhone(String value, String primary) {
+        if (blankToNull(value) == null) {
+            return null;
+        }
+        String phone = PhoneUtils.normalize(value);
+        if (phone.equals(primary)) {
+            throw new IllegalArgumentException("Phone 2 must be different from the main phone number");
+        }
+        return phone;
     }
 
     private static String blankToNull(String v) {

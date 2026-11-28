@@ -326,4 +326,22 @@ class ImportersTest {
         assertThat(messages(errors)).anyMatch(m -> m.startsWith("vat: '2'"))
                 .anyMatch(m -> m.startsWith("vat_rate") && m.contains("vat is 0"));
     }
+
+    @Test
+    void theTemplatesExampleRow_isRecognised_evenFromAnOlderTemplate_butAnEditedRowIsNot() {
+        assertThat(ImportType.PRODUCTS.isSampleRow(row(2, "item_code", "SKU-001", "name", "Coconut oil 1L",
+                "category", "Grocery", "price", "1250", "brand", "Kandy Gold", "vat_rate", "VAT 18%"))).isTrue();
+        assertThat(ImportType.PRODUCTS.isSampleRow(row(2, "name", "Baloon Red", "category", "Grocery",
+                "price", "1250.00", "brand", "Kandy Gold"))).isFalse();
+        for (ImportType type : ImportType.values()) {
+            String[] lines = type.templateCsv().split("\\n");
+            String[] headers = lines[0].split(",");
+            String[] cells = lines[1].split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+            Map<String, String> values = new LinkedHashMap<>();
+            for (int i = 0; i < headers.length; i++) {
+                values.put(headers[i], cells[i].replace("\"", ""));
+            }
+            assertThat(type.isSampleRow(new ImportRow(2, values))).as(type.name()).isTrue();
+        }
+    }
 }

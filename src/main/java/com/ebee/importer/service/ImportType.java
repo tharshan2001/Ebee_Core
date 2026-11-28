@@ -49,6 +49,41 @@ public enum ImportType {
                 + String.join(",", sampleRow.stream().map(v -> v.contains(",") ? "\"" + v + "\"" : v).toList()) + "\n";
     }
 
+    /** Columns that differ between template versions or are often changed alone, so they aren't compared. */
+    private static final java.util.Set<String> NOT_COMPARED = java.util.Set.of("item_code", "vat", "vat_rate");
+
+    /**
+     * True when the row is the template's example, left as downloaded (older templates included):
+     * every filled cell that is compared matches it.
+     */
+    public boolean isSampleRow(ImportRow row) {
+        List<String> columns = allColumns();
+        int matched = 0;
+        for (int i = 0; i < columns.size(); i++) {
+            String value = row.text(columns.get(i));
+            if (value == null || NOT_COMPARED.contains(columns.get(i))) {
+                continue;
+            }
+            if (!sameValue(value, sampleRow.get(i))) {
+                return false;
+            }
+            matched++;
+        }
+        return matched >= 3;
+    }
+
+    private static boolean sameValue(String typed, String sample) {
+        if (typed.equalsIgnoreCase(sample)) {
+            return true;
+        }
+        try {
+            // A spreadsheet rewrites 1250.00 as 1250.
+            return new java.math.BigDecimal(typed).compareTo(new java.math.BigDecimal(sample)) == 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     public static ImportType fromPath(String value) {
         return ImportType.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_'));
     }
